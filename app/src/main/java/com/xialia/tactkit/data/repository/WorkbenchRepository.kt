@@ -10,6 +10,7 @@ import com.xialia.tactkit.data.model.WorkbenchCardEntity
 import com.xialia.tactkit.data.model.WorkbenchCardType
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.QuickLookFileInspection
+import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -103,6 +104,28 @@ class WorkbenchRepository(
     )
   }
 
+  suspend fun createVoiceMemo(
+    title: String,
+    audioFilePath: String,
+    durationMs: Long,
+    note: String = "",
+  ): Long {
+    val cleanTitle = title.trim().ifEmpty { "语音备忘录" }
+    val now = System.currentTimeMillis()
+    return dao.insertCard(
+      WorkbenchCardEntity(
+        type = WorkbenchCardType.VOICE_MEMO.name,
+        title = cleanTitle,
+        content = note,
+        mimeType = "audio/mp4",
+        audioDurationMs = durationMs,
+        audioFilePath = audioFilePath,
+        createdAt = now,
+        updatedAt = now,
+      )
+    )
+  }
+
   suspend fun importLocalFile(uri: Uri): Long {
     val context = requireNotNull(appContext) { "Context is required to inspect SAF Uri" }
     try {
@@ -142,6 +165,10 @@ class WorkbenchRepository(
   }
 
   suspend fun deleteCard(cardId: Long) {
+    val entity = dao.getCardById(cardId)
+    if (entity?.audioFilePath != null) {
+      runCatching { File(entity.audioFilePath).delete() }
+    }
     dao.deleteCardById(cardId)
   }
 
@@ -169,6 +196,17 @@ class WorkbenchRepository(
           id = id,
           title = title,
           markdownContent = content,
+          pinned = pinned,
+          createdAt = createdAt,
+          updatedAt = updatedAt,
+        )
+      WorkbenchCardType.VOICE_MEMO.name ->
+        WorkbenchCard.VoiceMemo(
+          id = id,
+          title = title,
+          transcriptOrNote = content,
+          audioFilePath = audioFilePath.orEmpty(),
+          durationMs = audioDurationMs,
           pinned = pinned,
           createdAt = createdAt,
           updatedAt = updatedAt,

@@ -10,6 +10,8 @@ import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.data.repository.WorkbenchRepository
+import com.xialia.tactkit.engine.AudioPlaybackState
+import com.xialia.tactkit.engine.VoiceMemoManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +23,7 @@ enum class CardFilter(val label: String) {
   ALL("全部"),
   CHECKLIST("清单"),
   NOTE("便签"),
+  VOICE_MEMO("语音"),
   RECENT_FILE("文件"),
 }
 
@@ -28,6 +31,7 @@ data class HomeUiState(
   val cards: List<WorkbenchCard> = emptyList(),
   val totalChecklists: Int = 0,
   val totalNotes: Int = 0,
+  val totalVoiceMemos: Int = 0,
   val totalFiles: Int = 0,
   val searchQuery: String = "",
   val activeFilter: CardFilter = CardFilter.ALL,
@@ -42,6 +46,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   private val workbenchRepository =
     WorkbenchRepository(database.workbenchCardDao(), application.applicationContext)
   private val settingsRepository = SettingsRepository(application.applicationContext)
+  val voiceMemoManager = VoiceMemoManager(application.applicationContext)
+
+  val audioPlaybackState: StateFlow<AudioPlaybackState> = voiceMemoManager.playbackState
 
   private val searchQuery = MutableStateFlow("")
   private val activeFilter = MutableStateFlow(CardFilter.ALL)
@@ -67,6 +74,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         val checklistCount = allCards.count { it is WorkbenchCard.Checklist }
         val noteCount = allCards.count { it is WorkbenchCard.Note }
+        val voiceCount = allCards.count { it is WorkbenchCard.VoiceMemo }
         val fileCount = allCards.count { it is WorkbenchCard.RecentFile }
 
         val normalizedQuery = query.trim().lowercase()
@@ -77,6 +85,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 CardFilter.ALL -> true
                 CardFilter.CHECKLIST -> card is WorkbenchCard.Checklist
                 CardFilter.NOTE -> card is WorkbenchCard.Note
+                CardFilter.VOICE_MEMO -> card is WorkbenchCard.VoiceMemo
                 CardFilter.RECENT_FILE -> card is WorkbenchCard.RecentFile
               }
             val matchesQuery =
@@ -87,6 +96,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     card.items.any { it.text.lowercase().contains(normalizedQuery) }
                   is WorkbenchCard.Note ->
                     card.markdownContent.lowercase().contains(normalizedQuery)
+                  is WorkbenchCard.VoiceMemo ->
+                    card.transcriptOrNote.lowercase().contains(normalizedQuery)
                   is WorkbenchCard.RecentFile ->
                     card.fileName.lowercase().contains(normalizedQuery) ||
                       card.mimeType.lowercase().contains(normalizedQuery)
@@ -98,6 +109,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
           cards = filtered,
           totalChecklists = checklistCount,
           totalNotes = noteCount,
+          totalVoiceMemos = voiceCount,
           totalFiles = fileCount,
           searchQuery = query,
           activeFilter = filter,
@@ -148,11 +160,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch { workbenchRepository.updateNote(cardId, title, content) }
   }
 
+  fun createVoiceMemo(title: String, filePath: String, durationMs: Long, note: String) {
+    viewModelScope.launch {
+      workbenchRepository.createVoiceMemo(title, filePath, durationMs, note)
+    }
+  }
+
+  fun toggleVoiceMemoPlayback(card: WorkbenchCard.VoiceMemo) {
+    voiceMemoManager.togglePlayback(card.id, card.audioFilePath)
+  }
+
+  fun seekVoiceMemo(cardId: Long, positionMs: Long) {
+    voiceMemoManager.seekTo(cardId, positionMs)
+  }
+
   fun togglePinCard(cardId: Long) {
     viewModelScope.launch { workbenchRepository.togglePinCard(cardId) }
   }
 
   fun deleteCard(cardId: Long) {
+    if (audioPlaybackState.value.playingCardId == cardId) {
+      voiceMemoManager.stopPlayback()
+    }
     viewModelScope.launch { workbenchRepository.deleteCard(cardId) }
   }
 
@@ -184,5 +213,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
   fun setLiquidGlassPowerSave(enabled: Boolean) {
     viewModelScope.launch { settingsRepository.setLiquidGlassPowerSave(enabled) }
+  }
+
+  fun saveAiSettings(baseUrl: String, model: String, plainApiKey: String?) {
+    viewModelScope.launch {
+      runCatching { settingsRepository.saveAiSettings(baseUrl, model, plainApiKey) }
+        .onSuccess { statusMessage.value = "AI 中枢配置已加密保存至 Keystore" }
+        .onFailure { statusMessage.value = "保存 AI 配置失败：${it.message}" }
+    }
+  }
+
+  fun clearAiApiKey() {
+    viewModelScope.launch {
+      settingsRepository.clearAiApiKey()
+      statusMessage.value = "已清除本地加密 API Key"
+    }
+  }
+
+  suspend fun getDecryptedAiApiKey(): String = settingsRepository.getDecryptedAiApiKey()
+
+  override fun onCleared() {
+    voiceMemoManager.stopPlayback()
+    voiceMemoManager.cancelRecording()
+    super.onCleared()
   }
 }

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +16,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,13 +33,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Preview
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +57,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,9 +66,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -74,7 +86,8 @@ import com.xialia.tactkit.data.TactKitDatabase
 import com.xialia.tactkit.data.datastore.SettingsRepository
 import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.repository.WorkbenchRepository
-import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.engine.PdfEngine
+import com.xialia.tactkit.ui.components.MarkdownRenderer
 import com.xialia.tactkit.ui.theme.TactKitTheme
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.QuickLookFileInspection
@@ -83,8 +96,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Floating translucent Quick Look overlay Activity triggered via ACTION_VIEW / ACTION_SEND.
- * Inspects metadata, computes streaming SHA-256, previews text/code/images, and optionally
- * bookmarks the file into TactKit's local Room workbench without leaving the caller app.
+ * Inspects metadata, computes streaming SHA-256, previews Markdown/code/images/PDFs, and
+ * optionally bookmarks the file into TactKit's local Room workbench without leaving the caller app.
  */
 class QuickLookActivity : ComponentActivity() {
 
@@ -144,7 +157,7 @@ private fun QuickLookOverlayScreen(
   onCopyText: (String, String) -> Unit,
   onClose: () -> Unit,
 ) {
-  val context = androidx.compose.ui.platform.LocalContext.current
+  val context = LocalContext.current
   val haptics = rememberAppHaptics()
   val scope = rememberCoroutineScope()
 
@@ -153,13 +166,30 @@ private fun QuickLookOverlayScreen(
   var errorText by remember { mutableStateOf<String?>(null) }
   var savedToDesktop by remember { mutableStateOf(false) }
 
+  // Multi-page PDF preview state inside Quick Look
+  var pdfPageCount by remember { mutableIntStateOf(0) }
+  var pdfPageIndex by remember { mutableIntStateOf(0) }
+  var pdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
+  var pdfZoom by remember { mutableFloatStateOf(1f) }
+  var pdfPan by remember { mutableStateOf(Offset.Zero) }
+
   LaunchedEffect(intent) {
     isLoading = true
     errorText = null
+    pdfPageCount = 0
+    pdfPageIndex = 0
+    pdfBitmap = null
     try {
       val uri = extractIncomingUri(intent)
       if (uri != null) {
-        inspection = FileInspectionHelper.inspectUri(context.contentResolver, uri)
+        val result = FileInspectionHelper.inspectUri(context.contentResolver, uri)
+        inspection = result
+        if (result.mimeType == "application/pdf") {
+          pdfPageCount = PdfEngine.getPageCount(context, uri)
+          if (pdfPageCount > 0) {
+            pdfBitmap = PdfEngine.renderPageBitmap(context, uri, 0, targetWidthPx = 1080)
+          }
+        }
       } else {
         val sharedText = intent?.getStringExtra(Intent.EXTRA_TEXT)
         if (!sharedText.isNullOrEmpty()) {
@@ -186,11 +216,24 @@ private fun QuickLookOverlayScreen(
     }
   }
 
+  LaunchedEffect(inspection?.uriString, pdfPageIndex) {
+    val data = inspection ?: return@LaunchedEffect
+    val uriStr = data.uriString ?: return@LaunchedEffect
+    if (data.mimeType == "application/pdf" && pdfPageCount > 0) {
+      pdfZoom = 1f
+      pdfPan = Offset.Zero
+      pdfBitmap =
+        runCatching {
+          PdfEngine.renderPageBitmap(context, Uri.parse(uriStr), pdfPageIndex, targetWidthPx = 1080)
+        }.getOrNull()
+    }
+  }
+
   Box(
     contentAlignment = Alignment.Center,
     modifier =
       Modifier.fillMaxSize()
-        .background(Color.Black.copy(alpha = 0.25f))
+        .background(Color.Black.copy(alpha = 0.28f))
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
           indication = null,
@@ -202,18 +245,18 @@ private fun QuickLookOverlayScreen(
   ) {
     Surface(
       shape = ContinuousRoundedRectangle(28.dp),
-      color = MaterialTheme.colorScheme.surface,
+      color = MaterialTheme.colorScheme.surfaceContainerLowest,
       tonalElevation = 8.dp,
       shadowElevation = 16.dp,
       border =
         BorderStroke(
           width = 1.dp,
-          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
         ),
       modifier =
-        Modifier.widthIn(max = 520.dp)
+        Modifier.widthIn(max = 540.dp)
           .fillMaxWidth()
-          .heightIn(max = 680.dp)
+          .heightIn(max = 720.dp)
           .clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -302,7 +345,6 @@ private fun QuickLookOverlayScreen(
         } else {
           val data = inspection ?: return@Column
 
-          // File Name & Metadata Badges
           Text(
             text = data.fileName,
             style = MaterialTheme.typography.titleLarge,
@@ -317,7 +359,7 @@ private fun QuickLookOverlayScreen(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Surface(
-              color = MaterialTheme.colorScheme.surfaceVariant,
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
               shape = ContinuousRoundedRectangle(10.dp),
             ) {
               Text(
@@ -327,7 +369,7 @@ private fun QuickLookOverlayScreen(
               )
             }
             Surface(
-              color = MaterialTheme.colorScheme.surfaceVariant,
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
               shape = ContinuousRoundedRectangle(10.dp),
             ) {
               Text(
@@ -340,9 +382,8 @@ private fun QuickLookOverlayScreen(
             }
           }
 
-          // Streaming SHA-256 Digest Card
           Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             shape = ContinuousRoundedRectangle(16.dp),
             modifier = Modifier.fillMaxWidth(),
           ) {
@@ -385,6 +426,94 @@ private fun QuickLookOverlayScreen(
             }
           }
 
+          // Multi-page PDF preview (if PDF)
+          if (data.mimeType == "application/pdf" && pdfPageCount > 0) {
+            Surface(
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
+              shape = ContinuousRoundedRectangle(18.dp),
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(12.dp),
+              ) {
+                Row(
+                  verticalAlignment = Alignment.CenterVertically,
+                  modifier = Modifier.fillMaxWidth(),
+                ) {
+                  Icon(
+                    imageVector = Icons.Rounded.PictureAsPdf,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                  )
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "PDF 双指缩放预览 · 第 ${pdfPageIndex + 1} / $pdfPageCount 页",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
+                  )
+                  IconButton(
+                    enabled = pdfPageIndex > 0,
+                    onClick = {
+                      haptics.tick()
+                      pdfPageIndex--
+                    },
+                  ) {
+                    Icon(
+                      Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                      contentDescription = "上一页",
+                    )
+                  }
+                  IconButton(
+                    enabled = pdfPageIndex + 1 < pdfPageCount,
+                    onClick = {
+                      haptics.tick()
+                      pdfPageIndex++
+                    },
+                  ) {
+                    Icon(
+                      Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                      contentDescription = "下一页",
+                    )
+                  }
+                }
+
+                pdfBitmap?.let { bmp ->
+                  Box(
+                    contentAlignment = Alignment.Center,
+                    modifier =
+                      Modifier.fillMaxWidth()
+                        .height(280.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color.White)
+                        .pointerInput(pdfPageIndex) {
+                          detectTransformGestures { _, pan, zoom, _ ->
+                            val nextScale = (pdfZoom * zoom).coerceIn(1f, 3.5f)
+                            pdfZoom = nextScale
+                            pdfPan =
+                              if (nextScale > 1.05f) pdfPan + pan else Offset.Zero
+                          }
+                        },
+                  ) {
+                    Image(
+                      bitmap = bmp.asImageBitmap(),
+                      contentDescription = "PDF 第 ${pdfPageIndex + 1} 页",
+                      contentScale = ContentScale.Fit,
+                      modifier =
+                        Modifier.fillMaxSize().graphicsLayer {
+                          scaleX = pdfZoom
+                          scaleY = pdfZoom
+                          translationX = pdfPan.x
+                          translationY = pdfPan.y
+                        },
+                    )
+                  }
+                }
+              }
+            }
+          }
+
           // Optional Image Thumbnail Preview
           data.imagePreview?.let { bitmap ->
             Image(
@@ -398,16 +527,11 @@ private fun QuickLookOverlayScreen(
             )
           }
 
-          // Optional Pure Text / Markdown / Code Preview
+          // Optional Rich Markdown / Code Preview
           data.textPreview?.let { preview ->
             Surface(
-              color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
               shape = ContinuousRoundedRectangle(16.dp),
-              border =
-                BorderStroke(
-                  width = 1.dp,
-                  color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-                ),
               modifier = Modifier.fillMaxWidth(),
             ) {
               Column(modifier = Modifier.padding(12.dp)) {
@@ -423,7 +547,7 @@ private fun QuickLookOverlayScreen(
                   )
                   Spacer(modifier = Modifier.width(6.dp))
                   Text(
-                    text = if (data.isTextTruncated) "内容预览（前 32 KB）" else "内容预览",
+                    text = if (data.isTextTruncated) "Markdown 预览（前 32 KB）" else "Markdown 预览",
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.weight(1f),
                   )
@@ -445,14 +569,9 @@ private fun QuickLookOverlayScreen(
                   }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                  text = preview,
-                  style = MaterialTheme.typography.bodySmall.copy(fontFamily = TactKitMono),
-                  color = MaterialTheme.colorScheme.onSurface,
-                  maxLines = 14,
-                  overflow = TextOverflow.Ellipsis,
-                  modifier = Modifier.testTag("quick_look_text_preview"),
-                )
+                Box(modifier = Modifier.testTag("quick_look_text_preview")) {
+                  MarkdownRenderer(markdown = preview, compact = false)
+                }
               }
             }
           }

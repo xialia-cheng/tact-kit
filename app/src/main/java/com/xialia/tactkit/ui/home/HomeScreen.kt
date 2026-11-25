@@ -5,8 +5,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -32,9 +33,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AddTask
+import androidx.compose.material.icons.rounded.AudioFile
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.HideImage
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
@@ -71,6 +77,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.capsule.ContinuousCapsule
@@ -78,16 +85,28 @@ import com.xialia.tactkit.BuildConfig
 import com.xialia.tactkit.R
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.engine.AudioPlaybackState
+import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.components.LiquidGlassToolBallOverlay
+import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 
+private data class QuickStripEntry(
+  val id: String,
+  val label: String,
+  val icon: ImageVector,
+  val onClick: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
   uiState: HomeUiState,
+  audioPlaybackState: AudioPlaybackState,
+  voiceMemoManager: VoiceMemoManager,
   onSearchQueryChange: (String) -> Unit,
   onFilterChange: (CardFilter) -> Unit,
   onCreateChecklist: (String, List<String>) -> Unit,
@@ -96,12 +115,20 @@ fun HomeScreen(
   onDeleteChecklistItem: (Long, String) -> Unit,
   onCreateNote: (String, String) -> Unit,
   onUpdateNote: (Long, String, String) -> Unit,
+  onCreateVoiceMemo: (String, String, Long, String) -> Unit,
+  onToggleVoiceMemoPlay: (WorkbenchCard.VoiceMemo) -> Unit,
+  onSeekVoiceMemo: (Long, Long) -> Unit,
   onTogglePinCard: (Long) -> Unit,
   onDeleteCard: (Long) -> Unit,
   onImportLocalFile: (Uri) -> Unit,
   onTogglePinTool: (String) -> Unit,
   onClearStatusMessage: () -> Unit,
   onNavigateToSettings: () -> Unit,
+  onOpenPdfToolkit: (String?) -> Unit,
+  onOpenPdfAnnotate: (String?) -> Unit,
+  onOpenImageToolkit: (String?) -> Unit,
+  onOpenMediaWorkshop: (String?) -> Unit,
+  onOpenAiHub: (String) -> Unit,
 ) {
   val context = LocalContext.current
   val haptics = rememberAppHaptics()
@@ -111,6 +138,7 @@ fun HomeScreen(
   var showCreateChecklistDialog by remember { mutableStateOf(false) }
   var editingNote by remember { mutableStateOf<WorkbenchCard.Note?>(null) }
   var showCreateNoteDialog by remember { mutableStateOf(false) }
+  var showVoiceMemoDialog by remember { mutableStateOf(false) }
 
   val safImportLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -141,13 +169,14 @@ fun HomeScreen(
     }
   }
 
-  val surfaceBg = MaterialTheme.colorScheme.surfaceContainerLow
-  val backdrop = rememberLayerBackdrop { drawRect(surfaceBg) }
+  val bodySurfaceBg = MaterialTheme.colorScheme.surfaceContainerLowest
+  val topBarSurfaceBg = MaterialTheme.colorScheme.surfaceContainer
+  val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
+  val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
 
   Box(modifier = Modifier.fillMaxSize()) {
-    // Clean flat M3 Expressive surface layer captured for Liquid Glass
     Box(
-      modifier = Modifier.fillMaxSize().layerBackdrop(backdrop).background(surfaceBg),
+      modifier = Modifier.fillMaxSize().layerBackdrop(backdrop).background(bodySurfaceBg),
     ) {
       Scaffold(
         containerColor = Color.Transparent,
@@ -155,7 +184,11 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
           TopAppBar(
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+            colors =
+              TopAppBarDefaults.topAppBarColors(
+                containerColor = topBarSurfaceBg,
+                scrolledContainerColor = topBarSurfaceBg,
+              ),
             title = {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -163,21 +196,28 @@ fun HomeScreen(
               ) {
                 Text(
                   text = "简工坊",
-                  style = MaterialTheme.typography.headlineSmall,
-                  fontWeight = FontWeight.Bold,
-                  color = MaterialTheme.colorScheme.onBackground,
+                  fontSize = 30.sp,
+                  lineHeight = 36.sp,
+                  fontWeight = FontWeight.ExtraBold,
+                  color = MaterialTheme.colorScheme.onSurface,
                 )
                 Surface(
-                  color = MaterialTheme.colorScheme.primaryContainer,
+                  color = if (isDark) Color(0xFF2D3240) else Color(0xFF1C1F27),
                   shape = ContinuousCapsule(),
                 ) {
                   Text(
-                    text = "v${BuildConfig.VERSION_NAME} ✨",
+                    text = "v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                   )
                 }
+                Text(
+                  text = "✨",
+                  fontSize = 15.sp,
+                  color = Color(0xFFD99B26),
+                )
               }
             },
             actions = {
@@ -222,7 +262,7 @@ fun HomeScreen(
             OutlinedTextField(
               value = uiState.searchQuery,
               onValueChange = onSearchQueryChange,
-              placeholder = { Text("搜索标题、清单项、便签或文件名...") },
+              placeholder = { Text("搜索标题、清单项、便签、语音或文件名...") },
               leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
               trailingIcon = {
                 if (uiState.searchQuery.isNotEmpty()) {
@@ -238,7 +278,7 @@ fun HomeScreen(
               shape = RoundedCornerShape(16.dp),
               modifier =
                 Modifier.fillMaxWidth()
-                  .padding(horizontal = 16.dp, vertical = 6.dp)
+                  .padding(horizontal = 16.dp, vertical = 8.dp)
                   .testTag("home_search_input"),
             )
           }
@@ -251,22 +291,62 @@ fun HomeScreen(
             haptics.tick()
             showCreateNoteDialog = true
           }
+          val openVoiceMemoCreator = {
+            haptics.tick()
+            showVoiceMemoDialog = true
+          }
           val openFileImporter = {
             haptics.tick()
             safImportLauncher.launch(arrayOf("*/*"))
           }
-          val openQuickLook: (WorkbenchCard.RecentFile) -> Unit = { fileCard ->
+          val openRecentFile: (WorkbenchCard.RecentFile) -> Unit = { fileCard ->
             val uriStr = fileCard.fileUri
             if (uriStr != null) {
-              val intent =
-                Intent(context, QuickLookActivity::class.java).apply {
-                  action = Intent.ACTION_VIEW
-                  data = Uri.parse(uriStr)
-                  addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+              when {
+                fileCard.mimeType == "application/pdf" -> onOpenPdfToolkit(uriStr)
+                fileCard.mimeType.startsWith("image/") -> onOpenImageToolkit(uriStr)
+                fileCard.mimeType.startsWith("video/") || fileCard.mimeType.startsWith("audio/") ->
+                  onOpenMediaWorkshop(uriStr)
+                else -> {
+                  val intent =
+                    Intent(context, QuickLookActivity::class.java).apply {
+                      action = Intent.ACTION_VIEW
+                      data = Uri.parse(uriStr)
+                      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                  context.startActivity(intent)
                 }
-              context.startActivity(intent)
+              }
             }
           }
+
+          val quickStripEntries =
+            remember {
+              listOf(
+                QuickStripEntry("strip_pdf", "PDF 工具", Icons.Rounded.PictureAsPdf) {
+                  haptics.tick()
+                  onOpenPdfToolkit(null)
+                },
+                QuickStripEntry("strip_img", "图片隐私", Icons.Rounded.HideImage) {
+                  haptics.tick()
+                  onOpenImageToolkit(null)
+                },
+                QuickStripEntry("strip_ai", "AI 提取", Icons.Rounded.AutoAwesome) {
+                  haptics.tick()
+                  onOpenAiHub("VISION")
+                },
+                QuickStripEntry("strip_note", "新建便签", Icons.Rounded.EditNote) {
+                  openNoteCreator()
+                },
+                QuickStripEntry("strip_voice", "语音备忘", Icons.Rounded.Mic) {
+                  openVoiceMemoCreator()
+                },
+                QuickStripEntry("strip_media", "音视频", Icons.Rounded.AudioFile) {
+                  haptics.tick()
+                  onOpenMediaWorkshop(null)
+                },
+              )
+            }
 
           BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val isWide = maxWidth >= 640.dp
@@ -275,11 +355,14 @@ fun HomeScreen(
               LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding =
-                  PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 96.dp),
+                  PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
               ) {
+                item(span = { GridItemSpan(2) }, key = "quick_strip") {
+                  QuickActionStrip(entries = quickStripEntries)
+                }
                 item(span = { GridItemSpan(2) }, key = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
@@ -297,6 +380,7 @@ fun HomeScreen(
                         uiState.searchQuery.isNotBlank() || uiState.activeFilter != CardFilter.ALL,
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
+                      onCreateVoiceMemo = openVoiceMemoCreator,
                       onImportFile = openFileImporter,
                       onResetFilter = {
                         haptics.tick()
@@ -309,11 +393,14 @@ fun HomeScreen(
                   items(uiState.cards, key = { it.id }) { card ->
                     WorkbenchCardView(
                       card = card,
+                      audioPlaybackState = audioPlaybackState,
                       onToggleChecklistItem = onToggleChecklistItem,
                       onAddChecklistItem = onAddChecklistItem,
                       onDeleteChecklistItem = onDeleteChecklistItem,
                       onEditNote = { editingNote = it },
-                      onOpenFileQuickLook = openQuickLook,
+                      onOpenRecentFile = openRecentFile,
+                      onToggleVoiceMemoPlay = onToggleVoiceMemoPlay,
+                      onSeekVoiceMemo = onSeekVoiceMemo,
                       onTogglePin = onTogglePinCard,
                       onDeleteCard = onDeleteCard,
                     )
@@ -322,6 +409,7 @@ fun HomeScreen(
                     QuickCreateListSection(
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
+                      onCreateVoiceMemo = openVoiceMemoCreator,
                       onImportFile = openFileImporter,
                     )
                   }
@@ -330,10 +418,13 @@ fun HomeScreen(
             } else {
               LazyColumn(
                 contentPadding =
-                  PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 96.dp),
+                  PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
               ) {
+                item(key = "quick_strip") {
+                  QuickActionStrip(entries = quickStripEntries)
+                }
                 item(key = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
@@ -351,6 +442,7 @@ fun HomeScreen(
                         uiState.searchQuery.isNotBlank() || uiState.activeFilter != CardFilter.ALL,
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
+                      onCreateVoiceMemo = openVoiceMemoCreator,
                       onImportFile = openFileImporter,
                       onResetFilter = {
                         haptics.tick()
@@ -363,11 +455,14 @@ fun HomeScreen(
                   items(uiState.cards, key = { it.id }) { card ->
                     WorkbenchCardView(
                       card = card,
+                      audioPlaybackState = audioPlaybackState,
                       onToggleChecklistItem = onToggleChecklistItem,
                       onAddChecklistItem = onAddChecklistItem,
                       onDeleteChecklistItem = onDeleteChecklistItem,
                       onEditNote = { editingNote = it },
-                      onOpenFileQuickLook = openQuickLook,
+                      onOpenRecentFile = openRecentFile,
+                      onToggleVoiceMemoPlay = onToggleVoiceMemoPlay,
+                      onSeekVoiceMemo = onSeekVoiceMemo,
                       onTogglePin = onTogglePinCard,
                       onDeleteCard = onDeleteCard,
                     )
@@ -376,6 +471,7 @@ fun HomeScreen(
                     QuickCreateListSection(
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
+                      onCreateVoiceMemo = openVoiceMemoCreator,
                       onImportFile = openFileImporter,
                     )
                   }
@@ -396,7 +492,13 @@ fun HomeScreen(
         when (tool.id) {
           "quick_note" -> showCreateNoteDialog = true
           "quick_checklist" -> showCreateChecklistDialog = true
+          "voice_memo" -> showVoiceMemoDialog = true
           "quick_look" -> quickLookLauncher.launch(arrayOf("*/*"))
+          "ai_hub" -> onOpenAiHub("VISION")
+          "pdf_toolkit" -> onOpenPdfToolkit(null)
+          "pdf_annotate" -> onOpenPdfAnnotate(null)
+          "image_privacy" -> onOpenImageToolkit(null)
+          "media_extractor" -> onOpenMediaWorkshop(null)
         }
       },
       onTogglePinTool = onTogglePinTool,
@@ -436,6 +538,55 @@ fun HomeScreen(
       },
     )
   }
+
+  if (showVoiceMemoDialog) {
+    VoiceMemoDialog(
+      voiceMemoManager = voiceMemoManager,
+      onDismiss = { showVoiceMemoDialog = false },
+      onSaveMemo = { title, filePath, durationMs, note ->
+        onCreateVoiceMemo(title, filePath, durationMs, note)
+        showVoiceMemoDialog = false
+      },
+    )
+  }
+}
+
+@Composable
+private fun QuickActionStrip(entries: List<QuickStripEntry>) {
+  LazyRow(
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    modifier = Modifier.fillMaxWidth().testTag("quick_action_strip"),
+  ) {
+    items(entries, key = { it.id }) { entry ->
+      Surface(
+        onClick = entry.onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = Modifier.testTag(entry.id),
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(7.dp),
+          modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+        ) {
+          Icon(
+            imageVector = entry.icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+          )
+          Text(
+            text = entry.label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
+        }
+      }
+    }
+  }
 }
 
 @Composable
@@ -444,17 +595,12 @@ private fun WorkbenchOverviewSection(
   onFilterChange: (CardFilter) -> Unit,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    // Overview Card
+    // Borderless tonal overview card (no inner boxes around stat numbers)
     Surface(
       shape = RoundedCornerShape(22.dp),
-      color = MaterialTheme.colorScheme.surface,
+      color = MaterialTheme.colorScheme.surfaceContainerLow,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp,
-      border =
-        BorderStroke(
-          width = 1.dp,
-          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-        ),
       modifier = Modifier.fillMaxWidth().testTag("workbench_overview_card"),
     ) {
       Column(
@@ -473,7 +619,7 @@ private fun WorkbenchOverviewSection(
             color = MaterialTheme.colorScheme.onSurface,
           )
           Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             shape = ContinuousCapsule(),
           ) {
             Row(
@@ -496,8 +642,9 @@ private fun WorkbenchOverviewSection(
           }
         }
 
+        // Flat unboxed stats row
         Row(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          horizontalArrangement = Arrangement.SpaceEvenly,
           modifier = Modifier.fillMaxWidth(),
         ) {
           OverviewStatTile(
@@ -511,6 +658,11 @@ private fun WorkbenchOverviewSection(
             modifier = Modifier.weight(1f),
           )
           OverviewStatTile(
+            count = uiState.totalVoiceMemos,
+            label = "语音",
+            modifier = Modifier.weight(1f),
+          )
+          OverviewStatTile(
             count = uiState.totalFiles,
             label = "文件",
             modifier = Modifier.weight(1f),
@@ -519,7 +671,7 @@ private fun WorkbenchOverviewSection(
       }
     }
 
-    // Aligned Filter Tabs (flush with 16.dp list margin)
+    // Aligned borderless tonal filter tabs
     Row(
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       modifier = Modifier.fillMaxWidth(),
@@ -533,18 +685,8 @@ private fun WorkbenchOverviewSection(
             if (selected) {
               MaterialTheme.colorScheme.primaryContainer
             } else {
-              MaterialTheme.colorScheme.surface
+              MaterialTheme.colorScheme.surfaceContainerLow
             },
-          border =
-            BorderStroke(
-              width = 1.dp,
-              color =
-                if (selected) {
-                  MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                } else {
-                  MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                },
-            ),
           modifier = Modifier.weight(1f).testTag("filter_chip_${filter.name}"),
         ) {
           Text(
@@ -574,28 +716,22 @@ private fun OverviewStatTile(
   label: String,
   modifier: Modifier = Modifier,
 ) {
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant,
-    modifier = modifier,
+  Column(
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(2.dp),
+    modifier = modifier.padding(vertical = 4.dp, horizontal = 4.dp),
   ) {
-    Column(
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(2.dp),
-      modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
-    ) {
-      Text(
-        text = "$count",
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
-      Text(
-        text = label,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
+    Text(
+      text = "$count",
+      style = MaterialTheme.typography.headlineSmall,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.onSurface,
+    )
+    Text(
+      text = label,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
@@ -604,6 +740,7 @@ private fun EmptyQuickActionsSection(
   hasSearchOrFilter: Boolean,
   onCreateChecklist: () -> Unit,
   onCreateNote: () -> Unit,
+  onCreateVoiceMemo: () -> Unit,
   onImportFile: () -> Unit,
   onResetFilter: () -> Unit,
 ) {
@@ -614,12 +751,7 @@ private fun EmptyQuickActionsSection(
     if (hasSearchOrFilter) {
       Surface(
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border =
-          BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-          ),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
       ) {
         Row(
@@ -646,6 +778,7 @@ private fun EmptyQuickActionsSection(
       QuickCreateListSection(
         onCreateChecklist = onCreateChecklist,
         onCreateNote = onCreateNote,
+        onCreateVoiceMemo = onCreateVoiceMemo,
         onImportFile = onImportFile,
       )
     }
@@ -656,6 +789,7 @@ private fun EmptyQuickActionsSection(
 private fun QuickCreateListSection(
   onCreateChecklist: () -> Unit,
   onCreateNote: () -> Unit,
+  onCreateVoiceMemo: () -> Unit,
   onImportFile: () -> Unit,
 ) {
   Column(
@@ -682,16 +816,25 @@ private fun QuickCreateListSection(
       containerColor = MaterialTheme.colorScheme.secondaryContainer,
       contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
       title = "新建便签",
-      subtitle = "记录纯文本、Markdown 备忘或代码片段",
+      subtitle = "支持 Markdown 标题、表格、任务列表与代码块渲染",
       onClick = onCreateNote,
       testTag = "create_note_button",
     )
     ImageToolboxActionCard(
-      icon = Icons.Rounded.FolderOpen,
+      icon = Icons.Rounded.Mic,
       containerColor = MaterialTheme.colorScheme.tertiaryContainer,
       contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+      title = "录制语音备忘",
+      subtitle = "原生 AAC 录音并直接在桌面卡片中回放",
+      onClick = onCreateVoiceMemo,
+      testTag = "create_voice_memo_button",
+    )
+    ImageToolboxActionCard(
+      icon = Icons.Rounded.FolderOpen,
+      containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+      contentColor = MaterialTheme.colorScheme.onSurface,
       title = "导入本地文件",
-      subtitle = "从设备选取文档或图片并生成本地摘要指纹",
+      subtitle = "选取 PDF、图片、音视频或文档直达对应工坊",
       onClick = onImportFile,
       testTag = "import_local_file_button",
     )
@@ -711,14 +854,9 @@ private fun ImageToolboxActionCard(
   Surface(
     onClick = onClick,
     shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surface,
+    color = MaterialTheme.colorScheme.surfaceContainerLow,
     tonalElevation = 0.dp,
     shadowElevation = 0.dp,
-    border =
-      BorderStroke(
-        width = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-      ),
     modifier = Modifier.fillMaxWidth().testTag(testTag),
   ) {
     Row(
@@ -847,7 +985,7 @@ private fun NoteEditorDialog(
           value = content,
           onValueChange = { content = it },
           label = { Text("Markdown / 代码片段") },
-          placeholder = { Text("# 标题\n- 支持等宽预览与快速编辑") },
+          placeholder = { Text("# 标题\n- [x] 支持 GFM 表格与任务列表\n```kotlin\nprintln(\"TactKit\")\n```") },
           textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = TactKitMono),
           minLines = 6,
           maxLines = 12,

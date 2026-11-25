@@ -29,7 +29,7 @@ private val DarkColorScheme =
     tertiaryContainer = VioletContainerDark,
     onTertiaryContainer = OnVioletContainerDark,
     background = BackgroundDark,
-    surface = SurfaceContainerDark,
+    surface = SurfaceContainerLowestDark,
     surfaceVariant = SurfaceContainerHighDark,
     surfaceContainerLowest = SurfaceContainerLowestDark,
     surfaceContainerLow = SurfaceContainerLowDark,
@@ -107,7 +107,7 @@ fun TactKitTheme(
         if (isDarkTheme) {
           dynamic.copy(
             background = BackgroundDark,
-            surface = SurfaceContainerDark,
+            surface = SurfaceContainerLowestDark,
             surfaceVariant = SurfaceContainerHighDark,
             surfaceContainerLowest = SurfaceContainerLowestDark,
             surfaceContainerLow = SurfaceContainerLowDark,

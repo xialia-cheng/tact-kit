@@ -1,6 +1,5 @@
 package com.xialia.tactkit.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,13 +22,18 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.R
 import com.xialia.tactkit.data.model.WorkbenchCard
+import com.xialia.tactkit.engine.AudioPlaybackState
+import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -58,11 +64,14 @@ import java.util.Locale
 @Composable
 fun WorkbenchCardView(
   card: WorkbenchCard,
+  audioPlaybackState: AudioPlaybackState,
   onToggleChecklistItem: (Long, String) -> Unit,
   onAddChecklistItem: (Long, String) -> Unit,
   onDeleteChecklistItem: (Long, String) -> Unit,
   onEditNote: (WorkbenchCard.Note) -> Unit,
-  onOpenFileQuickLook: (WorkbenchCard.RecentFile) -> Unit,
+  onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
+  onToggleVoiceMemoPlay: (WorkbenchCard.VoiceMemo) -> Unit,
+  onSeekVoiceMemo: (Long, Long) -> Unit,
   onTogglePin: (Long) -> Unit,
   onDeleteCard: (Long) -> Unit,
   modifier: Modifier = Modifier,
@@ -71,28 +80,22 @@ fun WorkbenchCardView(
 
   Surface(
     shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surface,
+    color =
+      if (card.pinned) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+      } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+      },
     tonalElevation = 0.dp,
     shadowElevation = 0.dp,
-    border =
-      BorderStroke(
-        width = 1.dp,
-        color =
-          if (card.pinned) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-          } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-          },
-      ),
     modifier = modifier.fillMaxWidth().testTag("workbench_card_${card.id}"),
   ) {
     Column(modifier = Modifier.padding(16.dp)) {
-      // Image Toolbox-inspired header: 44.dp rounded-square badge + 1-line title + 1-line subtitle
       val (icon, containerColor, contentColor, subtitle) =
         when (card) {
           is WorkbenchCard.Checklist -> {
             val done = card.items.count { it.checked }
-            Quadruple(
+            CardHeaderMeta(
               Icons.Rounded.Checklist,
               MaterialTheme.colorScheme.primaryContainer,
               MaterialTheme.colorScheme.onPrimaryContainer,
@@ -101,15 +104,23 @@ fun WorkbenchCardView(
           }
           is WorkbenchCard.Note -> {
             val charCount = card.markdownContent.length
-            Quadruple(
+            CardHeaderMeta(
               Icons.Rounded.EditNote,
               MaterialTheme.colorScheme.secondaryContainer,
               MaterialTheme.colorScheme.onSecondaryContainer,
               "Markdown 便签 · $charCount 字 · ${formatTimestamp(card.updatedAt)}",
             )
           }
+          is WorkbenchCard.VoiceMemo -> {
+            CardHeaderMeta(
+              Icons.Rounded.Mic,
+              MaterialTheme.colorScheme.tertiaryContainer,
+              MaterialTheme.colorScheme.onTertiaryContainer,
+              "语音备忘 · ${VoiceMemoManager.formatDuration(card.durationMs)} · ${formatTimestamp(card.updatedAt)}",
+            )
+          }
           is WorkbenchCard.RecentFile -> {
-            Quadruple(
+            CardHeaderMeta(
               fileIconForMime(card.mimeType),
               MaterialTheme.colorScheme.tertiaryContainer,
               MaterialTheme.colorScheme.onTertiaryContainer,
@@ -221,27 +232,45 @@ fun WorkbenchCardView(
               haptics.tick()
               onEditNote(card)
             },
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),
             modifier = Modifier.fillMaxWidth().testTag("note_preview_${card.id}"),
           ) {
-            Text(
-              text = card.markdownContent.ifBlank { "点击编辑便签内容..." },
-              style = MaterialTheme.typography.bodyMedium.copy(fontFamily = TactKitMono),
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              maxLines = 5,
-              overflow = TextOverflow.Ellipsis,
-              modifier = Modifier.padding(12.dp),
-            )
+            if (card.markdownContent.isBlank()) {
+              Text(
+                text = "点击编辑 Markdown / 代码便签...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp),
+              )
+            } else {
+              MarkdownRenderer(
+                markdown = card.markdownContent,
+                compact = true,
+                modifier = Modifier.padding(12.dp),
+              )
+            }
           }
+        }
+
+        is WorkbenchCard.VoiceMemo -> {
+          VoiceMemoCardBody(
+            card = card,
+            playbackState = audioPlaybackState,
+            onTogglePlay = {
+              haptics.tick()
+              onToggleVoiceMemoPlay(card)
+            },
+            onSeek = { pos -> onSeekVoiceMemo(card.id, pos) },
+          )
         }
 
         is WorkbenchCard.RecentFile -> {
           RecentFileCardBody(
             card = card,
-            onOpenQuickLook = {
+            onOpenFile = {
               haptics.tick()
-              onOpenFileQuickLook(card)
+              onOpenRecentFile(card)
             },
           )
         }
@@ -250,12 +279,86 @@ fun WorkbenchCardView(
   }
 }
 
-private data class Quadruple<A, B, C, D>(
+private data class CardHeaderMeta<A, B, C, D>(
   val first: A,
   val second: B,
   val third: C,
   val fourth: D,
 )
+
+@Composable
+private fun VoiceMemoCardBody(
+  card: WorkbenchCard.VoiceMemo,
+  playbackState: AudioPlaybackState,
+  onTogglePlay: () -> Unit,
+  onSeek: (Long) -> Unit,
+) {
+  val isActive = playbackState.playingCardId == card.id
+  val isPlaying = isActive && playbackState.isPlaying
+  val totalMs = (if (isActive && playbackState.durationMs > 0) playbackState.durationMs else card.durationMs)
+    .coerceAtLeast(1L)
+  val currentMs = if (isActive) playbackState.positionMs.coerceIn(0L, totalMs) else 0L
+
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Surface(
+      shape = RoundedCornerShape(16.dp),
+      color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+      ) {
+        FilledTonalIconButton(
+          onClick = onTogglePlay,
+          modifier = Modifier.testTag("voice_play_btn_${card.id}"),
+        ) {
+          Icon(
+            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            contentDescription = if (isPlaying) "暂停" else "播放",
+          )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+          Slider(
+            value = currentMs.toFloat(),
+            onValueChange = { if (isActive) onSeek(it.toLong()) },
+            valueRange = 0f..totalMs.toFloat(),
+            enabled = isActive,
+            modifier = Modifier.fillMaxWidth().height(28.dp),
+          )
+          Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(
+              text = VoiceMemoManager.formatDuration(currentMs),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+              text = VoiceMemoManager.formatDuration(totalMs),
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
+      }
+    }
+
+    if (card.transcriptOrNote.isNotBlank()) {
+      Text(
+        text = card.transcriptOrNote,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(horizontal = 4.dp),
+      )
+    }
+  }
+}
 
 @Composable
 private fun ChecklistCardBody(
@@ -352,12 +455,19 @@ private fun ChecklistCardBody(
 @Composable
 private fun RecentFileCardBody(
   card: WorkbenchCard.RecentFile,
-  onOpenQuickLook: () -> Unit,
+  onOpenFile: () -> Unit,
 ) {
+  val actionLabel =
+    when {
+      card.mimeType == "application/pdf" -> "在内置 PDF 查看器中打开"
+      card.mimeType.startsWith("image/") -> "在图片工坊中打开"
+      else -> "在 Quick Look 中预览"
+    }
+
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     card.sha256?.takeIf { it.isNotBlank() }?.let { digest ->
       Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
@@ -372,7 +482,7 @@ private fun RecentFileCardBody(
 
     if (card.previewExcerpt.isNotBlank()) {
       Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.75f),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
@@ -389,7 +499,7 @@ private fun RecentFileCardBody(
 
     if (card.fileUri != null) {
       TextButton(
-        onClick = onOpenQuickLook,
+        onClick = onOpenFile,
         modifier = Modifier.testTag("open_quick_look_${card.id}"),
       ) {
         Icon(
@@ -398,7 +508,7 @@ private fun RecentFileCardBody(
           modifier = Modifier.size(16.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
-        Text("在 Quick Look 中预览")
+        Text(actionLabel)
       }
     }
   }

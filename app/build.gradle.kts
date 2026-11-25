@@ -14,7 +14,7 @@ android {
     minSdk = 26
     targetSdk = 35
     versionCode = project.findProperty("appVersionCode")?.toString()?.toIntOrNull() ?: 1
-    versionName = project.findProperty("appVersionName")?.toString() ?: "0.1.0"
+    versionName = project.findProperty("appVersionName")?.toString() ?: "0.2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -110,6 +110,12 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.kyant.backdrop)
   implementation(libs.kyant.capsule)
+  implementation(libs.commonmark)
+  implementation(libs.commonmark.ext.gfm.tables)
+  implementation(libs.commonmark.ext.task.list.items)
+  implementation(libs.pdfbox.android)
+  implementation(libs.androidx.exifinterface)
+  implementation(libs.okhttp.client)
 
   "ksp"(libs.androidx.room.compiler)
 

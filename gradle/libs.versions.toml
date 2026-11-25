@@ -43,6 +43,10 @@ googleid = "1.1.1"
 backdrop = "1.0.6"
 capsule = "2.1.2"
 kotlinxSerializationJson = "1.8.0"
+commonmark = "0.32.0"
+pdfboxAndroid = "2.0.27.0"
+exifinterface = "1.3.7"
+okhttpPhase2 = "4.12.0"
 
 
 [libraries]
@@ -100,6 +104,12 @@ googleid = { group = "com.google.android.libraries.identity.googleid", name = "g
 kyant-backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
 kyant-capsule = { group = "io.github.kyant0", name = "capsule", version.ref = "capsule" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
+commonmark-ext-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
+commonmark-ext-task-list-items = { group = "org.commonmark", name = "commonmark-ext-task-list-items", version.ref = "commonmark" }
+pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
+okhttp-client = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttpPhase2" }
 
 
 [plugins]

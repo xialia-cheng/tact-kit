@@ -115,4 +115,47 @@ class TactKitRobolectricTest {
     val matches = context.packageManager.queryIntentActivities(shareIntent, 0)
     assertTrue(matches.any { it.activityInfo.name == QuickLookActivity::class.java.name })
   }
+
+  @Test
+  fun `voice memo card persists in Room and cleans up audio file on delete`() = runTest {
+    val audioFile = File.createTempFile("voice_test_", ".m4a", context.cacheDir)
+    audioFile.writeBytes(byteArrayOf(1, 2, 3, 4))
+    assertTrue(audioFile.exists())
+
+    val cardId =
+      workbenchRepository.createVoiceMemo(
+        title = "会议口述",
+        audioFilePath = audioFile.absolutePath,
+        durationMs = 12_500L,
+        note = "周五前发布 v0.2.0",
+      )
+
+    val cards = workbenchRepository.observeCards().first()
+    val memo = cards.filterIsInstance<WorkbenchCard.VoiceMemo>().first { it.id == cardId }
+    assertEquals("会议口述", memo.title)
+    assertEquals(12_500L, memo.durationMs)
+    assertEquals("周五前发布 v0.2.0", memo.transcriptOrNote)
+
+    workbenchRepository.deleteCard(cardId)
+    assertFalse(audioFile.exists())
+  }
+
+  @Test
+  fun `settings repository persists AI endpoint and model preferences`() = runTest {
+    val tempFile = File.createTempFile("tactkit_ai_prefs_", ".preferences_pb")
+    tempFile.deleteOnExit()
+    val dataStore = PreferenceDataStoreFactory.create(produceFile = { tempFile })
+    val settingsRepo = SettingsRepository(dataStore)
+
+    settingsRepo.saveAiSettings(
+      baseUrl = "https://api.deepseek.com/v1",
+      model = "deepseek-chat",
+      plainApiKey = null,
+    )
+
+    val updated = settingsRepo.preferencesFlow.first()
+    assertEquals("https://api.deepseek.com/v1", updated.aiBaseUrl)
+    assertEquals("deepseek-chat", updated.aiModel)
+    assertFalse(updated.hasAiApiKey)
+  }
 }

@@ -15,6 +15,7 @@ enum class WorkbenchCardType {
   CHECKLIST,
   NOTE,
   RECENT_FILE,
+  VOICE_MEMO,
 }
 
 @Entity(tableName = "workbench_cards")
@@ -31,6 +32,8 @@ data class WorkbenchCardEntity(
   val pinned: Boolean = false,
   val createdAt: Long = System.currentTimeMillis(),
   val updatedAt: Long = System.currentTimeMillis(),
+  val audioDurationMs: Long = 0L,
+  val audioFilePath: String? = null,
 )
 
 sealed interface WorkbenchCard {
@@ -67,6 +70,17 @@ sealed interface WorkbenchCard {
     val mimeType: String,
     val sha256: String?,
     val previewExcerpt: String,
+    override val pinned: Boolean,
+    override val createdAt: Long,
+    override val updatedAt: Long,
+  ) : WorkbenchCard
+
+  data class VoiceMemo(
+    override val id: Long,
+    override val title: String,
+    val transcriptOrNote: String,
+    val audioFilePath: String,
+    val durationMs: Long,
     override val pinned: Boolean,
     override val createdAt: Long,
     override val updatedAt: Long,
