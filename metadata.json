@@ -1,0 +1,6 @@
+{
+  "name": "简工坊 TactKit",
+  "description": "个人定制、本地优先、零数据收集的全能工具与文档工作台 (MIT License)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
