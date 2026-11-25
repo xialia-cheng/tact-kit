@@ -128,8 +128,8 @@ fun TactKitNavHost(
 ) {
   val navController = rememberNavController()
   val audioPlaybackState by viewModel.audioPlaybackState.collectAsStateWithLifecycle()
+  val onboardingState by viewModel.onboardingUiState.collectAsStateWithLifecycle()
   var pendingHomeDialog by remember { mutableStateOf<String?>(null) }
-  var replayOnboardingTick by remember { mutableStateOf(0) }
 
   fun launchToolById(toolId: String) {
     when (toolId) {
@@ -212,8 +212,10 @@ fun TactKitNavHost(
         onTogglePinTool = viewModel::togglePinnedTool,
         onClearStatusMessage = viewModel::clearStatusMessage,
         onDismissAvailableUpdate = viewModel::dismissAvailableUpdate,
-        onCompleteOnboarding = { viewModel.setHasCompletedOnboarding(true) },
-        replayOnboardingTick = replayOnboardingTick,
+        onboardingState = onboardingState,
+        onStartOnboarding = viewModel::startOnboardingTutorial,
+        onAdvanceOnboarding = viewModel::advanceOnboardingStep,
+        onSkipOnboarding = viewModel::skipOnboardingForever,
         onNavigateToSettings = { navController.navigate(SettingsRoute) },
         onOpenPdfToolkit = { uri -> navController.navigate(PdfToolkitRoute(initialUri = uri)) },
         onOpenPdfAnnotate = { uri -> navController.navigate(PdfAnnotateRoute(initialUri = uri)) },
@@ -268,7 +270,7 @@ fun TactKitNavHost(
       HelpTipsScreen(
         onLaunchTool = { toolId -> launchToolById(toolId) },
         onReplayOnboarding = {
-          replayOnboardingTick++
+          viewModel.replayOnboardingFromHelp()
           navController.popBackStack(HomeRoute, inclusive = false)
         },
         onNavigateBack = { navController.popBackStack() },

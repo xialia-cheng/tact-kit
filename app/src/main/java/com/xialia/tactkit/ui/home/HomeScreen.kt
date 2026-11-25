@@ -151,8 +151,10 @@ fun HomeScreen(
   onTogglePinTool: (String) -> Unit,
   onClearStatusMessage: () -> Unit,
   onDismissAvailableUpdate: () -> Unit = {},
-  onCompleteOnboarding: () -> Unit = {},
-  replayOnboardingTick: Int = 0,
+  onboardingState: OnboardingUiState = OnboardingUiState(),
+  onStartOnboarding: () -> Unit = {},
+  onAdvanceOnboarding: () -> Unit = {},
+  onSkipOnboarding: () -> Unit = {},
   onNavigateToSettings: () -> Unit,
   onOpenPdfToolkit: (String?) -> Unit,
   onOpenPdfAnnotate: (String?) -> Unit,
@@ -197,31 +199,7 @@ fun HomeScreen(
   var showCreateNoteDialog by remember { mutableStateOf(false) }
   var showVoiceMemoDialog by remember { mutableStateOf(false) }
 
-  var showOnboardingWelcome by remember { mutableStateOf(false) }
-  var activeOnboardingStep by remember { mutableStateOf<OnboardingStep?>(null) }
-  var hasDismissedWelcomeThisSession by remember { mutableStateOf(false) }
   val targetBoundsMap = remember { mutableStateMapOf<OnboardingStep, Rect>() }
-
-  LaunchedEffect(
-    uiState.isPreferencesLoaded,
-    uiState.preferences.hasCompletedOnboarding,
-    hasDismissedWelcomeThisSession,
-  ) {
-    if (!uiState.isPreferencesLoaded) return@LaunchedEffect
-    if (!uiState.preferences.hasCompletedOnboarding && !hasDismissedWelcomeThisSession && activeOnboardingStep == null) {
-      showOnboardingWelcome = true
-    } else if (uiState.preferences.hasCompletedOnboarding) {
-      showOnboardingWelcome = false
-    }
-  }
-
-  LaunchedEffect(replayOnboardingTick) {
-    if (replayOnboardingTick > 0) {
-      hasDismissedWelcomeThisSession = false
-      showOnboardingWelcome = false
-      activeOnboardingStep = OnboardingStep.DASHBOARD
-    }
-  }
 
   LaunchedEffect(pendingHomeDialog) {
     when (pendingHomeDialog) {
@@ -737,42 +715,22 @@ fun HomeScreen(
     )
 
     // Interactive Spotlight Onboarding Overlay (5 steps on real HomeScreen)
-    activeOnboardingStep?.let { step ->
+    onboardingState.activeStep?.let { step ->
       SpotlightOnboardingOverlay(
         currentStep = step,
         targetBoundsMap = targetBoundsMap,
-        onAdvanceStep = {
-          val steps = OnboardingStep.entries
-          val nextIdx = steps.indexOf(step) + 1
-          if (nextIdx < steps.size) {
-            activeOnboardingStep = steps[nextIdx]
-          } else {
-            activeOnboardingStep = null
-            onCompleteOnboarding()
-          }
-        },
-        onSkipTutorial = {
-          activeOnboardingStep = null
-          hasDismissedWelcomeThisSession = true
-          onCompleteOnboarding()
-        },
+        onAdvanceStep = onAdvanceOnboarding,
+        onSkipTutorial = onSkipOnboarding,
       )
     }
   }
 
-  if (showOnboardingWelcome && activeOnboardingStep == null) {
+  if (onboardingState.showWelcomeDialog && onboardingState.activeStep == null) {
     OnboardingWelcomeDialog(
-      onSkipForever = {
-        showOnboardingWelcome = false
-        hasDismissedWelcomeThisSession = true
-        onCompleteOnboarding()
-      },
-      onStartTutorial = {
-        showOnboardingWelcome = false
-        activeOnboardingStep = OnboardingStep.DASHBOARD
-      },
+      onSkipForever = onSkipOnboarding,
+      onStartTutorial = onStartOnboarding,
     )
-  } else if (activeOnboardingStep == null) {
+  } else if (onboardingState.activeStep == null) {
     uiState.availableUpdate?.let { releaseInfo ->
       NewVersionUpdateDialog(
         releaseInfo = releaseInfo,

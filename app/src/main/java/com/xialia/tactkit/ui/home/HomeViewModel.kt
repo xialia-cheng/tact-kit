@@ -15,6 +15,8 @@ import com.xialia.tactkit.data.repository.ReleaseInfo
 import com.xialia.tactkit.data.repository.WorkbenchRepository
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
+import com.xialia.tactkit.ui.components.OnboardingStep
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class OnboardingUiState(
+  val showWelcomeDialog: Boolean = false,
+  val activeStep: OnboardingStep? = null,
+)
 
 enum class CardFilter(val label: String) {
   ALL("全部"),
@@ -74,7 +81,37 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   private val statusMessage = MutableStateFlow<String?>(null)
   private val availableUpdate = MutableStateFlow<ReleaseInfo?>(null)
 
+  val hasCompletedOnboarding: StateFlow<Boolean?> =
+    settingsRepository.hasCompletedOnboardingFlow.stateIn(
+      scope = viewModelScope,
+      started = SharingStarted.Eagerly,
+      initialValue = null,
+    )
+
+  private val onboardingHandledInSession = MutableStateFlow(false)
+  private val showOnboardingWelcome = MutableStateFlow(false)
+  private val activeOnboardingStep = MutableStateFlow<OnboardingStep?>(null)
+
+  val onboardingUiState: StateFlow<OnboardingUiState> =
+    combine(showOnboardingWelcome, activeOnboardingStep) { showWelcome, step ->
+        OnboardingUiState(showWelcomeDialog = showWelcome, activeStep = step)
+      }
+      .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = OnboardingUiState(),
+      )
+
   init {
+    viewModelScope.launch {
+      hasCompletedOnboarding.collect { completed ->
+        if (completed == false && !onboardingHandledInSession.value && activeOnboardingStep.value == null) {
+          showOnboardingWelcome.value = true
+        } else if (completed == true) {
+          showOnboardingWelcome.value = false
+        }
+      }
+    }
     viewModelScope.launch {
       val prefs = runCatching { settingsRepository.preferencesFlow.first() }.getOrNull()
       if (prefs?.autoCheckUpdates == true) {
@@ -313,9 +350,41 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   fun setHasCompletedOnboarding(completed: Boolean) {
-    viewModelScope.launch(kotlinx.coroutines.NonCancellable) {
+    viewModelScope.launch(NonCancellable) {
       settingsRepository.setHasCompletedOnboarding(completed)
     }
+  }
+
+  fun skipOnboardingForever() {
+    onboardingHandledInSession.value = true
+    showOnboardingWelcome.value = false
+    activeOnboardingStep.value = null
+    viewModelScope.launch(NonCancellable) {
+      settingsRepository.setHasCompletedOnboarding(true)
+    }
+  }
+
+  fun startOnboardingTutorial() {
+    onboardingHandledInSession.value = true
+    showOnboardingWelcome.value = false
+    activeOnboardingStep.value = OnboardingStep.DASHBOARD
+  }
+
+  fun advanceOnboardingStep() {
+    val current = activeOnboardingStep.value ?: return
+    val steps = OnboardingStep.entries
+    val nextIdx = steps.indexOf(current) + 1
+    if (nextIdx < steps.size) {
+      activeOnboardingStep.value = steps[nextIdx]
+    } else {
+      skipOnboardingForever()
+    }
+  }
+
+  fun replayOnboardingFromHelp() {
+    onboardingHandledInSession.value = true
+    showOnboardingWelcome.value = false
+    activeOnboardingStep.value = OnboardingStep.DASHBOARD
   }
 
   fun dismissAvailableUpdate() {

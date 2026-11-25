@@ -139,6 +139,19 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         )
       }
 
+  val hasCompletedOnboardingFlow: Flow<Boolean?> =
+    dataStore.data
+      .catch { exception ->
+        if (exception is IOException) {
+          emit(emptyPreferences())
+        } else {
+          throw exception
+        }
+      }
+      .map { prefs ->
+        prefs[Keys.HAS_COMPLETED_ONBOARDING] ?: false
+      }
+
   suspend fun setThemeMode(mode: ThemeMode) {
     dataStore.edit { it[Keys.THEME_MODE] = mode.name }
   }
