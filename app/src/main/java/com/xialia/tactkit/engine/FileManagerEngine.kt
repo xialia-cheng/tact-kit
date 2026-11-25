@@ -145,18 +145,18 @@ object FileManagerEngine {
     val lower = normalized.lowercase(Locale.ROOT)
     return when {
       lower.startsWith("download/qq") || lower.contains("/qqfile_recv") || lower.startsWith("pictures/qq") ->
-        "来自 QQ"
+        "QQ"
       lower.startsWith("download/weixin") || lower.contains("micromsg/download") || lower.startsWith("pictures/weixin") ->
-        "来自 微信"
-      lower.startsWith("download/") || lower == "download" -> "来自 Download"
-      lower.startsWith("documents/") || lower == "documents" -> "来自 Documents"
-      lower.startsWith("pictures/") || lower == "pictures" -> "来自 Pictures"
-      lower.startsWith("dcim/") -> "来自 相册"
-      lower.startsWith("movies/") -> "来自 Movies"
-      lower.startsWith("music/") -> "来自 Music"
-      isSaf -> if (parentName.isNotBlank()) "来自 $parentName" else "来自 关联目录"
-      parentName.isNotBlank() -> "来自 $parentName"
-      else -> "来自 根目录"
+        "微信"
+      lower.startsWith("download/") || lower == "download" -> "Download"
+      lower.startsWith("documents/") || lower == "documents" -> "Documents"
+      lower.startsWith("pictures/") || lower == "pictures" -> "Pictures"
+      lower.startsWith("dcim/") -> "相册"
+      lower.startsWith("movies/") -> "Movies"
+      lower.startsWith("music/") -> "Music"
+      isSaf -> if (parentName.isNotBlank()) parentName else "关联目录"
+      parentName.isNotBlank() -> parentName
+      else -> "根目录"
     }
   }
 

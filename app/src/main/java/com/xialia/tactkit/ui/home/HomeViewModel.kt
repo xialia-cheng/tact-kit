@@ -4,11 +4,14 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.xialia.tactkit.BuildConfig
 import com.xialia.tactkit.data.TactKitDatabase
 import com.xialia.tactkit.data.datastore.SettingsRepository
 import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.model.WorkbenchCard
+import com.xialia.tactkit.data.repository.AppUpdateRepository
+import com.xialia.tactkit.data.repository.ReleaseInfo
 import com.xialia.tactkit.data.repository.WorkbenchRepository
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -49,6 +53,7 @@ data class HomeUiState(
   val preferences: UserPreferences = UserPreferences(),
   val isImportingFile: Boolean = false,
   val statusMessage: String? = null,
+  val availableUpdate: ReleaseInfo? = null,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -57,6 +62,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   private val workbenchRepository =
     WorkbenchRepository(database.workbenchCardDao(), application.applicationContext)
   private val settingsRepository = SettingsRepository(application.applicationContext)
+  private val appUpdateRepository = AppUpdateRepository()
   val voiceMemoManager = VoiceMemoManager(application.applicationContext)
 
   val audioPlaybackState: StateFlow<AudioPlaybackState> = voiceMemoManager.playbackState
@@ -65,6 +71,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   private val activeFilter = MutableStateFlow(CardFilter.ALL)
   private val isImportingFile = MutableStateFlow(false)
   private val statusMessage = MutableStateFlow<String?>(null)
+  private val availableUpdate = MutableStateFlow<ReleaseInfo?>(null)
+
+  init {
+    viewModelScope.launch {
+      val prefs = runCatching { settingsRepository.preferencesFlow.first() }.getOrNull()
+      if (prefs?.autoCheckUpdates == true) {
+        appUpdateRepository.fetchLatestRelease(BuildConfig.VERSION_NAME).onSuccess { info ->
+          if (info.isUpdateAvailable) {
+            availableUpdate.value = info
+          }
+        }
+      }
+    }
+  }
 
   val uiState: StateFlow<HomeUiState> =
     combine(
@@ -74,6 +94,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         settingsRepository.preferencesFlow,
         isImportingFile,
         statusMessage,
+        availableUpdate,
       ) { values ->
         @Suppress("UNCHECKED_CAST")
         val allCards = values[0] as List<WorkbenchCard>
@@ -82,6 +103,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = values[3] as UserPreferences
         val importing = values[4] as Boolean
         val message = values[5] as String?
+        val updateInfo = values[6] as ReleaseInfo?
 
         val checklistCount = allCards.count { it is WorkbenchCard.Checklist }
         val noteCount = allCards.count { it is WorkbenchCard.Note }
@@ -161,6 +183,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
           preferences = prefs,
           isImportingFile = importing,
           statusMessage = message,
+          availableUpdate = updateInfo,
         )
       }
       .stateIn(
@@ -281,6 +304,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
   fun setLiquidGlassPowerSave(enabled: Boolean) {
     viewModelScope.launch { settingsRepository.setLiquidGlassPowerSave(enabled) }
+  }
+
+  fun setAutoCheckUpdates(enabled: Boolean) {
+    viewModelScope.launch { settingsRepository.setAutoCheckUpdates(enabled) }
+  }
+
+  fun setHasCompletedOnboarding(completed: Boolean) {
+    viewModelScope.launch { settingsRepository.setHasCompletedOnboarding(completed) }
+  }
+
+  fun dismissAvailableUpdate() {
+    availableUpdate.value = null
   }
 
   suspend fun saveAiSettings(baseUrl: String, model: String, plainApiKey: String?): Result<Unit> {

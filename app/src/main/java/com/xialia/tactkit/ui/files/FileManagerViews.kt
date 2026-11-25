@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -141,7 +143,7 @@ fun StorageOverviewAndQuickLinks(
 ) {
   Column(
     verticalArrangement = Arrangement.spacedBy(8.dp),
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+    modifier = Modifier.fillMaxWidth(),
   ) {
     if (storage.totalBytes > 0L) {
       val progress =
@@ -287,6 +289,8 @@ fun RecentFilesTabContent(
   isScanning: Boolean,
   isPickerMode: Boolean,
   selectedIds: Set<String>,
+  headerContent: (@Composable () -> Unit)? = null,
+  onCancelScan: () -> Unit = {},
   onSelectCategory: (FileCategory?) -> Unit,
   onSelectSizeFilter: (SizeFilterMode) -> Unit,
   onEntryClick: (ManagedFileEntry) -> Unit,
@@ -310,7 +314,7 @@ fun RecentFilesTabContent(
     LazyRow(
       contentPadding = PaddingValues(horizontal = 16.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+      modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
       item(key = "cat_all") {
         FilterChip(
@@ -343,6 +347,29 @@ fun RecentFilesTabContent(
       }
     }
 
+    if (isScanning) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+      ) {
+        LinearProgressIndicator(
+          modifier = Modifier.weight(1f).height(5.dp).clip(ContinuousCapsule()),
+        )
+        Text(
+          text = "扫描中",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
+          onClick = onCancelScan,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+        ) {
+          Text("取消", style = MaterialTheme.typography.labelSmall)
+        }
+      }
+    }
+
     if (isScanning && allRecentFiles.isEmpty()) {
       Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -352,12 +379,50 @@ fun RecentFilesTabContent(
         }
       }
     } else if (filteredFiles.isEmpty()) {
-      Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-        Text(
-          text = "当前筛选下暂无文件",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+      LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize(),
+      ) {
+        if (headerContent != null) {
+          item(key = "scrollable_header") { headerContent() }
+        }
+        item(key = "empty_msg") {
+          Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+          ) {
+            Text(
+              text = "当前筛选下暂无文件",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
+      }
+    } else if (selectedCategory == FileCategory.IMAGES) {
+      // 3-column square large-image grid (~110dp+ per tile)
+      LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 100.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize().testTag("recent_images_grid"),
+      ) {
+        if (headerContent != null) {
+          item(span = { GridItemSpan(3) }, key = "scrollable_header") {
+            Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
+          }
+        }
+        items(filteredFiles, key = { it.id }) { entry ->
+          SquareMediaGridTile(
+            entry = entry,
+            isSelected = entry.id in selectedIds,
+            selectionMode = selectedIds.isNotEmpty(),
+            onClick = { onEntryClick(entry) },
+            onLongClick = { onEntryLongClick(entry) },
+          )
+        }
       }
     } else {
       LazyColumn(
@@ -365,6 +430,11 @@ fun RecentFilesTabContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize().testTag("recent_files_list"),
       ) {
+        if (headerContent != null) {
+          item(key = "scrollable_header") {
+            Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
+          }
+        }
         items(filteredFiles, key = { it.id }) { entry ->
           ManagedFileRow(
             entry = entry,
@@ -394,6 +464,7 @@ fun DirectoryTreeTabContent(
   sortBy: DirectorySortBy,
   selectedIds: Set<String>,
   isPickerMode: Boolean,
+  headerContent: (@Composable () -> Unit)? = null,
   onNavigateToDir: (File) -> Unit,
   onToggleHidden: () -> Unit,
   onToggleNoiseReduction: () -> Unit,
@@ -489,7 +560,7 @@ fun DirectoryTreeTabContent(
         selected = smartNoiseReduction,
         onClick = onToggleNoiseReduction,
         leadingIcon = { Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp)) },
-        label = { Text("智能降噪", maxLines = 1, softWrap = false) },
+        label = { Text("精简目录", maxLines = 1, softWrap = false) },
       )
 
       Spacer(modifier = Modifier.weight(1f))
@@ -522,21 +593,37 @@ fun DirectoryTreeTabContent(
       }
 
     if (combinedEntries.isEmpty() && collapsedNoiseDirs.isEmpty()) {
-      Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-        Text(
-          text = "当前目录为空",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+      LazyColumn(
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 100.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize(),
+      ) {
+        if (headerContent != null) {
+          item(key = "scrollable_header") { headerContent() }
+        }
+        item(key = "empty_dir") {
+          Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) {
+            Text(
+              text = "当前目录为空",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
       }
     } else if (isGridMode) {
       LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Fixed(3),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 100.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
       ) {
+        if (headerContent != null) {
+          item(span = { GridItemSpan(3) }, key = "scrollable_header") {
+            Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
+          }
+        }
         items(combinedEntries, key = { it.id }) { entry ->
           ManagedFileGridCard(
             entry = entry,
@@ -553,6 +640,11 @@ fun DirectoryTreeTabContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize().testTag("directory_tree_list"),
       ) {
+        if (headerContent != null) {
+          item(key = "scrollable_header") {
+            Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
+          }
+        }
         items(activeEntries, key = { it.id }) { entry ->
           ManagedFileRow(
             entry = entry,
@@ -581,8 +673,8 @@ fun DirectoryTreeTabContent(
               ) {
                 Text(
                   text =
-                    if (expandNoiseDirs) "收起 ${collapsedNoiseDirs.size} 个空目录 / 系统媒体文件夹"
-                    else "已智能折叠 ${collapsedNoiseDirs.size} 个空目录与系统媒体文件夹",
+                    if (expandNoiseDirs) "收起 ${collapsedNoiseDirs.size} 个空目录 / 系统冷门目录"
+                    else "已精简折叠 ${collapsedNoiseDirs.size} 个空目录与系统冷门目录",
                   style = MaterialTheme.typography.labelMedium,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -620,7 +712,9 @@ fun SpaceCleanupTabContent(
   scanResult: SpaceScanResult?,
   isScanning: Boolean,
   checkedIds: Set<String>,
+  headerContent: (@Composable () -> Unit)? = null,
   onTriggerScan: () -> Unit,
+  onCancelScan: () -> Unit = {},
   onToggleChecked: (ManagedFileEntry) -> Unit,
   onDeleteChecked: () -> Unit,
 ) {
@@ -700,7 +794,21 @@ fun SpaceCleanupTabContent(
     }
 
     if (isScanning) {
-      LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+      ) {
+        LinearProgressIndicator(
+          modifier = Modifier.weight(1f).height(5.dp).clip(ContinuousCapsule()),
+        )
+        TextButton(
+          onClick = onCancelScan,
+          contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+        ) {
+          Text("取消", style = MaterialTheme.typography.labelSmall)
+        }
+      }
     }
 
     LazyColumn(
@@ -708,6 +816,11 @@ fun SpaceCleanupTabContent(
       verticalArrangement = Arrangement.spacedBy(8.dp),
       modifier = Modifier.weight(1f).fillMaxWidth(),
     ) {
+      if (headerContent != null) {
+        item(key = "scrollable_header") {
+          Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
+        }
+      }
       items(allVisibleEntries, key = { "clean_${it.id}" }) { entry ->
         Surface(
           onClick = { onToggleChecked(entry) },
@@ -724,7 +837,7 @@ fun SpaceCleanupTabContent(
               checked = entry.id in checkedIds,
               onCheckedChange = { onToggleChecked(entry) },
             )
-            FileEntryThumbnailOrBadge(entry = entry, size = 40.dp)
+            FileEntryThumbnailOrBadge(entry = entry, size = 44.dp)
             Column(modifier = Modifier.weight(1f)) {
               Text(
                 text = entry.name,
@@ -801,6 +914,11 @@ fun ManagedFileRow(
   onLongClick: () -> Unit,
   onLocateClick: () -> Unit,
 ) {
+  val isMediaThumb =
+    !entry.isDirectory &&
+      (entry.category == FileCategory.IMAGES || entry.category == FileCategory.AUDIO_VIDEO)
+  val thumbSize = if (isMediaThumb) 68.dp else 48.dp
+
   Surface(
     shape = RoundedCornerShape(18.dp),
     color =
@@ -818,7 +936,7 @@ fun ManagedFileRow(
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp),
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+      modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
       if (selectionMode) {
         Icon(
@@ -831,9 +949,9 @@ fun ManagedFileRow(
           modifier = Modifier.size(22.dp),
         )
       }
-      FileEntryThumbnailOrBadge(entry = entry, size = 44.dp)
+      FileEntryThumbnailOrBadge(entry = entry, size = thumbSize)
       Column(
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.weight(1f),
       ) {
         Text(
@@ -857,29 +975,46 @@ fun ManagedFileRow(
             fontFamily = TactKitMono,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
           )
           Text(
             text = "· ${FileManagerEngine.formatRelativeTime(entry.lastModifiedMs)}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Text(
-            text = "· ${entry.sourceLabel}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
           )
         }
-        if (showRelativePath && entry.relativePath.isNotBlank()) {
-          Text(
-            text = entry.relativePath,
-            fontFamily = TactKitMono,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
+        // Dedicated compact line for source label so it never truncates
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+          ) {
+            Text(
+              text = entry.sourceLabel,
+              style = MaterialTheme.typography.labelSmall,
+              fontWeight = FontWeight.Medium,
+              color = MaterialTheme.colorScheme.onPrimaryContainer,
+              maxLines = 1,
+              softWrap = false,
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+            )
+          }
+          if (showRelativePath && entry.relativePath.isNotBlank()) {
+            Text(
+              text = entry.relativePath,
+              fontFamily = TactKitMono,
+              style = MaterialTheme.typography.labelSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
         }
       }
       if (showLocateButton && !selectionMode) {
@@ -898,6 +1033,61 @@ fun ManagedFileRow(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+private fun SquareMediaGridTile(
+  entry: ManagedFileEntry,
+  isSelected: Boolean,
+  selectionMode: Boolean,
+  onClick: () -> Unit,
+  onLongClick: () -> Unit,
+) {
+  Box(
+    modifier =
+      Modifier.fillMaxWidth()
+        .aspectRatio(1f)
+        .clip(RoundedCornerShape(14.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        .combinedClickable(
+          onClick = onClick,
+          onLongClick = onLongClick,
+        ),
+  ) {
+    FileEntryThumbnailOrBadge(
+      entry = entry,
+      size = androidx.compose.ui.unit.Dp.Unspecified,
+      modifier = Modifier.fillMaxSize(),
+    )
+    if (selectionMode) {
+      Icon(
+        imageVector =
+          if (isSelected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+        contentDescription = null,
+        tint =
+          if (isSelected) MaterialTheme.colorScheme.primary
+          else androidx.compose.ui.graphics.Color.White,
+        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp),
+      )
+    } else if (entry.extension.isNotBlank()) {
+      Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.52f),
+        modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp),
+      ) {
+        Text(
+          text = entry.extension.uppercase(),
+          fontFamily = TactKitMono,
+          style = MaterialTheme.typography.labelSmall,
+          color = androidx.compose.ui.graphics.Color.White,
+          maxLines = 1,
+          softWrap = false,
+          modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
+      }
+    }
+  }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
 private fun ManagedFileGridCard(
   entry: ManagedFileEntry,
   isSelected: Boolean,
@@ -905,6 +1095,19 @@ private fun ManagedFileGridCard(
   onClick: () -> Unit,
   onLongClick: () -> Unit,
 ) {
+  if (!entry.isDirectory &&
+    (entry.category == FileCategory.IMAGES || entry.category == FileCategory.AUDIO_VIDEO)
+  ) {
+    SquareMediaGridTile(
+      entry = entry,
+      isSelected = isSelected,
+      selectionMode = selectionMode,
+      onClick = onClick,
+      onLongClick = onLongClick,
+    )
+    return
+  }
+
   Surface(
     shape = RoundedCornerShape(18.dp),
     color =
@@ -919,8 +1122,8 @@ private fun ManagedFileGridCard(
         ),
   ) {
     Column(
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.padding(12.dp),
+      verticalArrangement = Arrangement.spacedBy(6.dp),
+      modifier = Modifier.padding(10.dp),
     ) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -943,7 +1146,7 @@ private fun ManagedFileGridCard(
       }
       Text(
         text = entry.name,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodySmall,
         fontWeight = FontWeight.SemiBold,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
@@ -951,7 +1154,7 @@ private fun ManagedFileGridCard(
       Text(
         text =
           if (entry.isDirectory) "${entry.childCount} 项"
-          else "${FileInspectionHelper.formatBytes(entry.sizeBytes)} · ${FileManagerEngine.formatRelativeTime(entry.lastModifiedMs)}",
+          else FileInspectionHelper.formatBytes(entry.sizeBytes),
         fontFamily = TactKitMono,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,

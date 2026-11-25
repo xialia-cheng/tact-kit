@@ -49,12 +49,15 @@ import com.xialia.tactkit.ui.sensor.LightLuxScreen
 import com.xialia.tactkit.ui.sensor.MetalDetectorScreen
 import com.xialia.tactkit.ui.sensor.MorseTorchScreen
 import com.xialia.tactkit.ui.sensor.PhysicalRulerScreen
+import com.xialia.tactkit.ui.settings.HelpTipsScreen
 import com.xialia.tactkit.ui.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
 
 @Serializable data object SettingsRoute
+
+@Serializable data object HelpTipsRoute
 
 @Serializable data class PdfToolkitRoute(val initialUri: String? = null)
 
@@ -126,9 +129,9 @@ fun TactKitNavHost(
   val navController = rememberNavController()
   val audioPlaybackState by viewModel.audioPlaybackState.collectAsStateWithLifecycle()
   var pendingHomeDialog by remember { mutableStateOf<String?>(null) }
+  var replayOnboardingTick by remember { mutableStateOf(0) }
 
-  LaunchedEffect(pendingToolId) {
-    val toolId = pendingToolId ?: return@LaunchedEffect
+  fun launchToolById(toolId: String) {
     when (toolId) {
       "doc_scanner" -> navController.navigate(DocScannerRoute)
       "pdf_toolkit" -> navController.navigate(PdfToolkitRoute())
@@ -147,11 +150,24 @@ fun TactKitNavHost(
       "morse_torch" -> navController.navigate(MorseTorchRoute)
       "battery_hardware" -> navController.navigate(BatteryHardwareRoute)
       "led_clock" -> navController.navigate(LedClockRoute)
+      "docx_editor" -> navController.navigate(DocxEditorRoute())
+      "ai_hub" -> navController.navigate(AiHubRoute())
+      "media_extractor" -> navController.navigate(MediaWorkshopRoute())
+      "archive_box" -> navController.navigate(ArchiveWorkshopRoute())
+      "data_workshop" -> navController.navigate(DataWorkshopRoute())
+      "hash_workshop" -> navController.navigate(HashWorkshopRoute())
+      "crypto_vault" -> navController.navigate(CryptoVaultRoute())
+      "electronics_calc" -> navController.navigate(ElectronicsRoute)
       "quick_note", "quick_checklist", "voice_memo" -> {
         navController.popBackStack(HomeRoute, inclusive = false)
         pendingHomeDialog = toolId
       }
     }
+  }
+
+  LaunchedEffect(pendingToolId) {
+    val toolId = pendingToolId ?: return@LaunchedEffect
+    launchToolById(toolId)
     onConsumedPendingTool()
   }
 
@@ -195,6 +211,9 @@ fun TactKitNavHost(
         onImportLocalFile = viewModel::importLocalFile,
         onTogglePinTool = viewModel::togglePinnedTool,
         onClearStatusMessage = viewModel::clearStatusMessage,
+        onDismissAvailableUpdate = viewModel::dismissAvailableUpdate,
+        onCompleteOnboarding = { viewModel.setHasCompletedOnboarding(true) },
+        replayOnboardingTick = replayOnboardingTick,
         onNavigateToSettings = { navController.navigate(SettingsRoute) },
         onOpenPdfToolkit = { uri -> navController.navigate(PdfToolkitRoute(initialUri = uri)) },
         onOpenPdfAnnotate = { uri -> navController.navigate(PdfAnnotateRoute(initialUri = uri)) },
@@ -236,9 +255,22 @@ fun TactKitNavHost(
         onThemeModeChange = viewModel::setThemeMode,
         onDynamicColorChange = viewModel::setDynamicColor,
         onLiquidGlassPowerSaveChange = viewModel::setLiquidGlassPowerSave,
+        onAutoCheckUpdatesChange = viewModel::setAutoCheckUpdates,
         onSaveAiSettings = viewModel::saveAiSettings,
         onClearAiApiKey = viewModel::clearAiApiKey,
         onGetDecryptedAiApiKey = viewModel::getDecryptedAiApiKey,
+        onOpenHelpTips = { navController.navigate(HelpTipsRoute) },
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<HelpTipsRoute> {
+      HelpTipsScreen(
+        onLaunchTool = { toolId -> launchToolById(toolId) },
+        onReplayOnboarding = {
+          replayOnboardingTick++
+          navController.popBackStack(HomeRoute, inclusive = false)
+        },
         onNavigateBack = { navController.popBackStack() },
       )
     }
@@ -412,6 +444,8 @@ fun TactKitNavHost(
         onRegisterPdfFile = viewModel::registerGeneratedFileCard,
         onOpenQrStudio = { navController.navigate(QrStudioRoute) },
         onOpenPdfToolkit = { uri -> navController.navigate(PdfToolkitRoute(initialUri = uri)) },
+        onOpenPdfAnnotate = { uri -> navController.navigate(PdfAnnotateRoute(initialUri = uri)) },
+        onOpenLanShare = { uri -> navController.navigate(LanShareRoute(initialUri = uri)) },
         onNavigateBack = { navController.popBackStack() },
       )
     }

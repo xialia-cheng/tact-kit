@@ -122,6 +122,8 @@ fun DocScannerScreen(
   onRegisterPdfFile: (File, String, String, String) -> Unit,
   onOpenQrStudio: () -> Unit,
   onOpenPdfToolkit: (String) -> Unit,
+  onOpenPdfAnnotate: (String) -> Unit = {},
+  onOpenLanShare: (String) -> Unit = {},
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -150,6 +152,7 @@ fun DocScannerScreen(
   var selectedPageIndex by remember { mutableIntStateOf(0) }
   var draggingCornerIndex by remember { mutableIntStateOf(-1) }
   var pendingExportFile by remember { mutableStateOf<File?>(null) }
+  var lastExportedPdfUri by remember { mutableStateOf<String?>(null) }
 
   val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
   DisposableEffect(Unit) {
@@ -712,8 +715,9 @@ fun DocScannerScreen(
                           )
                           pendingExportFile = outFile
                           fileUri
-                        }.onSuccess {
+                        }.onSuccess { fileUri ->
                           haptics.confirm()
+                          lastExportedPdfUri = fileUri.toString()
                           exportPdfSafLauncher.launch("TactKit_Scan_${System.currentTimeMillis()}.pdf")
                         }.onFailure {
                           Toast.makeText(context, "合成失败：${it.message}", Toast.LENGTH_LONG).show()
@@ -727,6 +731,61 @@ fun DocScannerScreen(
                     Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("合成 PDF")
+                  }
+                }
+
+                lastExportedPdfUri?.let { pdfUri ->
+                  Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                    modifier = Modifier.fillMaxWidth().testTag("scanner_post_export_bar"),
+                  ) {
+                    Column(
+                      verticalArrangement = Arrangement.spacedBy(8.dp),
+                      modifier = Modifier.padding(12.dp),
+                    ) {
+                      Text(
+                        text = "已生成扫描 PDF，一键直达：",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                      )
+                      Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                      ) {
+                        FilledTonalButton(
+                          onClick = {
+                            haptics.click()
+                            onOpenPdfAnnotate(pdfUri)
+                          },
+                          shape = RoundedCornerShape(12.dp),
+                          modifier = Modifier.weight(1f),
+                        ) {
+                          Text("PDF 批注", maxLines = 1)
+                        }
+                        FilledTonalButton(
+                          onClick = {
+                            haptics.click()
+                            onOpenPdfToolkit(pdfUri)
+                          },
+                          shape = RoundedCornerShape(12.dp),
+                          modifier = Modifier.weight(1f),
+                        ) {
+                          Text("加密/拆分", maxLines = 1)
+                        }
+                        FilledTonalButton(
+                          onClick = {
+                            haptics.click()
+                            onOpenLanShare(pdfUri)
+                          },
+                          shape = RoundedCornerShape(12.dp),
+                          modifier = Modifier.weight(1f),
+                        ) {
+                          Text("局域网快传", maxLines = 1)
+                        }
+                      }
+                    }
                   }
                 }
               }

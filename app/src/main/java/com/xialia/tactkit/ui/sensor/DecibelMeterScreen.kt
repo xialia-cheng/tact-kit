@@ -256,10 +256,10 @@ fun DecibelMeterScreen(
                   verticalAlignment = Alignment.Bottom,
                   horizontalArrangement = Arrangement.Center,
                 ) {
-                  Text(
+                  com.xialia.tactkit.ui.components.RollingNumberText(
                     text = if (sampleCount == 0) "--.-" else String.format(Locale.US, "%.1f", currentDb),
                     fontFamily = TactKitMono,
-                    fontSize = 54.sp,
+                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 54.sp),
                     fontWeight = FontWeight.Bold,
                     color =
                       if (currentDb >= 82f) MaterialTheme.colorScheme.error

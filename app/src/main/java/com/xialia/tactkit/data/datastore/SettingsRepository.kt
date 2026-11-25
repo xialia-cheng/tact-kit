@@ -30,6 +30,8 @@ data class UserPreferences(
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
   val dynamicColor: Boolean = true,
   val liquidGlassPowerSave: Boolean = false,
+  val autoCheckUpdates: Boolean = true,
+  val hasCompletedOnboarding: Boolean = false,
   val pinnedToolIds: List<String> = DEFAULT_PINNED_TOOL_IDS,
   val aiBaseUrl: String = DEFAULT_AI_BASE_URL,
   val aiModel: String = DEFAULT_AI_MODEL,
@@ -58,6 +60,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val THEME_MODE = stringPreferencesKey("theme_mode")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val LIQUID_GLASS_POWER_SAVE = booleanPreferencesKey("liquid_glass_power_save")
+    val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_updates")
+    val HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
     val PINNED_TOOL_IDS = stringPreferencesKey("pinned_tool_ids")
     val AI_BASE_URL = stringPreferencesKey("ai_base_url")
     val AI_MODEL = stringPreferencesKey("ai_model")
@@ -117,6 +121,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
           themeMode = themeMode,
           dynamicColor = dynamicColor,
           liquidGlassPowerSave = powerSave,
+          autoCheckUpdates = prefs[Keys.AUTO_CHECK_UPDATES] ?: true,
+          hasCompletedOnboarding = prefs[Keys.HAS_COMPLETED_ONBOARDING] ?: false,
           pinnedToolIds = pinnedIds,
           aiBaseUrl =
             prefs[Keys.AI_BASE_URL]?.takeIf { it.isNotBlank() }
@@ -143,6 +149,14 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
   suspend fun setLiquidGlassPowerSave(enabled: Boolean) {
     dataStore.edit { it[Keys.LIQUID_GLASS_POWER_SAVE] = enabled }
+  }
+
+  suspend fun setAutoCheckUpdates(enabled: Boolean) {
+    dataStore.edit { it[Keys.AUTO_CHECK_UPDATES] = enabled }
+  }
+
+  suspend fun setHasCompletedOnboarding(completed: Boolean) {
+    dataStore.edit { it[Keys.HAS_COMPLETED_ONBOARDING] = completed }
   }
 
   suspend fun togglePinnedTool(toolId: String) {

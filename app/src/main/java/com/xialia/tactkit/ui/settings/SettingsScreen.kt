@@ -182,9 +182,11 @@ fun SettingsScreen(
   onThemeModeChange: (ThemeMode) -> Unit,
   onDynamicColorChange: (Boolean) -> Unit,
   onLiquidGlassPowerSaveChange: (Boolean) -> Unit,
+  onAutoCheckUpdatesChange: (Boolean) -> Unit = {},
   onSaveAiSettings: suspend (baseUrl: String, model: String, plainApiKey: String?) -> Result<Unit>,
   onClearAiApiKey: () -> Unit,
   onGetDecryptedAiApiKey: suspend () -> String,
+  onOpenHelpTips: () -> Unit = {},
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -448,11 +450,50 @@ fun SettingsScreen(
                   Icon(
                     imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                     contentDescription = "打开 GitHub 仓库",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                   )
                 }
               }
+            }
+          }
+
+          // 1.5 Prominent Help & Tips Entry Card
+          com.xialia.tactkit.ui.components.TactileCard(
+            onClick = onOpenHelpTips,
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            baseCorner = 22.dp,
+            pressedCorner = 26.dp,
+            modifier = Modifier.fillMaxWidth().testTag("settings_help_tips_entry"),
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(14.dp),
+              modifier = Modifier.fillMaxWidth().padding(18.dp),
+            ) {
+              Icon(
+                imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(26.dp),
+              )
+              Column(modifier = Modifier.weight(1f)) {
+                Text(
+                  text = "帮助和提示",
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Bold,
+                )
+                Text(
+                  text = "全功能图文指南、权限排查、关键词搜索与重播新手引导",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                )
+              }
+              Icon(
+                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                contentDescription = "进入帮助和提示",
+                modifier = Modifier.size(18.dp),
+              )
             }
           }
 
@@ -854,6 +895,33 @@ fun SettingsScreen(
 
             Row(
               verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text(
+                  text = "启动时自动检查更新",
+                  style = MaterialTheme.typography.titleSmall,
+                  fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                  text = "冷启动双路并发竞速检测新版本，失败时静默不打扰",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+              Switch(
+                checked = preferences.autoCheckUpdates,
+                onCheckedChange = {
+                  haptics.tick()
+                  onAutoCheckUpdatesChange(it)
+                },
+                modifier = Modifier.testTag("settings_auto_update_switch"),
+              )
+            }
+
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(8.dp),
               modifier = Modifier.fillMaxWidth(),
             ) {
@@ -891,6 +959,8 @@ fun SettingsScreen(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            var showUpdateDialog by remember { mutableStateOf(false) }
+
             FilledTonalButton(
               enabled = !isCheckingUpdate,
               onClick = {
@@ -902,6 +972,9 @@ fun SettingsScreen(
                     .onSuccess { info ->
                       haptics.confirm()
                       releaseInfo = info
+                      if (info.isUpdateAvailable) {
+                        showUpdateDialog = true
+                      }
                     }
                     .onFailure { err ->
                       updateError = err.message ?: "无法连接 GitHub Releases"
@@ -918,11 +991,21 @@ fun SettingsScreen(
                   modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("正在查询 GitHub Releases...")
+                Text("正在双路竞速查询 Releases...")
               } else {
                 Icon(Icons.Rounded.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("检查更新")
+              }
+            }
+
+            if (showUpdateDialog) {
+              releaseInfo?.takeIf { it.isUpdateAvailable }?.let { info ->
+                com.xialia.tactkit.ui.components.NewVersionUpdateDialog(
+                  releaseInfo = info,
+                  currentVersionName = appVersionInfo.versionName,
+                  onDismiss = { showUpdateDialog = false },
+                )
               }
             }
 
@@ -957,7 +1040,7 @@ fun SettingsScreen(
                     Button(
                       onClick = {
                         haptics.tick()
-                        openBrowserUrl(context, info.htmlUrl)
+                        showUpdateDialog = true
                       },
                       shape = RoundedCornerShape(12.dp),
                       modifier = Modifier.fillMaxWidth().testTag("settings_download_update_btn"),
@@ -968,7 +1051,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(16.dp),
                       )
                       Spacer(modifier = Modifier.width(6.dp))
-                      Text("前往 GitHub 下载安装包")
+                      Text("选择下载线路 (官方 / 镜像)")
                     }
                   }
                 }
@@ -1114,7 +1197,11 @@ private fun ExpandableSettingsCard(
         )
       }
 
-      AnimatedVisibility(visible = expanded) {
+      AnimatedVisibility(
+        visible = expanded,
+        enter = com.xialia.tactkit.ui.components.tactileExpandVertically(),
+        exit = com.xialia.tactkit.ui.components.tactileShrinkVertically(),
+      ) {
         Column(
           verticalArrangement = Arrangement.spacedBy(10.dp),
           modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),

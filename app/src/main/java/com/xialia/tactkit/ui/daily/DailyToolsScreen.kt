@@ -566,10 +566,9 @@ fun DailyToolsScreen(
                     }
                   }
 
-                  Text(
+                  com.xialia.tactkit.ui.components.RollingNumberText(
                     text = String.format("%02d:%02d", mm, ss),
-                    fontSize = 56.sp,
-                    lineHeight = 64.sp,
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 56.sp, lineHeight = 64.sp),
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = TactKitMono,
                     color = MaterialTheme.colorScheme.primary,

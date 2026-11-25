@@ -239,7 +239,7 @@ fun BatteryHardwareScreen(
 @Composable
 private fun HardwareMetricItem(label: String, value: String) {
   Column(horizontalAlignment = Alignment.CenterHorizontally) {
-    Text(
+    com.xialia.tactkit.ui.components.RollingNumberText(
       text = value,
       fontFamily = TactKitMono,
       style = MaterialTheme.typography.titleSmall,

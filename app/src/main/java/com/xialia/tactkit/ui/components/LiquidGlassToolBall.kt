@@ -60,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +76,7 @@ import com.xialia.tactkit.R
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
 /**
@@ -88,8 +90,10 @@ fun LiquidGlassToolBallOverlay(
   onLaunchTool: (ToolItem) -> Unit,
   onTogglePinTool: (String) -> Unit,
   modifier: Modifier = Modifier,
+  ballModifier: Modifier = Modifier,
 ) {
   val haptics = rememberAppHaptics()
+  val view = LocalView.current
   var isExpanded by remember { mutableStateOf(false) }
   var searchQuery by remember { mutableStateOf("") }
 
@@ -362,7 +366,8 @@ fun LiquidGlassToolBallOverlay(
       Box(
         contentAlignment = Alignment.Center,
         modifier =
-          Modifier.size(56.dp)
+          ballModifier
+            .size(56.dp)
             .tactilePress(
               interactionSource = orbInteraction,
               pressedScale = 0.90f,
@@ -382,7 +387,7 @@ fun LiquidGlassToolBallOverlay(
               interactionSource = orbInteraction,
               indication = null,
             ) {
-              haptics.tick()
+              AppHaptics.click(view)
               isExpanded = true
             }
             .testTag("liquid_glass_tool_ball"),
@@ -500,7 +505,11 @@ private fun CategoryToolCard(
         )
       }
 
-      AnimatedVisibility(visible = expanded) {
+      AnimatedVisibility(
+        visible = expanded,
+        enter = tactileExpandVertically(),
+        exit = tactileShrinkVertically(),
+      ) {
         Column(
           verticalArrangement = Arrangement.spacedBy(8.dp),
           modifier = Modifier.padding(top = 8.dp),

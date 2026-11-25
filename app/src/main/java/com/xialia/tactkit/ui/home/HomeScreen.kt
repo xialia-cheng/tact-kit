@@ -76,14 +76,19 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -101,13 +106,19 @@ import com.xialia.tactkit.domain.ToolItem
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.components.LiquidGlassToolBallOverlay
+import com.xialia.tactkit.ui.components.NewVersionUpdateDialog
+import com.xialia.tactkit.ui.components.OnboardingStep
+import com.xialia.tactkit.ui.components.OnboardingWelcomeDialog
 import com.xialia.tactkit.ui.components.PetalIconBadge
+import com.xialia.tactkit.ui.components.RollingNumberText
+import com.xialia.tactkit.ui.components.SpotlightOnboardingOverlay
 import com.xialia.tactkit.ui.components.TactileCard
 import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
 private data class QuickStripEntry(
@@ -139,6 +150,9 @@ fun HomeScreen(
   onImportLocalFile: (Uri) -> Unit,
   onTogglePinTool: (String) -> Unit,
   onClearStatusMessage: () -> Unit,
+  onDismissAvailableUpdate: () -> Unit = {},
+  onCompleteOnboarding: () -> Unit = {},
+  replayOnboardingTick: Int = 0,
   onNavigateToSettings: () -> Unit,
   onOpenPdfToolkit: (String?) -> Unit,
   onOpenPdfAnnotate: (String?) -> Unit,
@@ -173,6 +187,7 @@ fun HomeScreen(
   onConsumedHomeDialog: () -> Unit = {},
 ) {
   val context = LocalContext.current
+  val view = LocalView.current
   val haptics = rememberAppHaptics()
   val snackbarHostState = remember { SnackbarHostState() }
 
@@ -181,6 +196,27 @@ fun HomeScreen(
   var editingNote by remember { mutableStateOf<WorkbenchCard.Note?>(null) }
   var showCreateNoteDialog by remember { mutableStateOf(false) }
   var showVoiceMemoDialog by remember { mutableStateOf(false) }
+
+  var showOnboardingWelcome by remember { mutableStateOf(false) }
+  var activeOnboardingStep by remember { mutableStateOf<OnboardingStep?>(null) }
+  var hasDismissedWelcomeThisSession by remember { mutableStateOf(false) }
+  val targetBoundsMap = remember { mutableStateMapOf<OnboardingStep, Rect>() }
+
+  LaunchedEffect(uiState.preferences.hasCompletedOnboarding, hasDismissedWelcomeThisSession) {
+    if (!uiState.preferences.hasCompletedOnboarding && !hasDismissedWelcomeThisSession && activeOnboardingStep == null) {
+      showOnboardingWelcome = true
+    } else if (uiState.preferences.hasCompletedOnboarding) {
+      showOnboardingWelcome = false
+    }
+  }
+
+  LaunchedEffect(replayOnboardingTick) {
+    if (replayOnboardingTick > 0) {
+      hasDismissedWelcomeThisSession = false
+      showOnboardingWelcome = false
+      activeOnboardingStep = OnboardingStep.DASHBOARD
+    }
+  }
 
   LaunchedEffect(pendingHomeDialog) {
     when (pendingHomeDialog) {
@@ -282,7 +318,7 @@ fun HomeScreen(
             actions = {
               IconButton(
                 onClick = {
-                  haptics.tick()
+                  AppHaptics.click(view)
                   isSearchBarVisible = !isSearchBarVisible
                   if (!isSearchBarVisible) onSearchQueryChange("")
                 },
@@ -296,10 +332,14 @@ fun HomeScreen(
               }
               IconButton(
                 onClick = {
-                  haptics.tick()
+                  AppHaptics.click(view)
                   onNavigateToSettings()
                 },
-                modifier = Modifier.testTag("settings_button"),
+                modifier =
+                  Modifier.onGloballyPositioned { coords ->
+                      targetBoundsMap[OnboardingStep.SETTINGS_ENTRY] = coords.boundsInRoot()
+                    }
+                    .testTag("settings_button"),
               ) {
                 Icon(
                   imageVector = Icons.Rounded.Settings,
@@ -486,19 +526,31 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
               ) {
                 item(span = { GridItemSpan(2) }, key = "quick_strip") {
-                  QuickActionStrip(entries = quickStripEntries)
+                  QuickActionStrip(
+                    entries = quickStripEntries,
+                    modifier =
+                      Modifier.onGloballyPositioned { coords ->
+                        targetBoundsMap[OnboardingStep.QUICK_STRIP] = coords.boundsInRoot()
+                      },
+                  )
                 }
                 item(span = { GridItemSpan(2) }, key = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
                     onFilterChange = {
-                      haptics.tick()
+                      AppHaptics.click(view)
                       onFilterChange(it)
                     },
                     onOpenRecentFile = openRecentFile,
                     onOpenFileManager = {
-                      haptics.tick()
+                      AppHaptics.click(view)
                       onOpenFileManager()
+                    },
+                    onDashboardPositioned = { rect ->
+                      targetBoundsMap[OnboardingStep.DASHBOARD] = rect
+                    },
+                    onFileManagerButtonPositioned = { rect ->
+                      targetBoundsMap[OnboardingStep.FILE_MANAGER] = rect
                     },
                   )
                 }
@@ -553,19 +605,31 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
               ) {
                 item(key = "quick_strip") {
-                  QuickActionStrip(entries = quickStripEntries)
+                  QuickActionStrip(
+                    entries = quickStripEntries,
+                    modifier =
+                      Modifier.onGloballyPositioned { coords ->
+                        targetBoundsMap[OnboardingStep.QUICK_STRIP] = coords.boundsInRoot()
+                      },
+                  )
                 }
                 item(key = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
                     onFilterChange = {
-                      haptics.tick()
+                      AppHaptics.click(view)
                       onFilterChange(it)
                     },
                     onOpenRecentFile = openRecentFile,
                     onOpenFileManager = {
-                      haptics.tick()
+                      AppHaptics.click(view)
                       onOpenFileManager()
+                    },
+                    onDashboardPositioned = { rect ->
+                      targetBoundsMap[OnboardingStep.DASHBOARD] = rect
+                    },
+                    onFileManagerButtonPositioned = { rect ->
+                      targetBoundsMap[OnboardingStep.FILE_MANAGER] = rect
                     },
                   )
                 }
@@ -623,6 +687,10 @@ fun HomeScreen(
       backdrop = backdrop,
       isPowerSaveMode = uiState.preferences.liquidGlassPowerSave,
       pinnedToolIds = uiState.preferences.pinnedToolIds,
+      ballModifier =
+        Modifier.onGloballyPositioned { coords ->
+          targetBoundsMap[OnboardingStep.TOOL_BALL] = coords.boundsInRoot()
+        },
       onLaunchTool = { tool: ToolItem ->
         when (tool.id) {
           "quick_note" -> showCreateNoteDialog = true
@@ -662,6 +730,51 @@ fun HomeScreen(
       },
       onTogglePinTool = onTogglePinTool,
     )
+
+    // Interactive Spotlight Onboarding Overlay (5 steps on real HomeScreen)
+    activeOnboardingStep?.let { step ->
+      SpotlightOnboardingOverlay(
+        currentStep = step,
+        targetBoundsMap = targetBoundsMap,
+        onAdvanceStep = {
+          val steps = OnboardingStep.entries
+          val nextIdx = steps.indexOf(step) + 1
+          if (nextIdx < steps.size) {
+            activeOnboardingStep = steps[nextIdx]
+          } else {
+            activeOnboardingStep = null
+            onCompleteOnboarding()
+          }
+        },
+        onSkipTutorial = {
+          activeOnboardingStep = null
+          hasDismissedWelcomeThisSession = true
+          onCompleteOnboarding()
+        },
+      )
+    }
+  }
+
+  if (showOnboardingWelcome && activeOnboardingStep == null) {
+    OnboardingWelcomeDialog(
+      onSkipForever = {
+        showOnboardingWelcome = false
+        hasDismissedWelcomeThisSession = true
+        onCompleteOnboarding()
+      },
+      onStartTutorial = {
+        showOnboardingWelcome = false
+        activeOnboardingStep = OnboardingStep.DASHBOARD
+      },
+    )
+  } else if (activeOnboardingStep == null) {
+    uiState.availableUpdate?.let { releaseInfo ->
+      NewVersionUpdateDialog(
+        releaseInfo = releaseInfo,
+        currentVersionName = BuildConfig.VERSION_NAME,
+        onDismiss = onDismissAvailableUpdate,
+      )
+    }
   }
 
   if (showCreateChecklistDialog) {
@@ -711,15 +824,22 @@ fun HomeScreen(
 }
 
 @Composable
-private fun QuickActionStrip(entries: List<QuickStripEntry>) {
+private fun QuickActionStrip(
+  entries: List<QuickStripEntry>,
+  modifier: Modifier = Modifier,
+) {
+  val view = LocalView.current
   LazyRow(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
-    modifier = Modifier.fillMaxWidth().testTag("quick_action_strip"),
+    modifier = modifier.fillMaxWidth().testTag("quick_action_strip"),
   ) {
     items(entries, key = { it.id }) { entry ->
       val interaction = remember { MutableInteractionSource() }
       Surface(
-        onClick = entry.onClick,
+        onClick = {
+          AppHaptics.click(view)
+          entry.onClick()
+        },
         interactionSource = interaction,
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -765,6 +885,8 @@ private fun WorkbenchOverviewSection(
   onFilterChange: (CardFilter) -> Unit,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
   onOpenFileManager: () -> Unit,
+  onDashboardPositioned: (Rect) -> Unit = {},
+  onFileManagerButtonPositioned: (Rect) -> Unit = {},
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     // Borderless tonal overview card (no inner boxes around stat numbers)
@@ -773,7 +895,10 @@ private fun WorkbenchOverviewSection(
       color = MaterialTheme.colorScheme.surfaceContainerLow,
       tonalElevation = 0.dp,
       shadowElevation = 0.dp,
-      modifier = Modifier.fillMaxWidth().testTag("workbench_overview_card"),
+      modifier =
+        Modifier.fillMaxWidth()
+          .onGloballyPositioned { coords -> onDashboardPositioned(coords.boundsInRoot()) }
+          .testTag("workbench_overview_card"),
     ) {
       Column(
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -847,6 +972,7 @@ private fun WorkbenchOverviewSection(
       stats = uiState.dashboardStats,
       onOpenRecentFile = onOpenRecentFile,
       onOpenFileManager = onOpenFileManager,
+      onFileManagerButtonPositioned = onFileManagerButtonPositioned,
     )
 
     // Aligned borderless tonal filter tabs
@@ -910,7 +1036,7 @@ private fun OverviewStatTile(
     verticalArrangement = Arrangement.spacedBy(2.dp),
     modifier = modifier.padding(vertical = 4.dp, horizontal = 4.dp),
   ) {
-    Text(
+    RollingNumberText(
       text = "$count",
       style = MaterialTheme.typography.headlineSmall,
       fontWeight = FontWeight.Bold,
@@ -1196,6 +1322,7 @@ private fun DocumentDashboardCard(
   stats: DocumentDashboardStats,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
   onOpenFileManager: () -> Unit,
+  onFileManagerButtonPositioned: (Rect) -> Unit = {},
 ) {
   Surface(
     shape = RoundedCornerShape(22.dp),
@@ -1234,7 +1361,11 @@ private fun DocumentDashboardCard(
             onClick = onOpenFileManager,
             shape = ContinuousCapsule(),
             color = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.testTag("dashboard_open_file_manager"),
+            modifier =
+              Modifier.onGloballyPositioned { coords ->
+                  onFileManagerButtonPositioned(coords.boundsInRoot())
+                }
+                .testTag("dashboard_open_file_manager"),
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,

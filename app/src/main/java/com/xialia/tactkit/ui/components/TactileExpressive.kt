@@ -2,10 +2,21 @@ package com.xialia.tactkit.ui.components
 
 import android.graphics.Matrix as AndroidMatrix
 import android.graphics.Path as AndroidPath
-import androidx.compose.animation.core.Spring
+import android.view.SoundEffectConstants
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,55 +53,101 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.star
 import androidx.graphics.shapes.toPath
+import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
+
+private val TactilePressSpringFloat = spring<Float>(dampingRatio = 0.7f, stiffness = 420f)
+private val TactilePressSpringDp = spring<Dp>(dampingRatio = 0.7f, stiffness = 420f)
+private val TactileExpandSpringIntSize = spring<IntSize>(dampingRatio = 0.78f, stiffness = 420f)
+private val TactileExpandSpringFloat = spring<Float>(dampingRatio = 0.78f, stiffness = 420f)
+
+fun tactileExpandVertically(): EnterTransition =
+  expandVertically(animationSpec = TactileExpandSpringIntSize) +
+    fadeIn(animationSpec = TactileExpandSpringFloat)
+
+fun tactileShrinkVertically(): ExitTransition =
+  shrinkVertically(animationSpec = TactileExpandSpringIntSize) +
+    fadeOut(animationSpec = TactileExpandSpringFloat)
+
+@Composable
+fun RollingNumberText(
+  text: String,
+  modifier: Modifier = Modifier,
+  style: TextStyle = LocalTextStyle.current,
+  color: Color = Color.Unspecified,
+  fontWeight: FontWeight? = null,
+  fontFamily: FontFamily? = null,
+) {
+  AnimatedContent(
+    targetState = text,
+    transitionSpec = {
+      ContentTransform(
+        targetContentEnter =
+          slideInVertically(animationSpec = spring(dampingRatio = 0.78f, stiffness = 420f)) { it / 2 } +
+            fadeIn(animationSpec = spring(stiffness = 420f)),
+        initialContentExit =
+          slideOutVertically(animationSpec = spring(dampingRatio = 0.78f, stiffness = 420f)) { -it / 2 } +
+            fadeOut(animationSpec = spring(stiffness = 420f)),
+      )
+    },
+    label = "rolling_number_text",
+    modifier = modifier,
+  ) { value ->
+    Text(
+      text = value,
+      style = style,
+      color = color,
+      fontWeight = fontWeight,
+      fontFamily = fontFamily,
+      maxLines = 1,
+      softWrap = false,
+    )
+  }
+}
 
 /**
  * Pure Compose zero-bloat M3 Expressive "Q-bounce" tactile press modifier:
- * observes MutableInteractionSource.collectIsPressedAsState(), drives spring scaling (1f -> 0.94f),
+ * observes MutableInteractionSource.collectIsPressedAsState(), drives spring(0.7f, 420f) scaling (1f -> 0.95f),
  * dynamic corner radius morphing, and CLOCK_TICK micro-haptics.
  */
 fun Modifier.tactilePress(
   interactionSource: MutableInteractionSource,
-  pressedScale: Float = 0.94f,
+  pressedScale: Float = 0.95f,
   baseCorner: Dp = 18.dp,
   pressedCorner: Dp = 26.dp,
   enableHapticOnPress: Boolean = true,
 ): Modifier = composed {
   val isPressed by interactionSource.collectIsPressedAsState()
-  val haptics = rememberAppHaptics()
+  val view = LocalView.current
 
   LaunchedEffect(isPressed) {
     if (isPressed && enableHapticOnPress) {
-      haptics.tick()
+      AppHaptics.tick(view)
     }
   }
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed) pressedScale else 1f,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringFloat,
     label = "tactile_scale",
   )
 
   val cornerRadius by animateDpAsState(
     targetValue = if (isPressed) pressedCorner else baseCorner,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringDp,
     label = "tactile_corner",
   )
 
@@ -102,7 +160,41 @@ fun Modifier.tactilePress(
 }
 
 /**
- * M3 Expressive bouncy card container with spring scale + corner morphing + ripple + CLOCK_TICK haptics.
+ * Combined Q-bounce tactile press + clickable + SoundEffectConstants.CLICK + AppHaptics.tick(view).
+ */
+fun Modifier.tactileClickable(
+  enabled: Boolean = true,
+  pressedScale: Float = 0.95f,
+  baseCorner: Dp = 18.dp,
+  pressedCorner: Dp = 26.dp,
+  role: Role? = Role.Button,
+  onClick: () -> Unit,
+): Modifier = composed {
+  val interactionSource = remember { MutableInteractionSource() }
+  val view = LocalView.current
+  this
+    .tactilePress(
+      interactionSource = interactionSource,
+      pressedScale = if (enabled) pressedScale else 1f,
+      baseCorner = baseCorner,
+      pressedCorner = pressedCorner,
+      enableHapticOnPress = false,
+    )
+    .clickable(
+      interactionSource = interactionSource,
+      indication = ripple(),
+      enabled = enabled,
+      role = role,
+      onClick = {
+        view.playSoundEffect(SoundEffectConstants.CLICK)
+        AppHaptics.tick(view)
+        onClick()
+      },
+    )
+}
+
+/**
+ * M3 Expressive bouncy card container with spring(0.7f, 420f) scale + corner morphing + ripple + sound + haptics.
  */
 @Composable
 fun TactileCard(
@@ -119,31 +211,17 @@ fun TactileCard(
 ) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-  val haptics = rememberAppHaptics()
-
-  LaunchedEffect(isPressed) {
-    if (isPressed && enabled) {
-      haptics.tick()
-    }
-  }
+  val view = LocalView.current
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed && enabled) pressedScale else 1f,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringFloat,
     label = "tactile_card_scale",
   )
 
   val corner by animateDpAsState(
     targetValue = if (isPressed && enabled) pressedCorner else baseCorner,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringDp,
     label = "tactile_card_corner",
   )
 
@@ -165,7 +243,11 @@ fun TactileCard(
           indication = ripple(),
           enabled = enabled,
           role = Role.Button,
-          onClick = onClick,
+          onClick = {
+            view.playSoundEffect(SoundEffectConstants.CLICK)
+            AppHaptics.tick(view)
+            onClick()
+          },
         ),
   ) {
     androidx.compose.foundation.layout.Column(content = content)
@@ -185,29 +267,17 @@ fun TactileModeChip(
 ) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-  val haptics = rememberAppHaptics()
-
-  LaunchedEffect(isPressed) {
-    if (isPressed) haptics.tick()
-  }
+  val view = LocalView.current
 
   val scale by animateFloatAsState(
-    targetValue = if (isPressed) 0.94f else 1f,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    targetValue = if (isPressed) 0.95f else 1f,
+    animationSpec = TactilePressSpringFloat,
     label = "chip_scale",
   )
 
   val corner by animateDpAsState(
     targetValue = if (isPressed) 22.dp else if (selected) 16.dp else 14.dp,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringDp,
     label = "chip_corner",
   )
 
@@ -235,7 +305,11 @@ fun TactileModeChip(
           interactionSource = interactionSource,
           indication = ripple(),
           role = Role.Tab,
-          onClick = onClick,
+          onClick = {
+            view.playSoundEffect(SoundEffectConstants.CLICK)
+            AppHaptics.tick(view)
+            onClick()
+          },
         ),
   ) {
     Row(
@@ -262,7 +336,7 @@ fun TactileModeChip(
 }
 
 /**
- * M3 Expressive bouncy primary action button (scale 1f -> 0.94f, dynamic corner morph).
+ * M3 Expressive bouncy primary action button (scale 1f -> 0.95f, dynamic corner morph, sound + haptics).
  */
 @Composable
 fun TactileActionButton(
@@ -276,29 +350,17 @@ fun TactileActionButton(
 ) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-  val haptics = rememberAppHaptics()
-
-  LaunchedEffect(isPressed) {
-    if (isPressed && enabled) haptics.tick()
-  }
+  val view = LocalView.current
 
   val scale by animateFloatAsState(
-    targetValue = if (isPressed && enabled) 0.94f else 1f,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    targetValue = if (isPressed && enabled) 0.95f else 1f,
+    animationSpec = TactilePressSpringFloat,
     label = "btn_scale",
   )
 
   val corner by animateDpAsState(
     targetValue = if (isPressed && enabled) 26.dp else 16.dp,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
+    animationSpec = TactilePressSpringDp,
     label = "btn_corner",
   )
 
@@ -317,7 +379,11 @@ fun TactileActionButton(
           indication = ripple(),
           enabled = enabled,
           role = Role.Button,
-          onClick = onClick,
+          onClick = {
+            view.playSoundEffect(SoundEffectConstants.CLICK)
+            AppHaptics.tick(view)
+            onClick()
+          },
         ),
   ) {
     Row(

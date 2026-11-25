@@ -2,6 +2,7 @@ package com.xialia.tactkit.ui.files
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOff
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -95,9 +97,12 @@ fun FileEntryThumbnailOrBadge(
     return
   }
 
+  val isVideoFile =
+    entry.category == FileCategory.AUDIO_VIDEO &&
+      entry.extension.lowercase() in setOf("mp4", "mkv", "mov", "webm", "avi", "3gp", "m4v")
   val shouldLoadThumb =
-    entry.category == FileCategory.IMAGES &&
-      entry.extension !in setOf("svg", "raw", "dng")
+    (entry.category == FileCategory.IMAGES && entry.extension.lowercase() !in setOf("svg", "raw", "dng")) ||
+      isVideoFile
 
   val thumbnail by
     produceState<Bitmap?>(initialValue = null, key1 = entry.id, key2 = entry.lastModifiedMs) {
@@ -106,35 +111,64 @@ fun FileEntryThumbnailOrBadge(
           null
         } else {
           withContext(Dispatchers.IO) {
-            decodeScaledThumbnail(
-              absolutePath = entry.absolutePath,
-              safUriString = entry.safUriString,
-              context = context,
-              targetPx = 128,
-            )
+            if (isVideoFile) {
+              decodeVideoThumbnail(
+                absolutePath = entry.absolutePath,
+                safUriString = entry.safUriString,
+                context = context,
+              )
+            } else {
+              decodeScaledThumbnail(
+                absolutePath = entry.absolutePath,
+                safUriString = entry.safUriString,
+                context = context,
+                targetPx = 240,
+              )
+            }
           }
         }
     }
 
+  val sizedModifier =
+    if (size != Dp.Unspecified) modifier.size(size).clip(shape)
+    else modifier.clip(shape)
+
   val loadedBitmap = thumbnail
   if (loadedBitmap != null) {
-    Image(
-      bitmap = loadedBitmap.asImageBitmap(),
-      contentDescription = null,
-      contentScale = ContentScale.Crop,
-      modifier = modifier.size(size).clip(shape),
-    )
+    Box(modifier = sizedModifier) {
+      Image(
+        bitmap = loadedBitmap.asImageBitmap(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.matchParentSize(),
+      )
+      if (isVideoFile) {
+        Surface(
+          shape = RoundedCornerShape(999.dp),
+          color = Color.Black.copy(alpha = 0.55f),
+          modifier = Modifier.align(Alignment.Center).size(26.dp),
+        ) {
+          Icon(
+            imageVector = androidx.compose.material.icons.Icons.Rounded.PlayArrow,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.padding(4.dp),
+          )
+        }
+      }
+    }
   } else {
     val (bg, fg) = categoryTonalColors(entry.category)
+    val fallbackIconSize = if (size != Dp.Unspecified) size * 0.46f else 28.dp
     Box(
       contentAlignment = Alignment.Center,
-      modifier = modifier.size(size).clip(shape).background(bg),
+      modifier = sizedModifier.background(bg),
     ) {
       Icon(
         imageVector = entry.category.icon,
         contentDescription = null,
         tint = fg,
-        modifier = Modifier.size(size * 0.48f),
+        modifier = Modifier.size(fallbackIconSize),
       )
     }
   }
@@ -202,6 +236,27 @@ private fun decodeScaledThumbnail(
       null
     }
   }.getOrNull()
+}
+
+private fun decodeVideoThumbnail(
+  absolutePath: String?,
+  safUriString: String?,
+  context: android.content.Context,
+): Bitmap? {
+  val retriever = MediaMetadataRetriever()
+  return runCatching {
+    if (absolutePath != null) {
+      retriever.setDataSource(absolutePath)
+    } else if (safUriString != null) {
+      retriever.setDataSource(context, Uri.parse(safUriString))
+    } else {
+      return null
+    }
+    retriever.getFrameAtTime(500_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+      ?: retriever.frameAtTime
+  }.getOrNull().also {
+    runCatching { retriever.release() }
+  }
 }
 
 private fun calculateInSampleSize(width: Int, height: Int, targetPx: Int): Int {

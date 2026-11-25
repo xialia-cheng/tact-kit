@@ -128,9 +128,9 @@ class Phase6FileManagerTest {
     val recent = FileManagerEngine.scanRecentFiles(context, rootDir = tempRoot)
     assertEquals(2, recent.size)
     assertEquals(f2.name, recent[0].name)
-    assertEquals("来自 微信", recent[0].sourceLabel)
+    assertEquals("微信", recent[0].sourceLabel)
     assertEquals(f1.name, recent[1].name)
-    assertEquals("来自 QQ", recent[1].sourceLabel)
+    assertEquals("QQ", recent[1].sourceLabel)
 
     val found = FileManagerEngine.searchFiles(context, query = ".jks", rootDir = tempRoot)
     assertEquals(1, found.size)

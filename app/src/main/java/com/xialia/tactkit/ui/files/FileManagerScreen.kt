@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -87,6 +88,7 @@ import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -166,6 +168,7 @@ fun FileManagerWorkspace(
   var refreshTick by remember { mutableIntStateOf(0) }
 
   var mode by remember { mutableStateOf(FileManagerMode.RECENT) }
+  var isSearchVisible by remember { mutableStateOf(false) }
   var searchQuery by remember { mutableStateOf("") }
   var searchResults by remember { mutableStateOf<List<ManagedFileEntry>>(emptyList()) }
   var isSearching by remember { mutableStateOf(false) }
@@ -173,6 +176,7 @@ fun FileManagerWorkspace(
   // Recent tab state
   var recentFiles by remember { mutableStateOf<List<ManagedFileEntry>>(emptyList()) }
   var isScanningRecent by remember { mutableStateOf(false) }
+  var recentScanJob by remember { mutableStateOf<Job?>(null) }
   var selectedCategory by remember { mutableStateOf<FileCategory?>(null) }
   var sizeFilter by remember { mutableStateOf(SizeFilterMode.ALL) }
 
@@ -189,6 +193,7 @@ fun FileManagerWorkspace(
   // Cleanup tab state
   var spaceScanResult by remember { mutableStateOf<SpaceScanResult?>(null) }
   var isScanningSpace by remember { mutableStateOf(false) }
+  var spaceScanJob by remember { mutableStateOf<Job?>(null) }
   var cleanupCheckedIds by remember { mutableStateOf<Set<String>>(emptySet()) }
   var showCleanupDeleteDialog by remember { mutableStateOf(false) }
 
@@ -241,19 +246,28 @@ fun FileManagerWorkspace(
   }
 
   LaunchedEffect(hasPermission, refreshTick, preferences.linkedSafTreeUris, showHidden) {
+    recentScanJob?.cancel()
     if (hasPermission || preferences.linkedSafTreeUris.isNotEmpty()) {
-      isScanningRecent = true
-      recentFiles =
-        FileManagerEngine.scanRecentFiles(
-          context = context,
-          rootDir = rootDir,
-          linkedSafTreeUris = preferences.linkedSafTreeUris,
-          limit = 700,
-          includeHidden = showHidden,
-        )
-      isScanningRecent = false
+      val job =
+        scope.launch {
+          isScanningRecent = true
+          try {
+            recentFiles =
+              FileManagerEngine.scanRecentFiles(
+                context = context,
+                rootDir = rootDir,
+                linkedSafTreeUris = preferences.linkedSafTreeUris,
+                limit = 700,
+                includeHidden = showHidden,
+              )
+          } finally {
+            isScanningRecent = false
+          }
+        }
+      recentScanJob = job
     } else {
       recentFiles = emptyList()
+      isScanningRecent = false
     }
   }
 
@@ -452,7 +466,25 @@ fun FileManagerWorkspace(
               Icon(Icons.Rounded.Close, contentDescription = "退出多选")
             }
           } else {
-            IconButton(onClick = { refreshTick++ }) {
+            IconButton(
+              onClick = {
+                haptics.tick()
+                isSearchVisible = !isSearchVisible
+                if (!isSearchVisible) searchQuery = ""
+              },
+              modifier = Modifier.testTag("file_manager_search_toggle"),
+            ) {
+              Icon(
+                imageVector = if (isSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                contentDescription = "搜索文件",
+              )
+            }
+            IconButton(
+              onClick = {
+                haptics.tick()
+                refreshTick++
+              },
+            ) {
               Icon(Icons.Rounded.Refresh, contentDescription = "刷新")
             }
           }
@@ -516,7 +548,7 @@ fun FileManagerWorkspace(
     },
   ) { innerPadding ->
     Column(
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(6.dp),
       modifier = Modifier.fillMaxSize().padding(innerPadding),
     ) {
       if (!hasPermission && preferences.linkedSafTreeUris.isEmpty()) {
@@ -527,37 +559,44 @@ fun FileManagerWorkspace(
         return@Column
       }
 
-      if (hasPermission) {
-        StorageOverviewAndQuickLinks(
-          storage = storageOverview,
-          pinnedDirs = preferences.pinnedDirs,
-          messengerDirs = messengerDirs,
-          linkedSafCount = preferences.linkedSafTreeUris.size,
-          onOpenPinnedPath = { jumpToPathInTree(it) },
-          onLinkMessengerSaf = { safTreeLauncher.launch(null) },
+      // Single-line search bar expanded only when user taps TopAppBar search icon
+      AnimatedVisibility(visible = isSearchVisible) {
+        OutlinedTextField(
+          value = searchQuery,
+          onValueChange = { searchQuery = it },
+          placeholder = { Text("全局实时搜索文件名或后缀（如 .jks、.pem、apk）...") },
+          leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+          trailingIcon = {
+            if (searchQuery.isNotEmpty()) {
+              IconButton(onClick = { searchQuery = "" }) {
+                Icon(Icons.Rounded.Close, contentDescription = "清除搜索")
+              }
+            }
+          },
+          singleLine = true,
+          shape = RoundedCornerShape(16.dp),
+          modifier =
+            Modifier.fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 4.dp)
+              .testTag("file_manager_search"),
         )
       }
 
-      // Global Real-time Search
-      OutlinedTextField(
-        value = searchQuery,
-        onValueChange = { searchQuery = it },
-        placeholder = { Text("全局实时搜索文件名或后缀（如 .jks、.pem、apk）...") },
-        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-        trailingIcon = {
-          if (searchQuery.isNotEmpty()) {
-            IconButton(onClick = { searchQuery = "" }) {
-              Icon(Icons.Rounded.Close, contentDescription = "清除搜索")
-            }
+      val scrollableHeader: (@Composable () -> Unit)? =
+        if (hasPermission) {
+          {
+            StorageOverviewAndQuickLinks(
+              storage = storageOverview,
+              pinnedDirs = preferences.pinnedDirs,
+              messengerDirs = messengerDirs,
+              linkedSafCount = preferences.linkedSafTreeUris.size,
+              onOpenPinnedPath = { jumpToPathInTree(it) },
+              onLinkMessengerSaf = { safTreeLauncher.launch(null) },
+            )
           }
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(16.dp),
-        modifier =
-          Modifier.fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .testTag("file_manager_search"),
-      )
+        } else {
+          null
+        }
 
       if (searchQuery.isNotBlank()) {
         Text(
@@ -587,12 +626,12 @@ fun FileManagerWorkspace(
           }
         }
       } else {
-        // 3 single-line top mode capsules
+        // 3 single-line top mode capsules (pinned under TopAppBar)
         val visibleModes =
           if (isPickerMode) listOf(FileManagerMode.RECENT, FileManagerMode.TREE)
           else FileManagerMode.entries
         LazyRow(
-          contentPadding = PaddingValues(horizontal = 16.dp),
+          contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
           horizontalArrangement = Arrangement.spacedBy(8.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
@@ -625,6 +664,11 @@ fun FileManagerWorkspace(
               isScanning = isScanningRecent,
               isPickerMode = isPickerMode,
               selectedIds = selectedIds,
+              headerContent = scrollableHeader,
+              onCancelScan = {
+                recentScanJob?.cancel()
+                isScanningRecent = false
+              },
               onSelectCategory = { selectedCategory = it },
               onSelectSizeFilter = { sizeFilter = it },
               onEntryClick = ::handleEntryClick,
@@ -645,6 +689,7 @@ fun FileManagerWorkspace(
               sortBy = sortBy,
               selectedIds = selectedIds,
               isPickerMode = isPickerMode,
+              headerContent = scrollableHeader,
               onNavigateToDir = { dir ->
                 currentDir = dir
                 selectedIds = emptySet()
@@ -664,13 +709,23 @@ fun FileManagerWorkspace(
               scanResult = spaceScanResult,
               isScanning = isScanningSpace,
               checkedIds = cleanupCheckedIds,
+              headerContent = scrollableHeader,
               onTriggerScan = {
-                scope.launch {
-                  isScanningSpace = true
-                  cleanupCheckedIds = emptySet()
-                  spaceScanResult = FileManagerEngine.scanStorageWaste(rootDir)
-                  isScanningSpace = false
-                }
+                spaceScanJob?.cancel()
+                spaceScanJob =
+                  scope.launch {
+                    isScanningSpace = true
+                    cleanupCheckedIds = emptySet()
+                    try {
+                      spaceScanResult = FileManagerEngine.scanStorageWaste(rootDir)
+                    } finally {
+                      isScanningSpace = false
+                    }
+                  }
+              },
+              onCancelScan = {
+                spaceScanJob?.cancel()
+                isScanningSpace = false
               },
               onToggleChecked = { entry ->
                 cleanupCheckedIds =
