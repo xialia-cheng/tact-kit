@@ -25,6 +25,14 @@ data class SampledPixelColor(
 
 object ImageEngine {
 
+  private fun openUriStream(context: Context, uri: Uri): java.io.InputStream? {
+    return if (uri.scheme == "file" && !uri.path.isNullOrEmpty()) {
+      java.io.File(uri.path!!).takeIf { it.exists() }?.inputStream()
+    } else {
+      context.contentResolver.openInputStream(uri)
+    }
+  }
+
   suspend fun loadOrientedBitmap(
     context: Context,
     uri: Uri,
@@ -32,7 +40,7 @@ object ImageEngine {
   ): Bitmap? =
     withContext(Dispatchers.IO) {
       val orientation =
-        context.contentResolver.openInputStream(uri)?.use { stream ->
+        openUriStream(context, uri)?.use { stream ->
           runCatching {
             ExifInterface(stream).getAttributeInt(
               ExifInterface.TAG_ORIENTATION,
@@ -42,7 +50,7 @@ object ImageEngine {
         } ?: ExifInterface.ORIENTATION_NORMAL
 
       val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-      context.contentResolver.openInputStream(uri)?.use {
+      openUriStream(context, uri)?.use {
         BitmapFactory.decodeStream(it, null, bounds)
       }
       var sample = 1
@@ -53,7 +61,7 @@ object ImageEngine {
       }
       val opts = BitmapFactory.Options().apply { inSampleSize = sample }
       val decoded =
-        context.contentResolver.openInputStream(uri)?.use {
+        openUriStream(context, uri)?.use {
           BitmapFactory.decodeStream(it, null, opts)
         } ?: return@withContext null
 
@@ -83,7 +91,7 @@ object ImageEngine {
           ExifInterface.TAG_GPS_LONGITUDE to "GPS 经度",
           ExifInterface.TAG_SOFTWARE to "处理软件",
         )
-      context.contentResolver.openInputStream(uri)?.use { stream ->
+      openUriStream(context, uri)?.use { stream ->
         val exif = ExifInterface(stream)
         tags.mapNotNull { (tag, label) ->
           exif.getAttribute(tag)?.takeIf { it.isNotBlank() }?.let { label to it }

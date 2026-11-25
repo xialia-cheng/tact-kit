@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,34 +25,36 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.RotateRight
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.BrandingWatermark
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Colorize
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Crop
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Pinch
 import androidx.compose.material.icons.rounded.SaveAlt
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.ViewColumn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -59,11 +62,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -76,11 +83,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.engine.ImageEngine
 import com.xialia.tactkit.engine.PdfEngine
@@ -94,10 +103,9 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-private enum class ImageToolTab(val label: String) {
-  CROP_ROTATE("裁剪旋转"),
-  COMPRESS_EXIF("压缩与 EXIF"),
+enum class ImageToolTab(val label: String) {
   MOSAIC_WATERMARK("马赛克水印"),
+  CROP_COMPRESS("裁剪压缩"),
   STITCH_PDF("长图与 PDF"),
   COLOR_PICKER("像素取色"),
 }
@@ -106,6 +114,7 @@ private enum class ImageToolTab(val label: String) {
 @Composable
 fun ImageToolkitScreen(
   initialUriString: String?,
+  initialTabName: String? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -116,17 +125,41 @@ fun ImageToolkitScreen(
     mutableStateOf(initialUriString?.let { Uri.parse(it) })
   }
   var workingBitmap by remember { mutableStateOf<Bitmap?>(null) }
+  val undoStack = remember { mutableStateListOf<Bitmap>() }
   var exifSummary by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-  var activeTab by remember { mutableStateOf(ImageToolTab.CROP_ROTATE) }
+  var activeTab by remember(initialTabName) {
+    mutableStateOf(
+      ImageToolTab.entries.firstOrNull { it.name == initialTabName } ?: ImageToolTab.MOSAIC_WATERMARK
+    )
+  }
   var isBusy by remember { mutableStateOf(false) }
 
-  var targetKb by remember { mutableFloatStateOf(300f) }
-  var useTargetKb by remember { mutableStateOf(false) }
-  var watermarkText by remember { mutableStateOf("仅用于本人业务核验 · TactKit") }
+  // Mosaic / Zoom preview interaction states
+  var isZoomPreviewMode by remember { mutableStateOf(false) }
+  var zoomScale by remember { mutableFloatStateOf(1f) }
+  var zoomOffset by remember { mutableStateOf(Offset.Zero) }
+  var mosaicBlockSize by remember { mutableIntStateOf(24) }
   var mosaicStart by remember { mutableStateOf<Offset?>(null) }
   var mosaicEnd by remember { mutableStateOf<Offset?>(null) }
+
+  // Watermark & EXIF dialogs
+  var showWatermarkDialog by remember { mutableStateOf(false) }
+  var watermarkText by remember { mutableStateOf("仅用于本人业务核验 · TactKit") }
+  var showExifDialog by remember { mutableStateOf(false) }
+
+  // Compress, Stitch, Color picker states
+  var targetKb by remember { mutableFloatStateOf(300f) }
+  var useTargetKb by remember { mutableStateOf(false) }
   var sampledColor by remember { mutableStateOf<SampledPixelColor?>(null) }
   var multiImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+  fun pushUndoAndUpdate(nextBitmap: Bitmap) {
+    workingBitmap?.let { prev ->
+      if (undoStack.size >= 8) undoStack.removeAt(0)
+      undoStack.add(prev)
+    }
+    workingBitmap = nextBitmap
+  }
 
   val pickSingleImage =
     rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -158,7 +191,7 @@ fun ImageToolkitScreen(
             )
           }.onSuccess {
             haptics.confirm()
-            Toast.makeText(context, "已剥离隐私并保存图片", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "已剥离 EXIF 并保存图片", Toast.LENGTH_SHORT).show()
           }.onFailure {
             Toast.makeText(context, "保存失败：${it.message}", Toast.LENGTH_LONG).show()
           }
@@ -189,6 +222,9 @@ fun ImageToolkitScreen(
   LaunchedEffect(currentUri) {
     val uri = currentUri ?: return@LaunchedEffect
     isBusy = true
+    undoStack.clear()
+    zoomScale = 1f
+    zoomOffset = Offset.Zero
     runCatching {
       workingBitmap = ImageEngine.loadOrientedBitmap(context, uri)
       exifSummary = ImageEngine.readExifSummary(context, uri)
@@ -216,9 +252,9 @@ fun ImageToolkitScreen(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
       contentWindowInsets = WindowInsets.safeDrawing,
       topBar = {
-        LargeTopAppBar(
+        TopAppBar(
           colors =
-            TopAppBarDefaults.largeTopAppBarColors(
+            TopAppBarDefaults.topAppBarColors(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
@@ -242,19 +278,19 @@ fun ImageToolkitScreen(
         )
       },
     ) { innerPadding ->
+      // Full-screen fixed 3-part layout (zero outer verticalScroll -> zero mosaic mis-touch)
       Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier =
           Modifier.fillMaxSize()
             .padding(innerPadding)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
       ) {
         if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-        // Tab Strip
+        // Clean full-label tab strip
         Row(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
           modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         ) {
           ImageToolTab.entries.forEach { tab ->
@@ -264,189 +300,250 @@ fun ImageToolkitScreen(
                 haptics.tick()
                 activeTab = tab
               },
-              label = { Text(tab.label) },
+              label = { Text(tab.label, maxLines = 1) },
               modifier = Modifier.testTag("image_tab_${tab.name}"),
             )
           }
         }
 
-        // Interactive Image Canvas Preview
+        // Middle Adaptive Image Canvas (weight(1f))
         val bmp = workingBitmap
-        if (bmp != null) {
-          val ratio = (bmp.width.toFloat() / bmp.height.coerceAtLeast(1).toFloat()).coerceIn(0.3f, 3f)
-          Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Column(
-              horizontalAlignment = Alignment.CenterHorizontally,
-              modifier = Modifier.padding(12.dp),
-            ) {
-              Box(
-                modifier =
-                  Modifier.fillMaxWidth()
-                    .aspectRatio(ratio)
-                    .clip(RoundedCornerShape(14.dp))
-                    .pointerInput(activeTab, bmp) {
-                      if (activeTab == ImageToolTab.MOSAIC_WATERMARK) {
-                        detectDragGestures(
-                          onDragStart = { start ->
-                            mosaicStart =
-                              Offset(
-                                (start.x / size.width).coerceIn(0f, 1f),
-                                (start.y / size.height).coerceIn(0f, 1f),
-                              )
-                            mosaicEnd = mosaicStart
-                          },
-                          onDrag = { change, _ ->
-                            change.consume()
-                            mosaicEnd =
-                              Offset(
-                                (change.position.x / size.width).coerceIn(0f, 1f),
-                                (change.position.y / size.height).coerceIn(0f, 1f),
-                              )
-                          },
-                          onDragEnd = {
-                            val s = mosaicStart
-                            val e = mosaicEnd
-                            if (s != null && e != null) {
-                              workingBitmap =
-                                ImageEngine.applyMosaic(
-                                  bmp,
-                                  min(s.x, e.x),
-                                  min(s.y, e.y),
-                                  max(s.x, e.x),
-                                  max(s.y, e.y),
-                                )
-                              haptics.confirm()
-                            }
-                            mosaicStart = null
-                            mosaicEnd = null
-                          },
-                        )
-                      } else if (activeTab == ImageToolTab.COLOR_PICKER) {
-                        detectTapGestures { tap ->
-                          val nx = (tap.x / size.width).coerceIn(0f, 1f)
-                          val ny = (tap.y / size.height).coerceIn(0f, 1f)
-                          sampledColor = ImageEngine.samplePixelColor(bmp, nx, ny)
-                          haptics.tick()
-                        }
-                      }
-                    },
-              ) {
-                Image(
-                  bitmap = bmp.asImageBitmap(),
-                  contentDescription = "图片预览",
-                  contentScale = ContentScale.FillBounds,
-                  modifier = Modifier.fillMaxSize(),
-                )
-                if (mosaicStart != null && mosaicEnd != null) {
-                  Canvas(modifier = Modifier.fillMaxSize()) {
-                    val s = mosaicStart!!
-                    val e = mosaicEnd!!
-                    val left = min(s.x, e.x) * size.width
-                    val top = min(s.y, e.y) * size.height
-                    val w = (max(s.x, e.x) - min(s.x, e.x)) * size.width
-                    val h = (max(s.y, e.y) - min(s.y, e.y)) * size.height
-                    drawRect(
-                      color = Color.White.copy(alpha = 0.35f),
-                      topLeft = Offset(left, top),
-                      size = Size(w, h),
-                    )
-                    drawRect(
-                      color = Color.White,
-                      topLeft = Offset(left, top),
-                      size = Size(w, h),
-                      style = Stroke(width = 3f),
-                    )
+        Box(
+          contentAlignment = Alignment.Center,
+          modifier =
+            Modifier.weight(1f)
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(22.dp))
+              .background(MaterialTheme.colorScheme.surfaceContainerLow)
+              .padding(10.dp),
+        ) {
+          if (bmp != null) {
+            val ratio = (bmp.width.toFloat() / bmp.height.coerceAtLeast(1).toFloat()).coerceIn(0.25f, 4f)
+            Box(
+              modifier =
+                Modifier.aspectRatio(ratio)
+                  .graphicsLayer {
+                    scaleX = zoomScale
+                    scaleY = zoomScale
+                    translationX = zoomOffset.x
+                    translationY = zoomOffset.y
                   }
+                  .clip(RoundedCornerShape(14.dp))
+                  .pointerInput(activeTab, bmp, isZoomPreviewMode, mosaicBlockSize) {
+                    if (isZoomPreviewMode) {
+                      detectTransformGestures { _, pan, zoom, _ ->
+                        val next = (zoomScale * zoom).coerceIn(1f, 4f)
+                        zoomScale = next
+                        zoomOffset = if (next > 1.02f) zoomOffset + pan else Offset.Zero
+                      }
+                    } else if (activeTab == ImageToolTab.MOSAIC_WATERMARK) {
+                      detectDragGestures(
+                        onDragStart = { start ->
+                          mosaicStart =
+                            Offset(
+                              (start.x / size.width).coerceIn(0f, 1f),
+                              (start.y / size.height).coerceIn(0f, 1f),
+                            )
+                          mosaicEnd = mosaicStart
+                        },
+                        onDrag = { change, _ ->
+                          change.consume()
+                          mosaicEnd =
+                            Offset(
+                              (change.position.x / size.width).coerceIn(0f, 1f),
+                              (change.position.y / size.height).coerceIn(0f, 1f),
+                            )
+                        },
+                        onDragEnd = {
+                          val s = mosaicStart
+                          val e = mosaicEnd
+                          if (s != null && e != null) {
+                            pushUndoAndUpdate(
+                              ImageEngine.applyMosaic(
+                                bmp,
+                                min(s.x, e.x),
+                                min(s.y, e.y),
+                                max(s.x, e.x),
+                                max(s.y, e.y),
+                                blockSizePx = mosaicBlockSize,
+                              )
+                            )
+                            haptics.confirm()
+                          }
+                          mosaicStart = null
+                          mosaicEnd = null
+                        },
+                        onDragCancel = {
+                          mosaicStart = null
+                          mosaicEnd = null
+                        },
+                      )
+                    } else if (activeTab == ImageToolTab.COLOR_PICKER) {
+                      detectTapGestures { tap ->
+                        val nx = (tap.x / size.width).coerceIn(0f, 1f)
+                        val ny = (tap.y / size.height).coerceIn(0f, 1f)
+                        sampledColor = ImageEngine.samplePixelColor(bmp, nx, ny)
+                        haptics.tick()
+                      }
+                    }
+                  },
+            ) {
+              Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = "图片画布预览",
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier.fillMaxSize(),
+              )
+              if (mosaicStart != null && mosaicEnd != null) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                  val s = mosaicStart!!
+                  val e = mosaicEnd!!
+                  val left = min(s.x, e.x) * size.width
+                  val top = min(s.y, e.y) * size.height
+                  val w = (max(s.x, e.x) - min(s.x, e.x)) * size.width
+                  val h = (max(s.y, e.y) - min(s.y, e.y)) * size.height
+                  drawRect(
+                    color = Color.White.copy(alpha = 0.35f),
+                    topLeft = Offset(left, top),
+                    size = Size(w, h),
+                  )
+                  drawRect(
+                    color = Color.White,
+                    topLeft = Offset(left, top),
+                    size = Size(w, h),
+                    style = Stroke(width = 3f),
+                  )
                 }
               }
+            }
 
-              Spacer(modifier = Modifier.height(6.dp))
-              Text(
-                text =
-                  when (activeTab) {
-                    ImageToolTab.MOSAIC_WATERMARK ->
-                      "当前尺寸 ${bmp.width} × ${bmp.height} · 在图上拖拽框选即可打码"
-                    ImageToolTab.COLOR_PICKER ->
-                      "当前尺寸 ${bmp.width} × ${bmp.height} · 点击图像任意像素取色"
-                    else -> "当前尺寸 ${bmp.width} × ${bmp.height}"
-                  },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Floating Mode Toggle Pill (涂抹 / 缩放预览) + Resolution Chip
+            Row(
+              horizontalArrangement = Arrangement.spacedBy(6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            ) {
+              Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                shape = RoundedCornerShape(12.dp),
+              ) {
+                Text(
+                  text = "${bmp.width}×${bmp.height}",
+                  style = MaterialTheme.typography.labelSmall.copy(fontFamily = TactKitMono),
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                )
+              }
+              FilterChip(
+                selected = isZoomPreviewMode,
+                onClick = {
+                  haptics.tick()
+                  isZoomPreviewMode = !isZoomPreviewMode
+                  if (!isZoomPreviewMode && zoomScale <= 1.01f) {
+                    zoomOffset = Offset.Zero
+                  }
+                },
+                leadingIcon = {
+                  Icon(
+                    imageVector = if (isZoomPreviewMode) Icons.Rounded.Pinch else Icons.Rounded.Draw,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                  )
+                },
+                label = { Text(if (isZoomPreviewMode) "缩放预览" else "涂抹/操作") },
+                modifier = Modifier.testTag("image_zoom_mode_toggle"),
               )
             }
           }
+        }
 
-          // Controls for active tab
+        // Fixed Bottom Persistent Action Panel (always visible without scrolling)
+        if (bmp != null) {
           Surface(
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth(),
           ) {
             Column(
-              verticalArrangement = Arrangement.spacedBy(10.dp),
-              modifier = Modifier.padding(16.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier.padding(12.dp),
             ) {
               when (activeTab) {
-                ImageToolTab.CROP_ROTATE -> {
-                  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(
-                      onClick = {
-                        haptics.tick()
-                        workingBitmap = ImageEngine.rotate90(bmp)
-                      },
-                      shape = RoundedCornerShape(14.dp),
-                    ) {
-                      Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null)
-                      Spacer(modifier = Modifier.width(4.dp))
-                      Text("旋转 90°")
+                ImageToolTab.MOSAIC_WATERMARK -> {
+                  Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                  ) {
+                    listOf(14 to "细码", 24 to "中码", 40 to "粗码").forEach { (px, label) ->
+                      FilterChip(
+                        selected = mosaicBlockSize == px,
+                        onClick = {
+                          haptics.tick()
+                          mosaicBlockSize = px
+                        },
+                        label = { Text(label) },
+                      )
                     }
                     FilledTonalButton(
-                      onClick = {
-                        haptics.tick()
-                        workingBitmap = ImageEngine.cropNormalized(bmp, 0.1f, 0.1f, 0.9f, 0.9f)
-                      },
-                      shape = RoundedCornerShape(14.dp),
+                      onClick = { showWatermarkDialog = true },
+                      shape = RoundedCornerShape(12.dp),
                     ) {
-                      Icon(Icons.Rounded.Crop, contentDescription = null)
+                      Icon(Icons.Rounded.BrandingWatermark, contentDescription = null, modifier = Modifier.size(16.dp))
                       Spacer(modifier = Modifier.width(4.dp))
-                      Text("居中裁切 80%")
+                      Text("水印")
+                    }
+                    FilledTonalButton(
+                      onClick = { showExifDialog = true },
+                      shape = RoundedCornerShape(12.dp),
+                    ) {
+                      Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("EXIF(${exifSummary.size})")
                     }
                   }
                 }
 
-                ImageToolTab.COMPRESS_EXIF -> {
+                ImageToolTab.CROP_COMPRESS -> {
                   Row(
-                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                   ) {
-                    Icon(
-                      Icons.Rounded.Security,
-                      contentDescription = null,
-                      tint = MaterialTheme.colorScheme.primary,
+                    FilledTonalButton(
+                      onClick = {
+                        haptics.tick()
+                        pushUndoAndUpdate(ImageEngine.rotate90(bmp))
+                      },
+                      shape = RoundedCornerShape(12.dp),
+                    ) {
+                      Icon(Icons.AutoMirrored.Rounded.RotateRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("旋转90°")
+                    }
+                    FilledTonalButton(
+                      onClick = {
+                        haptics.tick()
+                        pushUndoAndUpdate(ImageEngine.cropNormalized(bmp, 0.1f, 0.1f, 0.9f, 0.9f))
+                      },
+                      shape = RoundedCornerShape(12.dp),
+                    ) {
+                      Icon(Icons.Rounded.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("裁切80%")
+                    }
+                    FilterChip(
+                      selected = useTargetKb,
+                      onClick = { useTargetKb = !useTargetKb },
+                      label = { Text("限重 ${targetKb.roundToInt()}KB") },
                     )
-                    Text(
-                      text =
-                        if (exifSummary.isEmpty()) "未检测到敏感 EXIF 拍摄/定位标签"
-                        else "检测到 ${exifSummary.size} 项 EXIF 元数据（导出时自动全部剥离）",
-                      style = MaterialTheme.typography.titleSmall,
-                    )
+                    FilledTonalButton(
+                      onClick = { showExifDialog = true },
+                      shape = RoundedCornerShape(12.dp),
+                    ) {
+                      Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("EXIF(${exifSummary.size})")
+                    }
                   }
-                  exifSummary.forEach { (k, v) ->
-                    Text(
-                      text = "$k: $v",
-                      style = MaterialTheme.typography.bodySmall,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                  }
-                  FilterChip(
-                    selected = useTargetKb,
-                    onClick = { useTargetKb = !useTargetKb },
-                    label = { Text("限制输出体积上限：${targetKb.roundToInt()} KB") },
-                  )
                   if (useTargetKb) {
                     Slider(
                       value = targetKb,
@@ -456,43 +553,22 @@ fun ImageToolkitScreen(
                   }
                 }
 
-                ImageToolTab.MOSAIC_WATERMARK -> {
-                  OutlinedTextField(
-                    value = watermarkText,
-                    onValueChange = { watermarkText = it },
-                    label = { Text("自定义水印文字") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                  )
-                  FilledTonalButton(
-                    onClick = {
-                      haptics.confirm()
-                      workingBitmap = ImageEngine.applyTextWatermark(bmp, watermarkText)
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                  ) {
-                    Text("应用斜向防盗水印")
-                  }
-                }
-
                 ImageToolTab.STITCH_PDF -> {
-                  Text(
-                    text = "已选择 ${multiImageUris.size.coerceAtLeast(1)} 张图片",
-                    style = MaterialTheme.typography.bodyMedium,
-                  )
-                  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                  ) {
                     FilledTonalButton(
                       onClick = {
                         pickMultipleImages.launch(
                           PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                       },
-                      shape = RoundedCornerShape(14.dp),
+                      shape = RoundedCornerShape(12.dp),
                     ) {
-                      Icon(Icons.Rounded.Collections, contentDescription = null)
-                      Spacer(modifier = Modifier.width(6.dp))
-                      Text("多选图片")
+                      Icon(Icons.Rounded.Collections, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("多选(${multiImageUris.size.coerceAtLeast(1)})")
                     }
                     FilledTonalButton(
                       enabled = multiImageUris.size >= 2,
@@ -504,29 +580,27 @@ fun ImageToolkitScreen(
                               ImageEngine.loadOrientedBitmap(context, it, maxDimension = 1280)
                             }
                           ImageEngine.stitchVertical(loaded)?.let { stitched ->
-                            workingBitmap = stitched
+                            pushUndoAndUpdate(stitched)
                             haptics.confirm()
-                            Toast.makeText(context, "长图拼接完成，可点击下方保存", Toast.LENGTH_SHORT)
-                              .show()
+                            Toast.makeText(context, "长图拼接完成", Toast.LENGTH_SHORT).show()
                           }
                           isBusy = false
                         }
                       },
-                      shape = RoundedCornerShape(14.dp),
+                      shape = RoundedCornerShape(12.dp),
                     ) {
-                      Icon(Icons.Rounded.ViewColumn, contentDescription = null)
-                      Spacer(modifier = Modifier.width(6.dp))
-                      Text("纵向拼接长图")
+                      Icon(Icons.Rounded.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("拼长图")
                     }
-                  }
-                  Button(
-                    onClick = { saveImagesToPdfLauncher.launch("TactKit_Images.pdf") },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                  ) {
-                    Icon(Icons.Rounded.PictureAsPdf, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("将所选图片转为 PDF")
+                    FilledTonalButton(
+                      onClick = { saveImagesToPdfLauncher.launch("TactKit_Images.pdf") },
+                      shape = RoundedCornerShape(12.dp),
+                    ) {
+                      Icon(Icons.Rounded.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text("转 PDF")
+                    }
                   }
                 }
 
@@ -537,65 +611,156 @@ fun ImageToolkitScreen(
                       verticalAlignment = Alignment.CenterVertically,
                       horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                      Icon(Icons.Rounded.Colorize, contentDescription = null)
-                      Text("点击上方预览图任意位置即可拾取像素颜色")
+                      Icon(Icons.Rounded.Colorize, contentDescription = null, modifier = Modifier.size(18.dp))
+                      Text(
+                        text = if (isZoomPreviewMode) "切回「涂抹/操作」即可点击取色" else "点击上方图片任意位置取色",
+                        style = MaterialTheme.typography.bodySmall,
+                      )
                     }
                   } else {
                     Row(
                       verticalAlignment = Alignment.CenterVertically,
-                      horizontalArrangement = Arrangement.spacedBy(12.dp),
+                      horizontalArrangement = Arrangement.spacedBy(10.dp),
                       modifier = Modifier.fillMaxWidth(),
                     ) {
                       Box(
                         modifier =
-                          Modifier.size(44.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                          Modifier.size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(Color(color.argb))
                       )
                       Column(modifier = Modifier.weight(1f)) {
                         Text(
                           text = color.hex,
-                          style = MaterialTheme.typography.titleMedium.copy(fontFamily = TactKitMono),
+                          style = MaterialTheme.typography.titleSmall.copy(fontFamily = TactKitMono),
                           fontWeight = FontWeight.Bold,
                         )
                         Text(
                           text = "RGB(${color.r}, ${color.g}, ${color.b})",
-                          style = MaterialTheme.typography.bodySmall.copy(fontFamily = TactKitMono),
+                          style = MaterialTheme.typography.labelSmall.copy(fontFamily = TactKitMono),
                           color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                       }
-                      IconButton(
+                      FilledTonalButton(
                         onClick = {
                           val cm =
                             context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                           cm.setPrimaryClip(ClipData.newPlainText("HEX", color.hex))
                           haptics.confirm()
                           Toast.makeText(context, "已复制 ${color.hex}", Toast.LENGTH_SHORT).show()
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp),
                       ) {
-                        Icon(Icons.Rounded.ContentCopy, contentDescription = "复制 HEX")
+                        Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("复制 HEX")
                       }
                     }
                   }
                 }
               }
-            }
-          }
 
-          Button(
-            onClick = {
-              haptics.tick()
-              saveImageLauncher.launch("TactKit_Clean_${System.currentTimeMillis()}.jpg")
-            },
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("image_save_clean_btn"),
-          ) {
-            Icon(Icons.Rounded.SaveAlt, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("一键剥离 EXIF 并导出新图片")
+              // Common Bottom Bar: Undo + Save Clean Export
+              Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+              ) {
+                FilledTonalButton(
+                  enabled = undoStack.isNotEmpty(),
+                  onClick = {
+                    val prev = undoStack.removeLastOrNull()
+                    if (prev != null) {
+                      workingBitmap = prev
+                      haptics.tick()
+                    }
+                  },
+                  shape = RoundedCornerShape(14.dp),
+                  modifier = Modifier.testTag("image_undo_btn"),
+                ) {
+                  Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text("撤销")
+                }
+
+                Button(
+                  onClick = {
+                    haptics.tick()
+                    saveImageLauncher.launch("TactKit_Clean_${System.currentTimeMillis()}.jpg")
+                  },
+                  shape = RoundedCornerShape(14.dp),
+                  modifier = Modifier.weight(1f).testTag("image_save_clean_btn"),
+                ) {
+                  Icon(Icons.Rounded.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text(
+                    text = "剥离 EXIF 并保存导出",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                  )
+                }
+              }
+            }
           }
         }
       }
     }
+  }
+
+  if (showWatermarkDialog && workingBitmap != null) {
+    AlertDialog(
+      onDismissRequest = { showWatermarkDialog = false },
+      title = { Text("添加防盗斜向水印") },
+      text = {
+        OutlinedTextField(
+          value = watermarkText,
+          onValueChange = { watermarkText = it },
+          label = { Text("水印文字") },
+          singleLine = true,
+          shape = RoundedCornerShape(14.dp),
+          modifier = Modifier.fillMaxWidth(),
+        )
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            workingBitmap?.let { pushUndoAndUpdate(ImageEngine.applyTextWatermark(it, watermarkText)) }
+            haptics.confirm()
+            showWatermarkDialog = false
+          }
+        ) {
+          Text("应用水印")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showWatermarkDialog = false }) { Text("取消") }
+      },
+    )
+  }
+
+  if (showExifDialog) {
+    AlertDialog(
+      onDismissRequest = { showExifDialog = false },
+      title = { Text("EXIF 隐私元数据检测") },
+      text = {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          if (exifSummary.isEmpty()) {
+            Text("未检测到敏感设备型号、拍摄时间或 GPS 定位信息。")
+          } else {
+            Text(
+              text = "检测到 ${exifSummary.size} 项元数据，点击「剥离 EXIF 并保存导出」将自动清空：",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            exifSummary.forEach { (k, v) ->
+              Text("$k：$v", style = MaterialTheme.typography.bodySmall)
+            }
+          }
+        }
+      },
+      confirmButton = {
+        TextButton(onClick = { showExifDialog = false }) { Text("知道了") }
+      },
+    )
   }
 }

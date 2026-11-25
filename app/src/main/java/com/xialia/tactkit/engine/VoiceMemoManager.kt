@@ -6,6 +6,7 @@ import android.media.MediaRecorder
 import android.os.Build
 import java.io.File
 import java.util.Locale
+import kotlin.math.sqrt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +28,7 @@ class VoiceMemoManager(private val context: Context) {
   private var recorder: MediaRecorder? = null
   private var activeRecordingFile: File? = null
   private var recordingStartTimeMs: Long = 0L
+  private var amplitudeJob: Job? = null
 
   private var player: MediaPlayer? = null
   private var progressJob: Job? = null
@@ -34,6 +36,9 @@ class VoiceMemoManager(private val context: Context) {
 
   private val _playbackState = MutableStateFlow(AudioPlaybackState())
   val playbackState: StateFlow<AudioPlaybackState> = _playbackState.asStateFlow()
+
+  private val _amplitudeHistory = MutableStateFlow<List<Float>>(emptyList())
+  val amplitudeHistory: StateFlow<List<Float>> = _amplitudeHistory.asStateFlow()
 
   fun startRecording(): File {
     stopPlayback()
@@ -59,10 +64,30 @@ class VoiceMemoManager(private val context: Context) {
     recorder = rec
     activeRecordingFile = outFile
     recordingStartTimeMs = System.currentTimeMillis()
+    startAmplitudeSampler(rec)
     return outFile
   }
 
+  private fun startAmplitudeSampler(rec: MediaRecorder) {
+    amplitudeJob?.cancel()
+    _amplitudeHistory.value = List(MAX_WAVE_BARS) { 0.08f }
+    amplitudeJob =
+      scope.launch {
+        while (recorder === rec) {
+          val raw = runCatching { rec.maxAmplitude }.getOrDefault(0)
+          val normalized = sqrt((raw / 32767f).coerceIn(0f, 1f)).coerceIn(0.08f, 1f)
+          val next = (_amplitudeHistory.value + normalized).takeLast(MAX_WAVE_BARS)
+          _amplitudeHistory.value = next
+          delay(65L)
+        }
+      }
+  }
+
   fun stopRecording(): Pair<String, Long>? {
+    amplitudeJob?.cancel()
+    amplitudeJob = null
+    _amplitudeHistory.value = emptyList()
+
     val rec = recorder ?: return null
     val file = activeRecordingFile ?: return null
     val elapsed = (System.currentTimeMillis() - recordingStartTimeMs).coerceAtLeast(500L)
@@ -82,6 +107,10 @@ class VoiceMemoManager(private val context: Context) {
   }
 
   fun cancelRecording() {
+    amplitudeJob?.cancel()
+    amplitudeJob = null
+    _amplitudeHistory.value = emptyList()
+
     val rec = recorder
     val file = activeRecordingFile
     recorder = null
@@ -173,6 +202,8 @@ class VoiceMemoManager(private val context: Context) {
   }
 
   companion object {
+    const val MAX_WAVE_BARS = 40
+
     fun formatDuration(ms: Long): String {
       val totalSec = (ms / 1000L).coerceAtLeast(0L)
       val min = totalSec / 60L

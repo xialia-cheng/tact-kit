@@ -35,6 +35,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
@@ -47,7 +48,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -156,7 +157,7 @@ fun LiquidGlassToolBallOverlay(
       val sheetModifier =
         Modifier.widthIn(max = 600.dp)
           .fillMaxWidth()
-          .heightIn(max = 620.dp)
+          .heightIn(max = 640.dp)
           .glassSurfaceModifier(
             useLiquidShader = useLiquidShader,
             backdrop = backdrop,
@@ -175,7 +176,7 @@ fun LiquidGlassToolBallOverlay(
 
       Column(modifier = sheetModifier) {
         Box(
-          modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+          modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
           contentAlignment = Alignment.Center,
         ) {
           Box(
@@ -187,26 +188,18 @@ fun LiquidGlassToolBallOverlay(
           )
         }
 
+        // Clean Header: only title "全部工具" + close button (zero technical jargon subtitle)
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = "工坊工具抽屉",
-              style = MaterialTheme.typography.titleLarge,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-              text =
-                if (useLiquidShader) "AGSL 实时折射液态玻璃 · 9 大工具就绪"
-                else "Material 3 省电半透明模式 · 9 大工具就绪",
-              style = MaterialTheme.typography.labelSmall,
-              color = MaterialTheme.colorScheme.primary,
-            )
-          }
+          Text(
+            text = "全部工具",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
           IconButton(
             onClick = {
               haptics.tick()
@@ -221,54 +214,74 @@ fun LiquidGlassToolBallOverlay(
           }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        OutlinedTextField(
-          value = searchQuery,
-          onValueChange = { searchQuery = it },
-          placeholder = { Text("搜索 PDF、图片隐私、AI、语音备忘...") },
-          leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-          trailingIcon = {
+        // Compact 50.dp single-line search bar
+        Surface(
+          shape = RoundedCornerShape(16.dp),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          modifier = Modifier.fillMaxWidth().height(50.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Rounded.Search,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Box(
+              contentAlignment = Alignment.CenterStart,
+              modifier = Modifier.weight(1f),
+            ) {
+              if (searchQuery.isEmpty()) {
+                Text(
+                  text = "搜索工具...",
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  maxLines = 1,
+                )
+              }
+              BasicTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                singleLine = true,
+                textStyle =
+                  MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurface
+                  ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.fillMaxWidth().testTag("tool_drawer_search_input"),
+              )
+            }
             if (searchQuery.isNotEmpty()) {
-              IconButton(onClick = { searchQuery = "" }) {
-                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close))
+              IconButton(
+                onClick = { searchQuery = "" },
+                modifier = Modifier.size(32.dp),
+              ) {
+                Icon(
+                  Icons.Rounded.Close,
+                  contentDescription = stringResource(R.string.cd_close),
+                  modifier = Modifier.size(18.dp),
+                )
               }
             }
-          },
-          singleLine = true,
-          shape = RoundedCornerShape(16.dp),
-          modifier = Modifier.fillMaxWidth().testTag("tool_drawer_search_input"),
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
+          }
+        }
 
         val pinnedTools =
           remember(pinnedToolIds) { pinnedToolIds.mapNotNull { ToolCatalog.findById(it) } }
 
-        Text(
-          text = "固定快捷槽位 (${pinnedTools.size}/4)",
-          style = MaterialTheme.typography.labelMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (pinnedTools.isEmpty()) {
-          Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-          ) {
-            Text(
-              text = "点击下方工具卡片的图钉图标，即可固定到最多 4 个快捷槽位。",
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.padding(12.dp),
-            )
-          }
-        } else {
+        // Only show pinned tools strip when user actually pinned >= 1 tool (no empty placeholder, no cap)
+        if (pinnedTools.isNotEmpty()) {
+          Spacer(modifier = Modifier.height(10.dp))
           LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(end = 4.dp),
+            modifier = Modifier.fillMaxWidth().testTag("pinned_tools_row"),
           ) {
             items(pinnedTools, key = { "pinned_${it.id}" }) { tool ->
               PinnedToolSlotChip(
@@ -437,7 +450,7 @@ private fun PinnedToolSlotChip(
 ) {
   Surface(
     onClick = onClick,
-    shape = RoundedCornerShape(14.dp),
+    shape = ContinuousCapsule(),
     color =
       if (tool.isAvailable) {
         MaterialTheme.colorScheme.primaryContainer
@@ -449,7 +462,7 @@ private fun PinnedToolSlotChip(
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(6.dp),
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
       Icon(
         imageVector = tool.icon,
@@ -460,7 +473,7 @@ private fun PinnedToolSlotChip(
           } else {
             MaterialTheme.colorScheme.onSurfaceVariant
           },
-        modifier = Modifier.size(18.dp),
+        modifier = Modifier.size(16.dp),
       )
       Text(
         text = tool.name,

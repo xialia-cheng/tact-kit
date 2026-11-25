@@ -32,11 +32,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class PdfAnnotateRoute(val initialUri: String? = null)
 
-@Serializable data class ImageToolkitRoute(val initialUri: String? = null)
+@Serializable data class ImageToolkitRoute(val initialUri: String? = null, val initialTab: String? = null)
 
 @Serializable data class MediaWorkshopRoute(val initialUri: String? = null)
 
-@Serializable data class AiHubRoute(val initialMode: String = "VISION")
+@Serializable data class AiHubRoute(val initialMode: String = "VISION", val initialImageUri: String? = null)
 
 @Composable
 fun TactKitNavHost(
@@ -129,6 +129,7 @@ fun TactKitNavHost(
       val route = backStackEntry.toRoute<ImageToolkitRoute>()
       ImageToolkitScreen(
         initialUriString = route.initialUri,
+        initialTabName = route.initialTab,
         onNavigateBack = { navController.popBackStack() },
       )
     }
@@ -137,6 +138,12 @@ fun TactKitNavHost(
       val route = backStackEntry.toRoute<MediaWorkshopRoute>()
       MediaWorkshopScreen(
         initialUriString = route.initialUri,
+        onOpenImageToolkit = { uri, tab ->
+          navController.navigate(ImageToolkitRoute(initialUri = uri, initialTab = tab.name))
+        },
+        onOpenAiVision = { uri ->
+          navController.navigate(AiHubRoute(initialMode = "VISION", initialImageUri = uri))
+        },
         onNavigateBack = { navController.popBackStack() },
       )
     }
@@ -145,6 +152,7 @@ fun TactKitNavHost(
       val route = backStackEntry.toRoute<AiHubRoute>()
       AiHubScreen(
         initialModeName = route.initialMode,
+        initialImageUriString = route.initialImageUri,
         preferences = uiState.preferences,
         onSaveNoteCard = viewModel::createNote,
         onSaveChecklistCard = viewModel::createChecklist,

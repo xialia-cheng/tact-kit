@@ -3,7 +3,9 @@ package com.xialia.tactkit
 import android.graphics.Bitmap
 import android.graphics.Color
 import com.xialia.tactkit.data.repository.AiHubRepository
+import com.xialia.tactkit.data.repository.AppUpdateRepository
 import com.xialia.tactkit.engine.ImageEngine
+import com.xialia.tactkit.engine.MediaEngine
 import com.xialia.tactkit.engine.VoiceMemoManager
 import org.commonmark.ext.gfm.tables.TableBlock
 import org.commonmark.ext.gfm.tables.TablesExtension
@@ -14,6 +16,7 @@ import org.commonmark.node.CustomBlock
 import org.commonmark.node.CustomNode
 import org.commonmark.parser.Parser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,5 +130,21 @@ class Phase2EnginesTest {
 
     assertTrue(sawTable)
     assertTrue(sawTaskMarker)
+  }
+
+  @Test
+  fun `AppUpdateRepository compares semantic version tags accurately`() {
+    assertTrue(AppUpdateRepository.isNewerVersion("0.2.0", "v0.2.1"))
+    assertTrue(AppUpdateRepository.isNewerVersion("0.2.0", "v1.0.0"))
+    assertTrue(AppUpdateRepository.isNewerVersion("0.2", "0.2.1"))
+    assertFalse(AppUpdateRepository.isNewerVersion("0.2.0", "v0.2.0"))
+    assertFalse(AppUpdateRepository.isNewerVersion("0.2.0", "v0.1.9"))
+  }
+
+  @Test
+  fun `MediaEngine formats frame millisecond timestamps accurately`() {
+    assertEquals("00:00.000", MediaEngine.formatFrameTimestampMs(0L))
+    assertEquals("00:05.042", MediaEngine.formatFrameTimestampMs(5_042L))
+    assertEquals("02:03.456", MediaEngine.formatFrameTimestampMs(123_456L))
   }
 }

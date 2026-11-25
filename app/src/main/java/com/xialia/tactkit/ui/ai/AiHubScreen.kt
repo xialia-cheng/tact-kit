@@ -34,15 +34,16 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +79,7 @@ enum class AiHubMode(val label: String) {
 @Composable
 fun AiHubScreen(
   initialModeName: String,
+  initialImageUriString: String? = null,
   preferences: UserPreferences,
   onSaveNoteCard: (title: String, markdown: String) -> Unit,
   onSaveChecklistCard: (title: String, items: List<String>) -> Unit,
@@ -100,6 +102,12 @@ fun AiHubScreen(
   var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var visionPrompt by remember { mutableStateOf("") }
   var aiMarkdownResult by remember { mutableStateOf("") }
+
+  LaunchedEffect(initialImageUriString) {
+    val raw = initialImageUriString ?: return@LaunchedEffect
+    val parsed = android.net.Uri.parse(raw)
+    selectedBitmap = ImageEngine.loadOrientedBitmap(context, parsed, maxDimension = 1400)
+  }
 
   // PDF QA state
   var extractedPdfText by remember { mutableStateOf("") }
@@ -143,9 +151,9 @@ fun AiHubScreen(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
       contentWindowInsets = WindowInsets.safeDrawing,
       topBar = {
-        LargeTopAppBar(
+        TopAppBar(
           colors =
-            TopAppBarDefaults.largeTopAppBarColors(
+            TopAppBarDefaults.topAppBarColors(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),

@@ -92,17 +92,25 @@ class TactKitRobolectricTest {
     val initial = settingsRepo.preferencesFlow.first()
     assertEquals(ThemeMode.SYSTEM, initial.themeMode)
     assertFalse(initial.liquidGlassPowerSave)
-    assertEquals(UserPreferences.MAX_PINNED_TOOLS, initial.pinnedToolIds.size)
+    assertEquals(UserPreferences.DEFAULT_PINNED_TOOL_IDS.size, initial.pinnedToolIds.size)
 
     settingsRepo.setLiquidGlassPowerSave(true)
     settingsRepo.setThemeMode(ThemeMode.DARK)
     settingsRepo.togglePinnedTool("codec_hash")
+    settingsRepo.togglePinnedTool("media_workshop")
+    settingsRepo.togglePinnedTool("voice_memo")
 
     val updated = settingsRepo.preferencesFlow.first()
     assertTrue(updated.liquidGlassPowerSave)
     assertEquals(ThemeMode.DARK, updated.themeMode)
-    assertEquals(UserPreferences.MAX_PINNED_TOOLS, updated.pinnedToolIds.size)
+    assertEquals(UserPreferences.DEFAULT_PINNED_TOOL_IDS.size + 3, updated.pinnedToolIds.size)
     assertTrue("codec_hash" in updated.pinnedToolIds)
+    assertTrue("media_workshop" in updated.pinnedToolIds)
+    assertTrue("voice_memo" in updated.pinnedToolIds)
+
+    settingsRepo.togglePinnedTool("codec_hash")
+    val afterUnpin = settingsRepo.preferencesFlow.first()
+    assertFalse("codec_hash" in afterUnpin.pinnedToolIds)
   }
 
   @Test

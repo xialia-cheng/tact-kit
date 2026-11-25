@@ -34,7 +34,6 @@ data class UserPreferences(
   val hasAiApiKey: Boolean = false,
 ) {
   companion object {
-    const val MAX_PINNED_TOOLS = 4
     const val DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
     const val DEFAULT_AI_MODEL = "gpt-4o-mini"
     val DEFAULT_PINNED_TOOL_IDS =
@@ -83,7 +82,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
               .map { it.trim() }
               .filter { it.isNotEmpty() }
               .distinct()
-              .take(UserPreferences.MAX_PINNED_TOOLS)
           }
 
         UserPreferences(
@@ -126,9 +124,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
       if (toolId in current) {
         current.remove(toolId)
       } else {
-        if (current.size >= UserPreferences.MAX_PINNED_TOOLS) {
-          current.removeAt(0)
-        }
         current.add(toolId)
       }
       prefs[Keys.PINNED_TOOL_IDS] = current.joinToString(",")

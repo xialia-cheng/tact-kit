@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -40,11 +42,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -71,6 +77,8 @@ fun VoiceMemoDialog(
   var title by remember { mutableStateOf("") }
   var noteText by remember { mutableStateOf("") }
   var recordedResult by remember { mutableStateOf<Pair<String, Long>?>(null) }
+
+  val amplitudes by voiceMemoManager.amplitudeHistory.collectAsStateWithLifecycle()
 
   val permissionLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -148,6 +156,13 @@ fun VoiceMemoDialog(
                 fontWeight = FontWeight.Bold,
               )
             }
+
+            // Live Canvas Audio Waveform Visualizer
+            LiveRecordingWaveform(
+              amplitudes = amplitudes,
+              isRecording = isRecording,
+              modifier = Modifier.fillMaxWidth().height(56.dp).testTag("voice_memo_waveform"),
+            )
 
             if (!hasPermission) {
               FilledTonalButton(
@@ -237,4 +252,53 @@ fun VoiceMemoDialog(
       }
     },
   )
+}
+
+@Composable
+private fun LiveRecordingWaveform(
+  amplitudes: List<Float>,
+  isRecording: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val activeBarColor = MaterialTheme.colorScheme.primary
+  val peakBarColor = MaterialTheme.colorScheme.error
+  val idleBarColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+  val bgColor = MaterialTheme.colorScheme.surfaceContainer
+
+  Canvas(
+    modifier = modifier.clip(RoundedCornerShape(12.dp)).background(bgColor).padding(horizontal = 8.dp),
+  ) {
+    val count = VoiceMemoManager.MAX_WAVE_BARS
+    val bars =
+      if (isRecording && amplitudes.isNotEmpty()) {
+        amplitudes
+      } else {
+        List(count) { idx ->
+          if (idx % 4 == 0) 0.16f else if (idx % 2 == 0) 0.11f else 0.08f
+        }
+      }
+
+    val slotWidth = size.width / count
+    val barWidth = (slotWidth * 0.56f).coerceAtLeast(3f)
+    val maxBarHeight = size.height * 0.82f
+    val centerY = size.height / 2f
+
+    bars.forEachIndexed { idx, amp ->
+      val barH = (amp * maxBarHeight).coerceAtLeast(4f)
+      val left = idx * slotWidth + (slotWidth - barWidth) / 2f
+      val top = centerY - barH / 2f
+      val color =
+        when {
+          !isRecording -> idleBarColor
+          amp > 0.78f -> peakBarColor
+          else -> activeBarColor.copy(alpha = (0.45f + 0.55f * amp).coerceIn(0.45f, 1f))
+        }
+      drawRoundRect(
+        color = color,
+        topLeft = Offset(left, top),
+        size = Size(barWidth, barH),
+        cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+      )
+    }
+  }
 }

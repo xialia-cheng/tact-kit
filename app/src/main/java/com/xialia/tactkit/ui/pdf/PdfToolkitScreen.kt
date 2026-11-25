@@ -45,7 +45,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -54,6 +53,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -242,9 +242,9 @@ fun PdfToolkitScreen(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
       contentWindowInsets = WindowInsets.safeDrawing,
       topBar = {
-        LargeTopAppBar(
+        TopAppBar(
           colors =
-            TopAppBarDefaults.largeTopAppBarColors(
+            TopAppBarDefaults.topAppBarColors(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
