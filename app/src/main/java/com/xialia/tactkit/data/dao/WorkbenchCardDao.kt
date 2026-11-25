@@ -17,6 +17,9 @@ interface WorkbenchCardDao {
   @Query("SELECT * FROM workbench_cards WHERE id = :id LIMIT 1")
   suspend fun getCardById(id: Long): WorkbenchCardEntity?
 
+  @Query("SELECT * FROM workbench_cards WHERE type = 'CHECKLIST' ORDER BY pinned DESC, updatedAt DESC LIMIT 1")
+  suspend fun getTopChecklist(): WorkbenchCardEntity?
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun insertCard(card: WorkbenchCardEntity): Long
 

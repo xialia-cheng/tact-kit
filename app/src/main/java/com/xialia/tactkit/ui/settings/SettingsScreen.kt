@@ -1,5 +1,6 @@
 package com.xialia.tactkit.ui.settings
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -7,7 +8,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -41,6 +46,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FolderShared
 import androidx.compose.material.icons.rounded.Gavel
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
@@ -66,6 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,7 +90,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.xialia.tactkit.BuildConfig
 import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
@@ -199,6 +210,23 @@ fun SettingsScreen(
   var isCheckingUpdate by remember { mutableStateOf(false) }
   var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
   var updateError by remember { mutableStateOf<String?>(null) }
+
+  var hasAllFilesAccess by remember { mutableStateOf(checkAllFilesGranted(context)) }
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        hasAllFilesAccess = checkAllFilesGranted(context)
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+  }
+
+  val legacyStorageLauncher =
+    rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+      hasAllFilesAccess = checkAllFilesGranted(context)
+    }
 
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -702,10 +730,87 @@ fun SettingsScreen(
             }
           }
 
-          // 5. Usage Help & Permissions Guide (Expandable)
+          // 5. All-Files Access & Permissions Diagnostic Card
+          SettingsSectionCard(
+            title = "所有文件访问权限",
+            icon = Icons.Rounded.FolderShared,
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                Text(
+                  text = "全盘文档管理状态",
+                  style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                  text =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      "可选授权。开启后可直接浏览本地目录中的 PDF、文档与压缩包。"
+                    } else {
+                      "Android 10 及以下使用传统存储读写权限。"
+                    },
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+              Surface(
+                color =
+                  if (hasAllFilesAccess) MaterialTheme.colorScheme.primaryContainer
+                  else MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier.testTag("settings_all_files_status_pill"),
+              ) {
+                Text(
+                  text = if (hasAllFilesAccess) "已授权" else "未授权",
+                  style = MaterialTheme.typography.labelMedium,
+                  fontWeight = FontWeight.SemiBold,
+                  color =
+                    if (hasAllFilesAccess) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                )
+              }
+            }
+
+            FilledTonalButton(
+              onClick = {
+                haptics.tick()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                  val appIntent =
+                    Intent(
+                      Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                      Uri.fromParts("package", context.packageName, null),
+                    )
+                  val fallbackIntent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                  runCatching { context.startActivity(appIntent) }
+                    .onFailure {
+                      runCatching { context.startActivity(fallbackIntent) }.onFailure {
+                        Toast.makeText(context, "请在系统设置 -> 应用权限中授予文件管理权限", Toast.LENGTH_LONG).show()
+                      }
+                    }
+                } else {
+                  legacyStorageLauncher.launch(
+                    arrayOf(
+                      Manifest.permission.READ_EXTERNAL_STORAGE,
+                      Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    )
+                  )
+                }
+              },
+              shape = RoundedCornerShape(14.dp),
+              modifier = Modifier.fillMaxWidth().testTag("settings_all_files_grant_btn"),
+            ) {
+              Text(if (hasAllFilesAccess) "管理文件访问权限" else "前往授权所有文件访问权限")
+            }
+          }
+
+          // 6. Usage Help & Permissions Guide (Expandable)
           ExpandableSettingsCard(
             title = "使用帮助与权限指南",
-            subtitle = "SAF 零全盘权限、按需麦克风与 Quick Look 速览",
+            subtitle = "全盘文件可选授权、SAF 文档选择与按需动态权限",
             icon = Icons.AutoMirrored.Rounded.HelpOutline,
             expanded = helpExpanded,
             onToggle = {
@@ -715,16 +820,16 @@ fun SettingsScreen(
             testTag = "settings_help_card",
           ) {
             HelpBullet(
-              title = "文件授权（SAF 系统文档选择器）",
-              detail = "简工坊不申请 READ_EXTERNAL_STORAGE 或全盘读写权限。每次导入图片、PDF 或音视频，均通过系统 Photo Picker 与 SAF 仅授权所选文件或导出目录。",
+              title = "所有文件访问与 SAF 双模式",
+              detail = "简工坊支持通过系统 Photo Picker 与 SAF 选择单文件，也支持在上方授权「所有文件访问权限」以便高效管理本地文档与导出文件；所有文件均仅在本地处理。",
             )
             HelpBullet(
-              title = "麦克风录音权限（按需动态申请）",
-              detail = "仅在您主动点击「语音备忘录 -> 开始录音」时向系统请求 RECORD_AUDIO 权限；日常浏览卡片、处理文档与图片无需任何麦克风权限。",
+              title = "相机、麦克风与 Wi-Fi 扫描权限（按需动态申请）",
+              detail = "仅在您使用文档扫描/扫码（CAMERA）、语音备忘/分贝仪（RECORD_AUDIO）或 Wi-Fi 信道分析（ACCESS_FINE_LOCATION）时请求对应权限，拒绝后其余功能完全不受影响。",
             )
             HelpBullet(
               title = "Quick Look 悬浮速览窗",
-              detail = "在微信、浏览器或文件管理器中点击「分享」，选择「简工坊 · Quick Look」即可在不离开当前应用的情况下速览 Markdown、文本或一键导入工作台。",
+              detail = "在微信、浏览器或文件管理器中点击「分享」，选择「简工坊 · Quick Look」即可在不离开当前应用的情况下速览 Markdown、加密 PDF 或一键导入工作台。",
             )
           }
 
@@ -1099,4 +1204,13 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
   clipboard?.setPrimaryClip(ClipData.newPlainText(label, text))
   Toast.makeText(context, "已复制：$text", Toast.LENGTH_SHORT).show()
+}
+
+private fun checkAllFilesGranted(context: Context): Boolean {
+  return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    Environment.isExternalStorageManager()
+  } else {
+    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
+      PackageManager.PERMISSION_GRANTED
+  }
 }

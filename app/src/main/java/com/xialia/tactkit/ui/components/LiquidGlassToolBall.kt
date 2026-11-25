@@ -98,7 +98,7 @@ fun LiquidGlassToolBallOverlay(
 
   val expandedCategories = remember {
     mutableStateMapOf<ToolCategory, Boolean>().apply {
-      ToolCategory.entries.forEach { put(it, true) }
+      ToolCategory.entries.forEach { put(it, it == ToolCategory.DOCUMENT_OFFICE) }
     }
   }
 
@@ -479,8 +479,20 @@ private fun CategoryToolCard(
           text = category.title,
           style = MaterialTheme.typography.titleSmall,
           fontWeight = FontWeight.SemiBold,
-          modifier = Modifier.weight(1f),
         )
+        Spacer(modifier = Modifier.width(6.dp))
+        Surface(
+          shape = ContinuousCapsule(),
+          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+          Text(
+            text = "${tools.size}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+          )
+        }
+        Spacer(modifier = Modifier.weight(1f))
         Icon(
           imageVector = if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
           contentDescription = if (expanded) "收起分类" else "展开分类",
@@ -507,14 +519,20 @@ private fun CategoryToolCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(12.dp),
               ) {
-                PetalIconBadge(
-                  icon = tool.icon,
-                  size = 44.dp,
-                  iconSize = 21.dp,
-                  petals = 8,
-                  containerColor = MaterialTheme.colorScheme.primaryContainer,
-                  contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                Surface(
+                  shape = RoundedCornerShape(14.dp),
+                  color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                  modifier = Modifier.size(42.dp),
+                ) {
+                  Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                      imageVector = tool.icon,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                      modifier = Modifier.size(21.dp),
+                    )
+                  }
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                   Text(

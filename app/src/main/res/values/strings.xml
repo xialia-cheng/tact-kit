@@ -9,4 +9,6 @@
     <string name="cd_pin">固定或取消固定</string>
     <string name="cd_delete">删除卡片</string>
     <string name="cd_copy">复制内容</string>
+    <string name="widget_pinned_checklist_desc">在桌面快速查看并勾选简工坊置顶待办清单</string>
+    <string name="widget_quick_shortcuts_desc">一键直达文档扫描、PDF 工具箱、便签与扫码</string>
 </resources>

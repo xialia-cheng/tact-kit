@@ -54,6 +54,7 @@ tukaaniXz = "1.10"
 snakeyaml = "2.3"
 zxingCore = "3.5.3"
 graphicsShapes = "1.0.1"
+glance = "1.1.1"
 
 
 [libraries]
@@ -124,6 +125,8 @@ tukaani-xz = { group = "org.tukaani", name = "xz", version.ref = "tukaaniXz" }
 snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 
 
 [plugins]

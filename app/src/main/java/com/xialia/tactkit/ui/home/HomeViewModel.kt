@@ -27,12 +27,23 @@ enum class CardFilter(val label: String) {
   RECENT_FILE("文件"),
 }
 
+data class DocumentDashboardStats(
+  val totalItemsCount: Int = 0,
+  val thisWeekAddedCount: Int = 0,
+  val pdfCount: Int = 0,
+  val docTextCount: Int = 0,
+  val imageCount: Int = 0,
+  val mediaArchiveCount: Int = 0,
+  val recentFiles: List<WorkbenchCard.RecentFile> = emptyList(),
+)
+
 data class HomeUiState(
   val cards: List<WorkbenchCard> = emptyList(),
   val totalChecklists: Int = 0,
   val totalNotes: Int = 0,
   val totalVoiceMemos: Int = 0,
   val totalFiles: Int = 0,
+  val dashboardStats: DocumentDashboardStats = DocumentDashboardStats(),
   val searchQuery: String = "",
   val activeFilter: CardFilter = CardFilter.ALL,
   val preferences: UserPreferences = UserPreferences(),
@@ -77,6 +88,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val voiceCount = allCards.count { it is WorkbenchCard.VoiceMemo }
         val fileCount = allCards.count { it is WorkbenchCard.RecentFile }
 
+        val weekCutoff = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1000L
+        val recentFiles = allCards.filterIsInstance<WorkbenchCard.RecentFile>()
+        var pdfDocs = 0
+        var textDocs = checklistCount + noteCount
+        var imgDocs = 0
+        var mediaDocs = voiceCount
+        recentFiles.forEach { file ->
+          val lower = file.fileName.lowercase()
+          when {
+            file.mimeType == "application/pdf" || lower.endsWith(".pdf") -> pdfDocs++
+            file.mimeType.startsWith("image/") -> imgDocs++
+            file.mimeType.startsWith("text/") ||
+              lower.endsWith(".docx") ||
+              lower.endsWith(".md") ||
+              lower.endsWith(".txt") ||
+              lower.endsWith(".json") ||
+              lower.endsWith(".csv") ||
+              lower.endsWith(".yaml") ||
+              lower.endsWith(".xml") -> textDocs++
+            else -> mediaDocs++
+          }
+        }
+        val dashboard =
+          DocumentDashboardStats(
+            totalItemsCount = allCards.size,
+            thisWeekAddedCount = allCards.count { it.createdAt >= weekCutoff },
+            pdfCount = pdfDocs,
+            docTextCount = textDocs,
+            imageCount = imgDocs,
+            mediaArchiveCount = mediaDocs,
+            recentFiles = recentFiles.take(3),
+          )
+
         val normalizedQuery = query.trim().lowercase()
         val filtered =
           allCards.filter { card ->
@@ -111,6 +155,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
           totalNotes = noteCount,
           totalVoiceMemos = voiceCount,
           totalFiles = fileCount,
+          dashboardStats = dashboard,
           searchQuery = query,
           activeFilter = filter,
           preferences = prefs,
@@ -196,6 +241,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
       } finally {
         isImportingFile.value = false
       }
+    }
+  }
+
+  fun registerGeneratedFileCard(
+    file: java.io.File,
+    uriString: String,
+    mimeType: String,
+    excerpt: String = "",
+  ) {
+    viewModelScope.launch {
+      workbenchRepository.registerGeneratedFileCard(file, uriString, mimeType, excerpt)
     }
   }
 

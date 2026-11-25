@@ -1,5 +1,8 @@
 package com.xialia.tactkit.ui.dev
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.widget.Toast
@@ -26,6 +29,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Preview
 import androidx.compose.material.icons.rounded.SaveAlt
@@ -61,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.xialia.tactkit.engine.LanReceivedFile
+import com.xialia.tactkit.engine.LanReceivedText
 import com.xialia.tactkit.engine.LanShareServer
 import com.xialia.tactkit.engine.LanSharedOutFile
 import com.xialia.tactkit.engine.QrCodeEngine
@@ -80,6 +86,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanShareScreen(
+  onSaveNoteCard: (String, String) -> Unit = { _, _ -> },
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -87,6 +94,7 @@ fun LanShareScreen(
   val scope = rememberCoroutineScope()
 
   val receivedFiles = remember { mutableStateListOf<LanReceivedFile>() }
+  val receivedTexts = remember { mutableStateListOf<LanReceivedText>() }
   val sharedOutFiles = remember { mutableStateListOf<LanSharedOutFile>() }
   val logs = remember { mutableStateListOf<String>() }
 
@@ -111,6 +119,11 @@ fun LanShareScreen(
         onLog = { msg ->
           scope.launch(Dispatchers.Main) {
             logs.add(0, msg)
+          }
+        },
+        onTextReceived = { textItem ->
+          scope.launch(Dispatchers.Main) {
+            receivedTexts.add(0, textItem)
           }
         },
       )
@@ -357,6 +370,69 @@ fun LanShareScreen(
                   maxLines = 1,
                   overflow = TextOverflow.Ellipsis,
                 )
+              }
+            }
+          }
+        }
+
+        if (receivedTexts.isNotEmpty()) {
+          item(key = "lan_received_texts_header") {
+            Text(
+              text = "已接收的文字 (${receivedTexts.size})",
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.padding(horizontal = 4.dp),
+            )
+          }
+          items(receivedTexts, key = { "txt_${it.id}" }) { txt ->
+            Surface(
+              shape = RoundedCornerShape(18.dp),
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
+              modifier = Modifier.fillMaxWidth().testTag("lan_received_text_card"),
+            ) {
+              Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(14.dp),
+              ) {
+                Text(
+                  text = txt.content,
+                  style = MaterialTheme.typography.bodyMedium,
+                  maxLines = 6,
+                  overflow = TextOverflow.Ellipsis,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  TactileActionButton(
+                    onClick = {
+                      val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                      cm.setPrimaryClip(ClipData.newPlainText("LAN Text", txt.content))
+                      haptics.confirm()
+                      Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f),
+                  ) {
+                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("复制文字")
+                  }
+                  TactileActionButton(
+                    onClick = {
+                      val title = txt.content.lineSequence().firstOrNull()?.take(24)?.ifBlank { "局域网接收便签" }
+                        ?: "局域网接收便签"
+                      onSaveNoteCard(title, txt.content)
+                      haptics.confirm()
+                      Toast.makeText(context, "已保存为桌面便签", Toast.LENGTH_SHORT).show()
+                    },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.weight(1f),
+                  ) {
+                    Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("存为便签")
+                  }
+                }
               }
             }
           }

@@ -7,7 +7,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,6 +20,7 @@ import androidx.navigation.toRoute
 import com.xialia.tactkit.ui.ai.AiHubScreen
 import com.xialia.tactkit.ui.archive.ArchiveWorkshopScreen
 import com.xialia.tactkit.ui.daily.DailyToolsScreen
+import com.xialia.tactkit.ui.daily.LedClockScreen
 import com.xialia.tactkit.ui.daily.QrStudioScreen
 import com.xialia.tactkit.ui.data.DataWorkshopScreen
 import com.xialia.tactkit.ui.dev.CryptoVaultScreen
@@ -28,11 +33,20 @@ import com.xialia.tactkit.ui.home.HomeUiState
 import com.xialia.tactkit.ui.home.HomeViewModel
 import com.xialia.tactkit.ui.image.ImageToolkitScreen
 import com.xialia.tactkit.ui.media.MediaWorkshopScreen
+import com.xialia.tactkit.ui.network.DnsSslScreen
+import com.xialia.tactkit.ui.network.NetDiagnosticsScreen
+import com.xialia.tactkit.ui.network.WifiChannelScreen
 import com.xialia.tactkit.ui.office.DocxEditorScreen
 import com.xialia.tactkit.ui.pdf.PdfAnnotateScreen
 import com.xialia.tactkit.ui.pdf.PdfToolkitScreen
+import com.xialia.tactkit.ui.scanner.DocScannerScreen
+import com.xialia.tactkit.ui.sensor.BatteryHardwareScreen
 import com.xialia.tactkit.ui.sensor.CompassLevelScreen
+import com.xialia.tactkit.ui.sensor.DecibelMeterScreen
+import com.xialia.tactkit.ui.sensor.LightLuxScreen
 import com.xialia.tactkit.ui.sensor.MetalDetectorScreen
+import com.xialia.tactkit.ui.sensor.MorseTorchScreen
+import com.xialia.tactkit.ui.sensor.PhysicalRulerScreen
 import com.xialia.tactkit.ui.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
@@ -74,13 +88,63 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object QrStudioRoute
 
+@Serializable data object DocScannerRoute
+
+@Serializable data object DecibelMeterRoute
+
+@Serializable data object LightLuxRoute
+
+@Serializable data object PhysicalRulerRoute
+
+@Serializable data object MorseTorchRoute
+
+@Serializable data object BatteryHardwareRoute
+
+@Serializable data object NetDiagnosticsRoute
+
+@Serializable data object DnsSslRoute
+
+@Serializable data object WifiChannelRoute
+
+@Serializable data object LedClockRoute
+
 @Composable
 fun TactKitNavHost(
   uiState: HomeUiState,
   viewModel: HomeViewModel,
+  pendingToolId: String? = null,
+  onConsumedPendingTool: () -> Unit = {},
 ) {
   val navController = rememberNavController()
   val audioPlaybackState by viewModel.audioPlaybackState.collectAsStateWithLifecycle()
+  var pendingHomeDialog by remember { mutableStateOf<String?>(null) }
+
+  LaunchedEffect(pendingToolId) {
+    val toolId = pendingToolId ?: return@LaunchedEffect
+    when (toolId) {
+      "doc_scanner" -> navController.navigate(DocScannerRoute)
+      "pdf_toolkit" -> navController.navigate(PdfToolkitRoute())
+      "pdf_annotate" -> navController.navigate(PdfAnnotateRoute())
+      "qr_studio" -> navController.navigate(QrStudioRoute)
+      "image_privacy" -> navController.navigate(ImageToolkitRoute())
+      "image_long" -> navController.navigate(ImageToolkitRoute(initialTab = "STITCH_PDF"))
+      "lan_share" -> navController.navigate(LanShareRoute)
+      "net_diag" -> navController.navigate(NetDiagnosticsRoute)
+      "dns_ssl" -> navController.navigate(DnsSslRoute)
+      "wifi_channel" -> navController.navigate(WifiChannelRoute)
+      "decibel_meter" -> navController.navigate(DecibelMeterRoute)
+      "light_lux" -> navController.navigate(LightLuxRoute)
+      "physical_ruler" -> navController.navigate(PhysicalRulerRoute)
+      "morse_torch" -> navController.navigate(MorseTorchRoute)
+      "battery_hardware" -> navController.navigate(BatteryHardwareRoute)
+      "led_clock" -> navController.navigate(LedClockRoute)
+      "quick_note", "quick_checklist", "voice_memo" -> {
+        navController.popBackStack(HomeRoute, inclusive = false)
+        pendingHomeDialog = toolId
+      }
+    }
+    onConsumedPendingTool()
+  }
 
   NavHost(
     navController = navController,
@@ -140,6 +204,19 @@ fun TactKitNavHost(
         onOpenMetalDetector = { navController.navigate(MetalDetectorRoute) },
         onOpenDailyTools = { tab -> navController.navigate(DailyToolsRoute(initialTab = tab)) },
         onOpenQrStudio = { navController.navigate(QrStudioRoute) },
+        onOpenDocScanner = { navController.navigate(DocScannerRoute) },
+        onOpenImageLongPdf = { navController.navigate(ImageToolkitRoute(initialTab = "STITCH_PDF")) },
+        onOpenDecibelMeter = { navController.navigate(DecibelMeterRoute) },
+        onOpenLightLux = { navController.navigate(LightLuxRoute) },
+        onOpenPhysicalRuler = { navController.navigate(PhysicalRulerRoute) },
+        onOpenMorseTorch = { navController.navigate(MorseTorchRoute) },
+        onOpenBatteryHardware = { navController.navigate(BatteryHardwareRoute) },
+        onOpenNetDiagnostics = { navController.navigate(NetDiagnosticsRoute) },
+        onOpenDnsSsl = { navController.navigate(DnsSslRoute) },
+        onOpenWifiChannel = { navController.navigate(WifiChannelRoute) },
+        onOpenLedClock = { navController.navigate(LedClockRoute) },
+        pendingHomeDialog = pendingHomeDialog,
+        onConsumedHomeDialog = { pendingHomeDialog = null },
       )
     }
 
@@ -248,7 +325,10 @@ fun TactKitNavHost(
     }
 
     composable<LanShareRoute> {
-      LanShareScreen(onNavigateBack = { navController.popBackStack() })
+      LanShareScreen(
+        onSaveNoteCard = viewModel::createNote,
+        onNavigateBack = { navController.popBackStack() },
+      )
     }
 
     composable<CompassLevelRoute> {
@@ -274,6 +354,51 @@ fun TactKitNavHost(
 
     composable<QrStudioRoute> {
       QrStudioScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<DocScannerRoute> {
+      DocScannerScreen(
+        onRegisterPdfFile = viewModel::registerGeneratedFileCard,
+        onOpenQrStudio = { navController.navigate(QrStudioRoute) },
+        onOpenPdfToolkit = { uri -> navController.navigate(PdfToolkitRoute(initialUri = uri)) },
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<DecibelMeterRoute> {
+      DecibelMeterScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<LightLuxRoute> {
+      LightLuxScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<PhysicalRulerRoute> {
+      PhysicalRulerScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<MorseTorchRoute> {
+      MorseTorchScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<BatteryHardwareRoute> {
+      BatteryHardwareScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<NetDiagnosticsRoute> {
+      NetDiagnosticsScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<DnsSslRoute> {
+      DnsSslScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<WifiChannelRoute> {
+      WifiChannelScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<LedClockRoute> {
+      LedClockScreen(onNavigateBack = { navController.popBackStack() })
     }
   }
 }

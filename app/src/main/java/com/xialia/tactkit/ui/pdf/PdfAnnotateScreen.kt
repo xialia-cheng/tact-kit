@@ -54,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -83,10 +84,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.engine.AnnotationTool
 import com.xialia.tactkit.engine.PdfEngine
+import com.xialia.tactkit.engine.PdfPrepareResult
 import com.xialia.tactkit.engine.PdfStroke
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.util.rememberAppHaptics
+import java.io.File
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,6 +105,12 @@ fun PdfAnnotateScreen(
   var currentUri by remember(initialUriString) {
     mutableStateOf(initialUriString?.let { Uri.parse(it) })
   }
+  var readableUri by remember { mutableStateOf<Uri?>(null) }
+  var tempUnlockedFile by remember { mutableStateOf<File?>(null) }
+  var showUnlockDialog by remember { mutableStateOf(false) }
+  var isUnlocking by remember { mutableStateOf(false) }
+  var unlockError by remember { mutableStateOf<String?>(null) }
+
   var pageCount by remember { mutableIntStateOf(0) }
   var currentPage by remember { mutableIntStateOf(0) }
   var pageBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -116,6 +125,13 @@ fun PdfAnnotateScreen(
   val strokesByPage = remember { mutableStateMapOf<Int, List<PdfStroke>>() }
   var activeStrokePoints by remember { mutableStateOf<List<Pair<Float, Float>>>(emptyList()) }
 
+  DisposableEffect(Unit) {
+    onDispose {
+      tempUnlockedFile?.delete()
+      tempUnlockedFile = null
+    }
+  }
+
   val palette =
     listOf(
       Color(0xFFFACC15),
@@ -128,6 +144,9 @@ fun PdfAnnotateScreen(
   val pickPdfLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
       if (uri != null) {
+        tempUnlockedFile?.delete()
+        tempUnlockedFile = null
+        readableUri = null
         currentUri = uri
         currentPage = 0
         zoomScale = 1f
@@ -138,7 +157,7 @@ fun PdfAnnotateScreen(
 
   val exportPdfLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { outUri ->
-      val srcUri = currentUri
+      val srcUri = readableUri ?: currentUri
       if (outUri != null && srcUri != null) {
         scope.launch {
           isBusy = true
@@ -155,15 +174,46 @@ fun PdfAnnotateScreen(
       }
     }
 
-  LaunchedEffect(currentUri, currentPage) {
+  LaunchedEffect(currentUri) {
     val uri = currentUri ?: return@LaunchedEffect
     isBusy = true
     zoomScale = 1f
     zoomOffset = Offset.Zero
-    runCatching {
-      pageCount = PdfEngine.getPageCount(context, uri)
-      pageBitmap = PdfEngine.renderPageBitmap(context, uri, currentPage, targetWidthPx = 1280)
+    pageBitmap = null
+    pageCount = 0
+    showUnlockDialog = false
+    unlockError = null
+    when (val res = PdfEngine.prepareReadablePdf(context, uri)) {
+      is PdfPrepareResult.Ready -> {
+        tempUnlockedFile?.delete()
+        tempUnlockedFile = res.tempFile
+        readableUri = res.readableUri
+        pageCount = res.pageCount
+        if (res.pageCount > 0) {
+          pageBitmap = PdfEngine.renderPageBitmap(context, res.readableUri, 0, targetWidthPx = 1280)
+        }
+      }
+      PdfPrepareResult.PasswordRequired,
+      PdfPrepareResult.WrongPassword -> {
+        readableUri = null
+        showUnlockDialog = true
+      }
+      is PdfPrepareResult.Error -> {
+        Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+      }
     }
+    isBusy = false
+  }
+
+  LaunchedEffect(readableUri, currentPage) {
+    val uri = readableUri ?: return@LaunchedEffect
+    if (pageCount <= 0) return@LaunchedEffect
+    isBusy = true
+    zoomScale = 1f
+    zoomOffset = Offset.Zero
+    pageBitmap =
+      runCatching { PdfEngine.renderPageBitmap(context, uri, currentPage, targetWidthPx = 1280) }
+        .getOrNull()
     isBusy = false
   }
 
@@ -482,5 +532,42 @@ fun PdfAnnotateScreen(
         }
       }
     }
+  }
+
+  if (showUnlockDialog) {
+    PdfPasswordUnlockDialog(
+      isVerifying = isUnlocking,
+      errorText = unlockError,
+      onSubmitPassword = { pwd ->
+        val src = currentUri ?: return@PdfPasswordUnlockDialog
+        scope.launch {
+          isUnlocking = true
+          unlockError = null
+          when (val res = PdfEngine.prepareReadablePdf(context, src, password = pwd)) {
+            is PdfPrepareResult.Ready -> {
+              tempUnlockedFile?.delete()
+              tempUnlockedFile = res.tempFile
+              readableUri = res.readableUri
+              pageCount = res.pageCount
+              currentPage = 0
+              showUnlockDialog = false
+              haptics.confirm()
+              if (res.pageCount > 0) {
+                pageBitmap = PdfEngine.renderPageBitmap(context, res.readableUri, 0, targetWidthPx = 1280)
+              }
+            }
+            PdfPrepareResult.WrongPassword,
+            PdfPrepareResult.PasswordRequired -> {
+              unlockError = "密码错误，请重试"
+            }
+            is PdfPrepareResult.Error -> {
+              unlockError = res.message
+            }
+          }
+          isUnlocking = false
+        }
+      },
+      onDismiss = { showUnlockDialog = false },
+    )
   }
 }

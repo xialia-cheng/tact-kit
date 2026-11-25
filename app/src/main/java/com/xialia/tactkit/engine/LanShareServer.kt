@@ -34,14 +34,21 @@ data class LanReceivedFile(
   val receivedAt: Long = System.currentTimeMillis(),
 )
 
+data class LanReceivedText(
+  val id: String = UUID.randomUUID().toString().take(8),
+  val content: String,
+  val receivedAt: Long = System.currentTimeMillis(),
+)
+
 /**
- * Lightweight temporary LAN HTTP file sharing server powered by pure Kotlin/Java ServerSocket.
- * No persistent background daemon: explicitly starts when user taps Start and closes all sockets on Stop.
+ * Lightweight temporary LAN HTTP file & text sharing server powered by pure Kotlin/Java ServerSocket.
+ * Upgraded with 128 KB streaming buffers and bidirectional clipboard text submission (`POST /clipboard`).
  */
 class LanShareServer(
   private val uploadDir: File,
   private val onFileReceived: (LanReceivedFile) -> Unit,
   private val onLog: (String) -> Unit = {},
+  private val onTextReceived: (LanReceivedText) -> Unit = {},
 ) {
   private val running = AtomicBoolean(false)
   private var serverSocket: ServerSocket? = null
@@ -101,7 +108,11 @@ class LanShareServer(
   private fun handleClient(client: Socket) {
     client.use { sock ->
       sock.soTimeout = 30_000
-      val rawInput = BufferedInputStream(sock.getInputStream(), 64 * 1024)
+      runCatching {
+        sock.sendBufferSize = 128 * 1024
+        sock.receiveBufferSize = 128 * 1024
+      }
+      val rawInput = BufferedInputStream(sock.getInputStream(), 128 * 1024)
       val out = sock.getOutputStream()
 
       val headerBytes = readHeaderBlock(rawInput) ?: return
@@ -133,7 +144,13 @@ class LanShareServer(
           if (target != null && target.stagedFile.exists()) {
             sendFileDownload(out, target)
           } else {
-            sendSimpleResponse(out, 404, "Not Found", "text/plain; charset=utf-8", "File not found".toByteArray())
+            sendSimpleResponse(
+              out,
+              404,
+              "Not Found",
+              "text/plain; charset=utf-8",
+              "File not found".toByteArray(),
+            )
           }
         }
         method == "POST" && path == "/upload" -> {
@@ -145,13 +162,58 @@ class LanShareServer(
             onLog("收到文件：${saved.fileName} (${saved.byteSize} B)")
             val redirectHtml =
               """<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="1;url=/"></head><body style="font-family:sans-serif;padding:24px;"><h3>上传成功：${escapeHtml(saved.fileName)}</h3><p>正在返回...</p></body></html>"""
-            sendSimpleResponse(out, 200, "OK", "text/html; charset=utf-8", redirectHtml.toByteArray(Charsets.UTF_8))
+            sendSimpleResponse(
+              out,
+              200,
+              "OK",
+              "text/html; charset=utf-8",
+              redirectHtml.toByteArray(Charsets.UTF_8),
+            )
           } else {
-            sendSimpleResponse(out, 400, "Bad Request", "text/plain; charset=utf-8", "Upload failed".toByteArray())
+            sendSimpleResponse(
+              out,
+              400,
+              "Bad Request",
+              "text/plain; charset=utf-8",
+              "Upload failed".toByteArray(),
+            )
+          }
+        }
+        method == "POST" && path == "/clipboard" -> {
+          val contentLength = headers["content-length"]?.toLongOrNull() ?: -1L
+          val contentType = headers["content-type"].orEmpty()
+          val text = handleTextSubmission(rawInput, contentType, contentLength)
+          if (!text.isNullOrBlank()) {
+            val item = LanReceivedText(content = text)
+            onTextReceived(item)
+            onLog("收到文字片段 (${text.length} 字)")
+            val redirectHtml =
+              """<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="1;url=/"></head><body style="font-family:sans-serif;padding:24px;"><h3>文字已发送至简工坊</h3><p>正在返回...</p></body></html>"""
+            sendSimpleResponse(
+              out,
+              200,
+              "OK",
+              "text/html; charset=utf-8",
+              redirectHtml.toByteArray(Charsets.UTF_8),
+            )
+          } else {
+            sendSimpleResponse(
+              out,
+              400,
+              "Bad Request",
+              "text/plain; charset=utf-8",
+              "Empty text".toByteArray(),
+            )
           }
         }
         else -> {
-          sendSimpleResponse(out, 404, "Not Found", "text/plain; charset=utf-8", "Not Found".toByteArray())
+          sendSimpleResponse(
+            out,
+            404,
+            "Not Found",
+            "text/plain; charset=utf-8",
+            "Not Found".toByteArray(),
+          )
         }
       }
     }
@@ -183,14 +245,22 @@ class LanShareServer(
           ul { padding-left:18px; }
           button { background:#1a73e8; color:#fff; border:none; border-radius:12px; padding:10px 18px; font-size:15px; cursor:pointer; }
           input[type=file] { margin:12px 0; display:block; width:100%; }
+          textarea { width:100%; box-sizing:border-box; border:1px solid #d0d5dd; border-radius:12px; padding:10px; font-size:14px; min-height:96px; margin:10px 0; font-family:inherit; }
         </style>
       </head>
       <body>
         <div class="card">
           <h2>简工坊 (TactKit) · 局域网快传</h2>
-          <p style="color:#5f6368;font-size:14px;">同局域网设备免安装直连，关闭服务后立即断开。</p>
+          <p style="color:#5f6368;font-size:14px;">同局域网设备免安装高速直连，关闭服务后立即断开。</p>
           <h3>从手机下载文件</h3>
           <ul>$filesHtml</ul>
+        </div>
+        <div class="card">
+          <h3>发送文字到手机</h3>
+          <form method="POST" action="/clipboard">
+            <textarea name="text" placeholder="粘贴链接、命令、笔记或任意文本发送到手机..." required></textarea>
+            <button type="submit">发送到手机</button>
+          </form>
         </div>
         <div class="card">
           <h3>发送文件到手机</h3>
@@ -202,7 +272,13 @@ class LanShareServer(
       </body>
       </html>
       """.trimIndent()
-    sendSimpleResponse(out, 200, "OK", "text/html; charset=utf-8", html.toByteArray(Charsets.UTF_8))
+    sendSimpleResponse(
+      out,
+      200,
+      "OK",
+      "text/html; charset=utf-8",
+      html.toByteArray(Charsets.UTF_8),
+    )
   }
 
   private fun sendFileDownload(out: OutputStream, item: LanSharedOutFile) {
@@ -218,7 +294,7 @@ class LanShareServer(
       }
     out.write(header.toByteArray(Charsets.ISO_8859_1))
     FileInputStream(file).use { fis ->
-      val buf = ByteArray(16 * 1024)
+      val buf = ByteArray(128 * 1024)
       var read = fis.read(buf)
       while (read > 0) {
         out.write(buf, 0, read)
@@ -261,6 +337,37 @@ class LanShareServer(
     return null
   }
 
+  private fun handleTextSubmission(
+    input: InputStream,
+    contentType: String,
+    contentLength: Long,
+  ): String? {
+    if (contentLength <= 0 || contentLength > 2L * 1024L * 1024L) return null
+    val buf = ByteArray(contentLength.toInt())
+    var offset = 0
+    while (offset < buf.size) {
+      val read = input.read(buf, offset, buf.size - offset)
+      if (read <= 0) break
+      offset += read
+    }
+    val rawBody = String(buf, 0, offset, Charsets.UTF_8)
+    return if (contentType.contains("application/x-www-form-urlencoded", ignoreCase = true)) {
+      rawBody.split("&")
+        .mapNotNull { pair ->
+          val idx = pair.indexOf('=')
+          if (idx <= 0) null
+          else {
+            val k = pair.substring(0, idx)
+            val v = pair.substring(idx + 1)
+            if (k == "text") runCatching { URLDecoder.decode(v, "UTF-8") }.getOrDefault(v) else null
+          }
+        }
+        .firstOrNull()
+    } else {
+      rawBody.trim()
+    }
+  }
+
   private fun handleMultipartUpload(
     input: InputStream,
     contentType: String,
@@ -276,7 +383,6 @@ class LanShareServer(
 
     if (contentLength <= 0 || contentLength > 512L * 1024L * 1024L) return null
 
-    // Stream multipart upload directly to disk so large files never OOM
     val headerBuffer = ByteArrayOutputStream(4096)
     var headerState = 0
     var bytesConsumed = 0L
@@ -312,12 +418,12 @@ class LanShareServer(
     val destFile = File(uploadDir, "${System.currentTimeMillis()}_$safeFileName")
 
     val closingMarker = "\r\n--$boundary".toByteArray(Charsets.ISO_8859_1)
-    val tailReserve = closingMarker.size + 128 // Enough to catch closing boundary + "--\r\n"
-    val pending = ByteArrayOutputStream(tailReserve * 2)
+    val tailReserve = closingMarker.size + 128
+    val pending = ByteArrayOutputStream(128 * 1024 + tailReserve)
     var totalWritten = 0L
 
     FileOutputStream(destFile).use { fos ->
-      val buf = ByteArray(16 * 1024)
+      val buf = ByteArray(128 * 1024)
       var remaining = contentLength - bytesConsumed
       while (remaining > 0) {
         val toRead = minOf(buf.size.toLong(), remaining).toInt()

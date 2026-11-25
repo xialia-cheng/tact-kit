@@ -14,12 +14,14 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.text.PDFTextStripper
-import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -36,17 +38,134 @@ data class PdfStroke(
   val normalizedPoints: List<Pair<Float, Float>>,
 )
 
+sealed interface PdfPrepareResult {
+  data class Ready(
+    val readableUri: Uri,
+    val pageCount: Int,
+    val tempFile: File?,
+  ) : PdfPrepareResult
+
+  data object PasswordRequired : PdfPrepareResult
+
+  data object WrongPassword : PdfPrepareResult
+
+  data class Error(val message: String) : PdfPrepareResult
+}
+
 object PdfEngine {
 
   private fun ensureInit(context: Context) {
     PDFBoxResourceLoader.init(context.applicationContext)
   }
 
+  private fun openPdfFileDescriptor(context: Context, uri: Uri): ParcelFileDescriptor? {
+    return if (uri.scheme == "file" && !uri.path.isNullOrEmpty()) {
+      val f = File(uri.path!!)
+      if (f.exists()) ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY) else null
+    } else {
+      context.contentResolver.openFileDescriptor(uri, "r")
+    }
+  }
+
+  private fun openPdfInputStream(context: Context, uri: Uri): InputStream? {
+    return if (uri.scheme == "file" && !uri.path.isNullOrEmpty()) {
+      val f = File(uri.path!!)
+      if (f.exists()) FileInputStream(f) else null
+    } else {
+      context.contentResolver.openInputStream(uri)
+    }
+  }
+
+  /**
+   * Opens a PDF safely. If protected with a password, returns PasswordRequired / WrongPassword
+   * without touching the original file. When password is valid, decrypts to an ephemeral cacheDir
+   * file whose URI can be rendered by Android's PdfRenderer.
+   */
+  suspend fun prepareReadablePdf(
+    context: Context,
+    uri: Uri,
+    password: String? = null,
+  ): PdfPrepareResult =
+    withContext(Dispatchers.IO) {
+      ensureInit(context)
+      if (password == null) {
+        try {
+          val pfd = openPdfFileDescriptor(context, uri)
+            ?: return@withContext PdfPrepareResult.Error("无法打开 PDF 文件")
+          pfd.use { fd ->
+            PdfRenderer(fd).use { renderer ->
+              return@withContext PdfPrepareResult.Ready(
+                readableUri = uri,
+                pageCount = renderer.pageCount,
+                tempFile = null,
+              )
+            }
+          }
+        } catch (_: SecurityException) {
+          return@withContext PdfPrepareResult.PasswordRequired
+        } catch (e: Throwable) {
+          var fallbackPages = -1
+          val encrypted = runCatching {
+            openPdfInputStream(context, uri)?.use { input ->
+              PDDocument.load(input).use { doc ->
+                fallbackPages = doc.numberOfPages
+              }
+            }
+            false
+          }.getOrElse { err -> err is InvalidPasswordException }
+          return@withContext when {
+            encrypted -> PdfPrepareResult.PasswordRequired
+            fallbackPages >= 0 ->
+              PdfPrepareResult.Ready(readableUri = uri, pageCount = fallbackPages, tempFile = null)
+            else -> PdfPrepareResult.Error(e.message ?: "无法读取 PDF")
+          }
+        }
+      } else {
+        var tempFile: File? = null
+        try {
+          val stream = openPdfInputStream(context, uri)
+            ?: return@withContext PdfPrepareResult.Error("无法读取加密 PDF")
+          var pageCount = 0
+          stream.use { input ->
+            PDDocument.load(input, password).use { doc ->
+              doc.isAllSecurityToBeRemoved = true
+              pageCount = doc.numberOfPages
+              val outTmp = File.createTempFile("unlocked_preview_", ".pdf", context.cacheDir)
+              tempFile = outTmp
+              outTmp.outputStream().use { out -> doc.save(out) }
+            }
+          }
+          val file = tempFile ?: return@withContext PdfPrepareResult.Error("创建临时文件失败")
+          val unlockedUri = Uri.fromFile(file)
+          PdfPrepareResult.Ready(
+            readableUri = unlockedUri,
+            pageCount = pageCount,
+            tempFile = file,
+          )
+        } catch (_: InvalidPasswordException) {
+          tempFile?.delete()
+          PdfPrepareResult.WrongPassword
+        } catch (e: Exception) {
+          tempFile?.delete()
+          PdfPrepareResult.Error(e.message ?: "解密 PDF 失败")
+        }
+      }
+    }
+
   suspend fun getPageCount(context: Context, uri: Uri): Int =
     withContext(Dispatchers.IO) {
-      context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-        PdfRenderer(pfd).use { renderer -> renderer.pageCount }
-      } ?: 0
+      runCatching {
+        openPdfFileDescriptor(context, uri)?.use { pfd ->
+          PdfRenderer(pfd).use { renderer -> renderer.pageCount }
+        } ?: 0
+      }.getOrElse {
+        ensureInit(context)
+        runCatching {
+          openPdfInputStream(context, uri)?.use { input ->
+            PDDocument.load(input).use { it.numberOfPages }
+          } ?: 0
+        }.getOrDefault(0)
+      }
     }
 
   suspend fun renderPageBitmap(
@@ -56,7 +175,7 @@ object PdfEngine {
     targetWidthPx: Int = 1280,
   ): Bitmap? =
     withContext(Dispatchers.IO) {
-      context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+      openPdfFileDescriptor(context, uri)?.use { pfd ->
         PdfRenderer(pfd).use { renderer ->
           if (pageIndex !in 0 until renderer.pageCount) return@withContext null
           renderer.openPage(pageIndex).use { page ->
@@ -82,7 +201,7 @@ object PdfEngine {
         inputUris.forEachIndexed { idx, uri ->
           val tmp = File.createTempFile("merge_in_$idx", ".pdf", context.cacheDir)
           tempFiles += tmp
-          context.contentResolver.openInputStream(uri)?.use { input ->
+          openPdfInputStream(context, uri)?.use { input ->
             tmp.outputStream().use { out -> input.copyTo(out) }
           }
           merger.addSource(tmp)
@@ -109,7 +228,7 @@ object PdfEngine {
   ) =
     withContext(Dispatchers.IO) {
       ensureInit(context)
-      context.contentResolver.openInputStream(inputUri)?.use { input ->
+      openPdfInputStream(context, inputUri)?.use { input ->
         PDDocument.load(input).use { sourceDoc ->
           val total = sourceDoc.numberOfPages
           val from = startPage1Based.coerceIn(1, total)
@@ -135,7 +254,7 @@ object PdfEngine {
     withContext(Dispatchers.IO) {
       ensureInit(context)
       val pfd: ParcelFileDescriptor =
-        context.contentResolver.openFileDescriptor(inputUri, "r") ?: error("无法打开 PDF")
+        openPdfFileDescriptor(context, inputUri) ?: error("无法打开 PDF")
       pfd.use { fd ->
         PdfRenderer(fd).use { renderer ->
           PDDocument().use { outDoc ->
@@ -175,7 +294,7 @@ object PdfEngine {
     withContext(Dispatchers.IO) {
       ensureInit(context)
       require(userPassword.isNotBlank()) { "密码不能为空" }
-      context.contentResolver.openInputStream(inputUri)?.use { input ->
+      openPdfInputStream(context, inputUri)?.use { input ->
         PDDocument.load(input).use { doc ->
           val ap = AccessPermission()
           val policy = StandardProtectionPolicy(ownerPassword.ifBlank { userPassword }, userPassword, ap)
@@ -196,7 +315,7 @@ object PdfEngine {
   ) =
     withContext(Dispatchers.IO) {
       ensureInit(context)
-      context.contentResolver.openInputStream(inputUri)?.use { input ->
+      openPdfInputStream(context, inputUri)?.use { input ->
         PDDocument.load(input, password).use { doc ->
           doc.isAllSecurityToBeRemoved = true
           context.contentResolver.openOutputStream(outputUri)?.use { out ->
@@ -209,7 +328,7 @@ object PdfEngine {
   suspend fun extractText(context: Context, inputUri: Uri, maxChars: Int = 16_000): String =
     withContext(Dispatchers.IO) {
       ensureInit(context)
-      context.contentResolver.openInputStream(inputUri)?.use { input ->
+      openPdfInputStream(context, inputUri)?.use { input ->
         PDDocument.load(input).use { doc ->
           val stripper = PDFTextStripper()
           val raw = stripper.getText(doc).orEmpty().trim()
@@ -226,7 +345,7 @@ object PdfEngine {
   ) =
     withContext(Dispatchers.IO) {
       ensureInit(context)
-      context.contentResolver.openInputStream(inputUri)?.use { input ->
+      openPdfInputStream(context, inputUri)?.use { input ->
         PDDocument.load(input).use { doc ->
           strokesByPage.forEach { (pageIndex, strokes) ->
             if (pageIndex in 0 until doc.numberOfPages && strokes.isNotEmpty()) {

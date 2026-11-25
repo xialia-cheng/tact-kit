@@ -10,6 +10,7 @@ import com.xialia.tactkit.data.model.WorkbenchCardEntity
 import com.xialia.tactkit.data.model.WorkbenchCardType
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.QuickLookFileInspection
+import com.xialia.tactkit.ui.widget.PinnedChecklistWidget
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -36,7 +37,7 @@ class WorkbenchRepository(
         .filter { it.isNotEmpty() }
         .map { ChecklistItem(id = UUID.randomUUID().toString(), text = it, checked = false) }
     val now = System.currentTimeMillis()
-    return dao.insertCard(
+    val inserted = dao.insertCard(
       WorkbenchCardEntity(
         type = WorkbenchCardType.CHECKLIST.name,
         title = cleanTitle,
@@ -45,6 +46,8 @@ class WorkbenchRepository(
         updatedAt = now,
       )
     )
+    appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
+    return inserted
   }
 
   suspend fun toggleChecklistItem(cardId: Long, itemId: String) {
@@ -56,6 +59,7 @@ class WorkbenchRepository(
     dao.updateCard(
       entity.copy(content = json.encodeToString(updated), updatedAt = System.currentTimeMillis())
     )
+    appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
   }
 
   suspend fun addChecklistItem(cardId: Long, text: String) {
@@ -68,6 +72,7 @@ class WorkbenchRepository(
     dao.updateCard(
       entity.copy(content = json.encodeToString(items), updatedAt = System.currentTimeMillis())
     )
+    appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
   }
 
   suspend fun deleteChecklistItem(cardId: Long, itemId: String) {
@@ -77,6 +82,7 @@ class WorkbenchRepository(
     dao.updateCard(
       entity.copy(content = json.encodeToString(items), updatedAt = System.currentTimeMillis())
     )
+    appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
   }
 
   suspend fun createNote(title: String, markdownContent: String): Long {
@@ -159,9 +165,35 @@ class WorkbenchRepository(
     )
   }
 
+  suspend fun registerGeneratedFileCard(
+    file: File,
+    uriString: String,
+    mimeType: String,
+    excerpt: String = "",
+  ): Long {
+    val now = System.currentTimeMillis()
+    return dao.insertCard(
+      WorkbenchCardEntity(
+        type = WorkbenchCardType.RECENT_FILE.name,
+        title = file.name,
+        content = excerpt.take(320),
+        fileUri = uriString,
+        fileName = file.name,
+        fileSizeBytes = file.length(),
+        mimeType = mimeType,
+        sha256 = null,
+        createdAt = now,
+        updatedAt = now,
+      )
+    )
+  }
+
   suspend fun togglePinCard(cardId: Long) {
     val entity = dao.getCardById(cardId) ?: return
     dao.updateCard(entity.copy(pinned = !entity.pinned, updatedAt = System.currentTimeMillis()))
+    if (entity.type == WorkbenchCardType.CHECKLIST.name) {
+      appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
+    }
   }
 
   suspend fun deleteCard(cardId: Long) {
@@ -170,6 +202,9 @@ class WorkbenchRepository(
       runCatching { File(entity.audioFilePath).delete() }
     }
     dao.deleteCardById(cardId)
+    if (entity?.type == WorkbenchCardType.CHECKLIST.name) {
+      appContext?.let { PinnedChecklistWidget.notifyChanged(it) }
+    }
   }
 
   private fun decodeChecklist(raw: String): List<ChecklistItem> {

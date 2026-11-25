@@ -92,3 +92,8 @@
 -dontwarn java.nio.file.**
 -dontwarn javax.naming.**
 
+# Phase 5: Jetpack Glance AppWidgets
+-keep class androidx.glance.** { *; }
+-dontwarn androidx.glance.**
+-keep class com.xialia.tactkit.ui.widget.** { *; }
+

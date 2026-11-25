@@ -105,7 +105,9 @@ import com.xialia.tactkit.data.datastore.SettingsRepository
 import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.repository.WorkbenchRepository
 import com.xialia.tactkit.engine.PdfEngine
+import com.xialia.tactkit.engine.PdfPrepareResult
 import com.xialia.tactkit.ui.components.MarkdownRenderer
+import com.xialia.tactkit.ui.pdf.PdfPasswordUnlockDialog
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.ui.theme.TactKitTheme
 import com.xialia.tactkit.util.ApkInspectionInfo
@@ -119,6 +121,7 @@ import com.xialia.tactkit.util.SpecialtyFileKind
 import com.xialia.tactkit.util.SpecialtyFormatParser
 import com.xialia.tactkit.util.VCardContactInfo
 import com.xialia.tactkit.util.rememberAppHaptics
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -201,6 +204,11 @@ private fun QuickLookOverlayScreen(
   var pdfBitmap by remember { mutableStateOf<Bitmap?>(null) }
   var pdfZoom by remember { mutableFloatStateOf(1f) }
   var pdfPan by remember { mutableStateOf(Offset.Zero) }
+  var pdfReadableUri by remember { mutableStateOf<Uri?>(null) }
+  var pdfTempUnlockedFile by remember { mutableStateOf<File?>(null) }
+  var showPdfUnlockDialog by remember { mutableStateOf(false) }
+  var isPdfUnlocking by remember { mutableStateOf(false) }
+  var pdfUnlockError by remember { mutableStateOf<String?>(null) }
 
   // Ephemeral in-memory keystore state
   var unlockedCerts by remember { mutableStateOf<List<CertificateEntryInfo>>(emptyList()) }
@@ -211,6 +219,8 @@ private fun QuickLookOverlayScreen(
     onDispose {
       keystorePassword = ""
       unlockedCerts = emptyList()
+      pdfTempUnlockedFile?.delete()
+      pdfTempUnlockedFile = null
     }
   }
 
@@ -220,6 +230,11 @@ private fun QuickLookOverlayScreen(
     pdfPageCount = 0
     pdfPageIndex = 0
     pdfBitmap = null
+    pdfReadableUri = null
+    pdfTempUnlockedFile?.delete()
+    pdfTempUnlockedFile = null
+    showPdfUnlockDialog = false
+    pdfUnlockError = null
     unlockedCerts = emptyList()
     keystorePassword = ""
     keystoreError = null
@@ -229,9 +244,20 @@ private fun QuickLookOverlayScreen(
         val result = FileInspectionHelper.inspectUri(context.contentResolver, uri, context)
         inspection = result
         if (result.mimeType == "application/pdf") {
-          pdfPageCount = PdfEngine.getPageCount(context, uri)
-          if (pdfPageCount > 0) {
-            pdfBitmap = PdfEngine.renderPageBitmap(context, uri, 0, targetWidthPx = 1080)
+          when (val prep = PdfEngine.prepareReadablePdf(context, uri)) {
+            is PdfPrepareResult.Ready -> {
+              pdfTempUnlockedFile = prep.tempFile
+              pdfReadableUri = prep.readableUri
+              pdfPageCount = prep.pageCount
+              if (prep.pageCount > 0) {
+                pdfBitmap = PdfEngine.renderPageBitmap(context, prep.readableUri, 0, targetWidthPx = 1080)
+              }
+            }
+            PdfPrepareResult.PasswordRequired,
+            PdfPrepareResult.WrongPassword -> {
+              showPdfUnlockDialog = true
+            }
+            is PdfPrepareResult.Error -> Unit
           }
         }
       } else {
@@ -260,15 +286,14 @@ private fun QuickLookOverlayScreen(
     }
   }
 
-  LaunchedEffect(inspection?.uriString, pdfPageIndex) {
-    val data = inspection ?: return@LaunchedEffect
-    val uriStr = data.uriString ?: return@LaunchedEffect
-    if (data.mimeType == "application/pdf" && pdfPageCount > 0) {
+  LaunchedEffect(pdfReadableUri, pdfPageIndex) {
+    val readable = pdfReadableUri ?: return@LaunchedEffect
+    if (pdfPageCount > 0) {
       pdfZoom = 1f
       pdfPan = Offset.Zero
       pdfBitmap =
         runCatching {
-          PdfEngine.renderPageBitmap(context, Uri.parse(uriStr), pdfPageIndex, targetWidthPx = 1080)
+          PdfEngine.renderPageBitmap(context, readable, pdfPageIndex, targetWidthPx = 1080)
         }.getOrNull()
     }
   }
@@ -778,6 +803,43 @@ private fun QuickLookOverlayScreen(
         }
       }
     }
+  }
+
+  if (showPdfUnlockDialog) {
+    PdfPasswordUnlockDialog(
+      isVerifying = isPdfUnlocking,
+      errorText = pdfUnlockError,
+      onSubmitPassword = { pwd ->
+        val uriStr = inspection?.uriString ?: return@PdfPasswordUnlockDialog
+        scope.launch {
+          isPdfUnlocking = true
+          pdfUnlockError = null
+          when (val prep = PdfEngine.prepareReadablePdf(context, Uri.parse(uriStr), password = pwd)) {
+            is PdfPrepareResult.Ready -> {
+              pdfTempUnlockedFile?.delete()
+              pdfTempUnlockedFile = prep.tempFile
+              pdfReadableUri = prep.readableUri
+              pdfPageCount = prep.pageCount
+              pdfPageIndex = 0
+              showPdfUnlockDialog = false
+              haptics.confirm()
+              if (prep.pageCount > 0) {
+                pdfBitmap = PdfEngine.renderPageBitmap(context, prep.readableUri, 0, targetWidthPx = 1080)
+              }
+            }
+            PdfPrepareResult.WrongPassword,
+            PdfPrepareResult.PasswordRequired -> {
+              pdfUnlockError = "密码错误，请重试"
+            }
+            is PdfPrepareResult.Error -> {
+              pdfUnlockError = prep.message
+            }
+          }
+          isPdfUnlocking = false
+        }
+      },
+      onDismiss = { showPdfUnlockDialog = false },
+    )
   }
 }
 

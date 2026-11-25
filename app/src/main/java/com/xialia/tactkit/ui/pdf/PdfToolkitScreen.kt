@@ -56,6 +56,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,9 +78,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.engine.PdfEngine
+import com.xialia.tactkit.engine.PdfPrepareResult
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.util.rememberAppHaptics
+import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -106,6 +109,12 @@ fun PdfToolkitScreen(
   var currentUri by remember(initialUriString) {
     mutableStateOf(initialUriString?.let { Uri.parse(it) })
   }
+  var readableUri by remember { mutableStateOf<Uri?>(null) }
+  var tempUnlockedFile by remember { mutableStateOf<File?>(null) }
+  var showUnlockDialog by remember { mutableStateOf(false) }
+  var isUnlocking by remember { mutableStateOf(false) }
+  var unlockError by remember { mutableStateOf<String?>(null) }
+
   var pageCount by remember { mutableIntStateOf(0) }
   var currentPage by remember { mutableIntStateOf(0) }
   var pageBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -124,9 +133,19 @@ fun PdfToolkitScreen(
   var passwordIsProtect by remember { mutableStateOf(true) }
   var passwordInput by remember { mutableStateOf("") }
 
+  DisposableEffect(Unit) {
+    onDispose {
+      tempUnlockedFile?.delete()
+      tempUnlockedFile = null
+    }
+  }
+
   val pickSinglePdf =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
       if (uri != null) {
+        tempUnlockedFile?.delete()
+        tempUnlockedFile = null
+        readableUri = null
         currentUri = uri
         currentPage = 0
         scale = 1f
@@ -145,7 +164,7 @@ fun PdfToolkitScreen(
           when (op) {
             PendingPdfExport.MERGE -> PdfEngine.mergePdfs(context, pendingMergeUris, outUri)
             PendingPdfExport.SPLIT -> {
-              val src = currentUri ?: error("未选择 PDF")
+              val src = readableUri ?: currentUri ?: error("未选择 PDF")
               PdfEngine.splitPdfByRange(
                 context,
                 src,
@@ -155,11 +174,11 @@ fun PdfToolkitScreen(
               )
             }
             PendingPdfExport.COMPRESS -> {
-              val src = currentUri ?: error("未选择 PDF")
+              val src = readableUri ?: currentUri ?: error("未选择 PDF")
               PdfEngine.compressPdf(context, src, compressQuality, outUri)
             }
             PendingPdfExport.PROTECT -> {
-              val src = currentUri ?: error("未选择 PDF")
+              val src = readableUri ?: currentUri ?: error("未选择 PDF")
               PdfEngine.protectPdf(context, src, passwordInput, passwordInput, outUri)
             }
             PendingPdfExport.UNLOCK -> {
@@ -209,17 +228,42 @@ fun PdfToolkitScreen(
       }
     }
 
-  LaunchedEffect(currentUri, currentPage) {
+  LaunchedEffect(currentUri) {
     val uri = currentUri ?: return@LaunchedEffect
     isBusy = true
-    runCatching {
-      val count = PdfEngine.getPageCount(context, uri)
-      pageCount = count
-      splitEnd = count.coerceAtLeast(1).toString()
-      pageBitmap = PdfEngine.renderPageBitmap(context, uri, currentPage)
-    }.onFailure {
-      Toast.makeText(context, "无法渲染此 PDF（如已加密请先解除密码）", Toast.LENGTH_SHORT).show()
+    pageBitmap = null
+    pageCount = 0
+    showUnlockDialog = false
+    unlockError = null
+    when (val res = PdfEngine.prepareReadablePdf(context, uri)) {
+      is PdfPrepareResult.Ready -> {
+        tempUnlockedFile?.delete()
+        tempUnlockedFile = res.tempFile
+        readableUri = res.readableUri
+        pageCount = res.pageCount
+        splitEnd = res.pageCount.coerceAtLeast(1).toString()
+        if (res.pageCount > 0) {
+          pageBitmap = PdfEngine.renderPageBitmap(context, res.readableUri, 0)
+        }
+      }
+      PdfPrepareResult.PasswordRequired,
+      PdfPrepareResult.WrongPassword -> {
+        readableUri = null
+        showUnlockDialog = true
+      }
+      is PdfPrepareResult.Error -> {
+        Toast.makeText(context, res.message, Toast.LENGTH_SHORT).show()
+      }
     }
+    isBusy = false
+  }
+
+  LaunchedEffect(readableUri, currentPage) {
+    val uri = readableUri ?: return@LaunchedEffect
+    if (pageCount <= 0) return@LaunchedEffect
+    isBusy = true
+    pageBitmap =
+      runCatching { PdfEngine.renderPageBitmap(context, uri, currentPage) }.getOrNull()
     isBusy = false
   }
 
@@ -368,7 +412,7 @@ fun PdfToolkitScreen(
         Button(
           onClick = {
             haptics.tick()
-            currentUri?.let { onOpenAnnotate(it.toString()) }
+            (readableUri ?: currentUri)?.let { onOpenAnnotate(it.toString()) }
           },
           shape = RoundedCornerShape(18.dp),
           modifier = Modifier.fillMaxWidth().height(52.dp).testTag("pdf_open_annotate_btn"),
@@ -549,6 +593,44 @@ fun PdfToolkitScreen(
       dismissButton = {
         TextButton(onClick = { showPasswordDialog = false }) { Text("取消") }
       },
+    )
+  }
+
+  if (showUnlockDialog) {
+    PdfPasswordUnlockDialog(
+      isVerifying = isUnlocking,
+      errorText = unlockError,
+      onSubmitPassword = { pwd ->
+        val src = currentUri ?: return@PdfPasswordUnlockDialog
+        scope.launch {
+          isUnlocking = true
+          unlockError = null
+          when (val res = PdfEngine.prepareReadablePdf(context, src, password = pwd)) {
+            is PdfPrepareResult.Ready -> {
+              tempUnlockedFile?.delete()
+              tempUnlockedFile = res.tempFile
+              readableUri = res.readableUri
+              pageCount = res.pageCount
+              currentPage = 0
+              splitEnd = res.pageCount.coerceAtLeast(1).toString()
+              showUnlockDialog = false
+              haptics.confirm()
+              if (res.pageCount > 0) {
+                pageBitmap = PdfEngine.renderPageBitmap(context, res.readableUri, 0)
+              }
+            }
+            PdfPrepareResult.WrongPassword,
+            PdfPrepareResult.PasswordRequired -> {
+              unlockError = "密码错误，请重试"
+            }
+            is PdfPrepareResult.Error -> {
+              unlockError = res.message
+            }
+          }
+          isUnlocking = false
+        }
+      },
+      onDismiss = { showUnlockDialog = false },
     )
   }
 }

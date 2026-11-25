@@ -4,32 +4,45 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.EnhancedEncryption
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.FlashlightOn
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideImage
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Lan
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Preview
 import androidx.compose.material.icons.rounded.QrCode2
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Sensors
+import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material.icons.rounded.TableChart
+import androidx.compose.material.icons.rounded.WifiFind
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class ToolCategory(val title: String, val icon: ImageVector) {
   DOCUMENT_OFFICE("文档与办公", Icons.Rounded.Description),
-  PDF_IMAGE("PDF 与图像", Icons.Rounded.PictureAsPdf),
-  MEDIA_ARCHIVE("媒体与压缩", Icons.Rounded.Archive),
-  DAILY_SENSOR("日常与传感器", Icons.Rounded.Sensors),
+  MEDIA_VISUAL("媒体与视觉", Icons.Rounded.Image),
+  FILE_NETWORK("文件与网络", Icons.Rounded.Folder),
   DEV_ELECTRONICS("开发与电子", Icons.Rounded.Code),
+  MEASURE_DAILY("测量与日常", Icons.Rounded.Straighten),
 }
 
 data class ToolItem(
@@ -45,161 +58,238 @@ object ToolCatalog {
 
   val allTools: List<ToolItem> =
     listOf(
-      // 文档与办公
+      // 1. 文档与办公
       ToolItem(
         id = "quick_note",
         name = "快速便签",
-        subtitle = "Markdown 富文本、表格与代码便签",
+        subtitle = "Markdown 便签",
         category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.EditNote,
       ),
       ToolItem(
         id = "quick_checklist",
         name = "待办清单",
-        subtitle = "可勾选任务卡片",
+        subtitle = "可勾选待办任务卡片",
         category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.Checklist,
       ),
       ToolItem(
         id = "voice_memo",
         name = "语音备忘录",
-        subtitle = "实时波形 AAC 录音与本地回放",
+        subtitle = "实时波形录音与回放",
         category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.Mic,
       ),
       ToolItem(
-        id = "quick_look",
-        name = "Quick Look",
-        subtitle = "文件体检、SHA-256 与多页预览",
+        id = "doc_scanner",
+        name = "文档扫描",
+        subtitle = "拍照矫平生成多页PDF",
         category = ToolCategory.DOCUMENT_OFFICE,
-        icon = Icons.Rounded.Preview,
-      ),
-      ToolItem(
-        id = "ai_hub",
-        name = "多模态 AI 中枢",
-        subtitle = "识图转 Markdown、PDF 摘要与清单整理",
-        category = ToolCategory.DOCUMENT_OFFICE,
-        icon = Icons.Rounded.AutoAwesome,
+        icon = Icons.Rounded.DocumentScanner,
       ),
       ToolItem(
         id = "docx_editor",
         name = "Docx 文档工坊",
-        subtitle = "离线阅读、段落编辑与导出 Word (.docx)",
+        subtitle = "离线阅读编辑与导出",
         category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.Description,
       ),
       ToolItem(
-        id = "data_workshop",
-        name = "结构化数据工坊",
-        subtitle = "CSV / JSON / YAML / XML 互转、校验与表格编辑",
-        category = ToolCategory.DOCUMENT_OFFICE,
-        icon = Icons.Rounded.TableChart,
-      ),
-
-      // PDF 与图像
-      ToolItem(
         id = "pdf_toolkit",
         name = "PDF 核心工具箱",
-        subtitle = "缩放预览、合并拆分、压缩与密码保护",
-        category = ToolCategory.PDF_IMAGE,
+        subtitle = "合并拆分压缩与解锁",
+        category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.PictureAsPdf,
       ),
       ToolItem(
         id = "pdf_annotate",
         name = "PDF 批注与签名",
-        subtitle = "荧光笔高亮、自由涂鸦与手写签名导出",
-        category = ToolCategory.PDF_IMAGE,
+        subtitle = "高亮涂鸦与签名导出",
+        category = ToolCategory.DOCUMENT_OFFICE,
         icon = Icons.Rounded.Draw,
       ),
       ToolItem(
-        id = "image_privacy",
-        name = "图片隐私与工坊",
-        subtitle = "剥离 EXIF、马赛克、水印、长图拼接与取色",
-        category = ToolCategory.PDF_IMAGE,
-        icon = Icons.Rounded.HideImage,
+        id = "quick_look",
+        name = "Quick Look",
+        subtitle = "文件体检哈希与预览",
+        category = ToolCategory.DOCUMENT_OFFICE,
+        icon = Icons.Rounded.Preview,
       ),
 
-      // 媒体与压缩
+      // 2. 媒体与视觉
+      ToolItem(
+        id = "image_privacy",
+        name = "图片隐私与工坊",
+        subtitle = "去EXIF马赛克与水印",
+        category = ToolCategory.MEDIA_VISUAL,
+        icon = Icons.Rounded.HideImage,
+      ),
+      ToolItem(
+        id = "image_long",
+        name = "长图与转 PDF",
+        subtitle = "多图长图拼接转PDF",
+        category = ToolCategory.MEDIA_VISUAL,
+        icon = Icons.Rounded.Collections,
+      ),
       ToolItem(
         id = "media_extractor",
-        name = "音视频无损轻处理",
-        subtitle = "零重编码提取 .m4a 音轨、抽帧与裁剪",
-        category = ToolCategory.MEDIA_ARCHIVE,
+        name = "音视频轻处理",
+        subtitle = "音轨提取抽帧与裁剪",
+        category = ToolCategory.MEDIA_VISUAL,
         icon = Icons.Rounded.AudioFile,
       ),
       ToolItem(
+        id = "led_clock",
+        name = "LED 弹幕与时钟",
+        subtitle = "手持弹幕与极简时钟",
+        category = ToolCategory.MEDIA_VISUAL,
+        icon = Icons.Rounded.Schedule,
+      ),
+      ToolItem(
+        id = "ai_hub",
+        name = "✨ AI 中枢",
+        subtitle = "识图摘要与智能整理",
+        category = ToolCategory.MEDIA_VISUAL,
+        icon = Icons.Rounded.AutoAwesome,
+      ),
+
+      // 3. 文件与网络
+      ToolItem(
         id = "archive_box",
         name = "压缩包工坊",
-        subtitle = "ZIP (AES-256) / 7Z / TAR / GZ / XZ 打包与解压",
-        category = ToolCategory.MEDIA_ARCHIVE,
+        subtitle = "多格式压缩包打包解压",
+        category = ToolCategory.FILE_NETWORK,
         icon = Icons.Rounded.Archive,
       ),
+      ToolItem(
+        id = "data_workshop",
+        name = "结构化数据工坊",
+        subtitle = "表格互转校验与编辑",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.TableChart,
+      ),
+      ToolItem(
+        id = "lan_share",
+        name = "局域网 HTTP 快传",
+        subtitle = "同网扫码双向传文件",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.WifiTethering,
+      ),
+      ToolItem(
+        id = "net_diag",
+        name = "局域网体检与 Ping",
+        subtitle = "本机链路与端口探测",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.Lan,
+      ),
+      ToolItem(
+        id = "dns_ssl",
+        name = "DNS 与 SSL 检查",
+        subtitle = "域名解析与证书检查",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.Dns,
+      ),
+      ToolItem(
+        id = "wifi_channel",
+        name = "Wi-Fi 信道分析",
+        subtitle = "2.4G/5G拥挤度",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.WifiFind,
+      ),
 
-      // 日常与传感器
-      ToolItem(
-        id = "level_compass",
-        name = "指南针与水平仪",
-        subtitle = "高精度罗盘与双轴气泡水平仪",
-        category = ToolCategory.DAILY_SENSOR,
-        icon = Icons.Rounded.Explore,
-      ),
-      ToolItem(
-        id = "metal_detector",
-        name = "磁力计金属探测",
-        subtitle = "μT 磁场实时波形与渐进触感告警",
-        category = ToolCategory.DAILY_SENSOR,
-        icon = Icons.Rounded.Sensors,
-      ),
-      ToolItem(
-        id = "unit_calculator",
-        name = "日常高频工具箱",
-        subtitle = "音量键计数器、单位换算、AA 分摊与番茄钟",
-        category = ToolCategory.DAILY_SENSOR,
-        icon = Icons.Rounded.Calculate,
-      ),
-      ToolItem(
-        id = "qr_studio",
-        name = "二维码工坊",
-        subtitle = "离线生成、相册识码与相机实时扫描",
-        category = ToolCategory.DAILY_SENSOR,
-        icon = Icons.Rounded.QrCode2,
-      ),
-
-      // 开发与电子
+      // 4. 开发与电子
       ToolItem(
         id = "hash_workshop",
         name = "校验和与哈希",
-        subtitle = "MD5 / SHA 全家族流式计算、文本哈希与批量比对",
+        subtitle = "流式计算哈希与比对",
         category = ToolCategory.DEV_ELECTRONICS,
         icon = Icons.Rounded.Fingerprint,
       ),
       ToolItem(
         id = "crypto_vault",
         name = "AES-256 加密锁",
-        subtitle = "文件与私密便签口令加密保护",
+        subtitle = "文件便签口令加密锁",
         category = ToolCategory.DEV_ELECTRONICS,
         icon = Icons.Rounded.EnhancedEncryption,
       ),
       ToolItem(
         id = "codec_hash",
         name = "开发实用小工具",
-        subtitle = "Base64 / URL 去追踪 / JWT / 正则 / 进制 / CIDR",
+        subtitle = "编码正则进制与子网",
         category = ToolCategory.DEV_ELECTRONICS,
         icon = Icons.Rounded.Code,
       ),
       ToolItem(
         id = "electronics_calc",
         name = "电子工程计算器",
-        subtitle = "4/5 环色环电阻交互与电阻分压计算",
+        subtitle = "色环电阻与分压计算",
         category = ToolCategory.DEV_ELECTRONICS,
         icon = Icons.Rounded.Memory,
       ),
+
+      // 5. 测量与日常
       ToolItem(
-        id = "lan_share",
-        name = "局域网 HTTP 快传",
-        subtitle = "同 Wi-Fi 扫码浏览器双向传文件，一键停止",
-        category = ToolCategory.DEV_ELECTRONICS,
-        icon = Icons.Rounded.WifiTethering,
+        id = "level_compass",
+        name = "指南针与水平仪",
+        subtitle = "罗盘与双轴气泡水平仪",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.Explore,
+      ),
+      ToolItem(
+        id = "metal_detector",
+        name = "磁力计金属探测",
+        subtitle = "磁场波形与触感告警",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.Sensors,
+      ),
+      ToolItem(
+        id = "decibel_meter",
+        name = "分贝噪音计",
+        subtitle = "实时声压分贝波形计",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.GraphicEq,
+      ),
+      ToolItem(
+        id = "light_lux",
+        name = "光线照度计",
+        subtitle = "环境照度传感器测量",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.LightMode,
+      ),
+      ToolItem(
+        id = "physical_ruler",
+        name = "屏幕物理直尺",
+        subtitle = "物理厘米英寸双游标",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.Straighten,
+      ),
+      ToolItem(
+        id = "morse_torch",
+        name = "摩斯电码手电",
+        subtitle = "SOS与文本闪烁信号",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.FlashlightOn,
+      ),
+      ToolItem(
+        id = "battery_hardware",
+        name = "电池与硬件参数",
+        subtitle = "充放电功率与设备参数",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.BatteryChargingFull,
+      ),
+      ToolItem(
+        id = "unit_calculator",
+        name = "日常高频工具箱",
+        subtitle = "计数器换算AA与番茄",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.Calculate,
+      ),
+      ToolItem(
+        id = "qr_studio",
+        name = "二维码工坊",
+        subtitle = "离线制码与相册扫码",
+        category = ToolCategory.MEASURE_DAILY,
+        icon = Icons.Rounded.QrCode2,
       ),
     )
 

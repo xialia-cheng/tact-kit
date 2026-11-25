@@ -37,14 +37,18 @@ import androidx.compose.material.icons.rounded.AddTask
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideImage
+import androidx.compose.material.icons.rounded.Lan
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.QrCode2
@@ -153,6 +157,19 @@ fun HomeScreen(
   onOpenMetalDetector: () -> Unit,
   onOpenDailyTools: (String?) -> Unit,
   onOpenQrStudio: () -> Unit,
+  onOpenDocScanner: () -> Unit,
+  onOpenImageLongPdf: () -> Unit,
+  onOpenDecibelMeter: () -> Unit,
+  onOpenLightLux: () -> Unit,
+  onOpenPhysicalRuler: () -> Unit,
+  onOpenMorseTorch: () -> Unit,
+  onOpenBatteryHardware: () -> Unit,
+  onOpenNetDiagnostics: () -> Unit,
+  onOpenDnsSsl: () -> Unit,
+  onOpenWifiChannel: () -> Unit,
+  onOpenLedClock: () -> Unit,
+  pendingHomeDialog: String? = null,
+  onConsumedHomeDialog: () -> Unit = {},
 ) {
   val context = LocalContext.current
   val haptics = rememberAppHaptics()
@@ -163,6 +180,23 @@ fun HomeScreen(
   var editingNote by remember { mutableStateOf<WorkbenchCard.Note?>(null) }
   var showCreateNoteDialog by remember { mutableStateOf(false) }
   var showVoiceMemoDialog by remember { mutableStateOf(false) }
+
+  LaunchedEffect(pendingHomeDialog) {
+    when (pendingHomeDialog) {
+      "quick_note" -> {
+        showCreateNoteDialog = true
+        onConsumedHomeDialog()
+      }
+      "quick_checklist" -> {
+        showCreateChecklistDialog = true
+        onConsumedHomeDialog()
+      }
+      "voice_memo" -> {
+        showVoiceMemoDialog = true
+        onConsumedHomeDialog()
+      }
+    }
+  }
 
   val safImportLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -361,6 +395,10 @@ fun HomeScreen(
           val quickStripEntries =
             remember {
               listOf(
+                QuickStripEntry("strip_scan", "文档扫描", Icons.Rounded.DocumentScanner) {
+                  haptics.tick()
+                  onOpenDocScanner()
+                },
                 QuickStripEntry("strip_pdf", "PDF 工具", Icons.Rounded.PictureAsPdf) {
                   haptics.tick()
                   onOpenPdfToolkit(null)
@@ -376,6 +414,18 @@ fun HomeScreen(
                 QuickStripEntry("strip_lan", "局域网快传", Icons.Rounded.WifiTethering) {
                   haptics.tick()
                   onOpenLanShare()
+                },
+                QuickStripEntry("strip_net", "网络体检", Icons.Rounded.Lan) {
+                  haptics.tick()
+                  onOpenNetDiagnostics()
+                },
+                QuickStripEntry("strip_db", "分贝计", Icons.Rounded.GraphicEq) {
+                  haptics.tick()
+                  onOpenDecibelMeter()
+                },
+                QuickStripEntry("strip_hw", "电池硬件", Icons.Rounded.BatteryChargingFull) {
+                  haptics.tick()
+                  onOpenBatteryHardware()
                 },
                 QuickStripEntry("strip_hash", "哈希校验", Icons.Rounded.Fingerprint) {
                   haptics.tick()
@@ -440,6 +490,7 @@ fun HomeScreen(
                       haptics.tick()
                       onFilterChange(it)
                     },
+                    onOpenRecentFile = openRecentFile,
                   )
                 }
 
@@ -502,6 +553,7 @@ fun HomeScreen(
                       haptics.tick()
                       onFilterChange(it)
                     },
+                    onOpenRecentFile = openRecentFile,
                   )
                 }
 
@@ -563,6 +615,7 @@ fun HomeScreen(
           "quick_note" -> showCreateNoteDialog = true
           "quick_checklist" -> showCreateChecklistDialog = true
           "voice_memo" -> showVoiceMemoDialog = true
+          "doc_scanner" -> onOpenDocScanner()
           "quick_look" -> quickLookLauncher.launch(arrayOf("*/*"))
           "ai_hub" -> onOpenAiHub("VISION")
           "docx_editor" -> onOpenDocxEditor(null)
@@ -570,17 +623,27 @@ fun HomeScreen(
           "pdf_toolkit" -> onOpenPdfToolkit(null)
           "pdf_annotate" -> onOpenPdfAnnotate(null)
           "image_privacy" -> onOpenImageToolkit(null)
+          "image_long" -> onOpenImageLongPdf()
           "media_extractor" -> onOpenMediaWorkshop(null)
+          "led_clock" -> onOpenLedClock()
           "archive_box" -> onOpenArchiveWorkshop(null)
-          "level_compass" -> onOpenCompassLevel()
-          "metal_detector" -> onOpenMetalDetector()
-          "unit_calculator" -> onOpenDailyTools(null)
-          "qr_studio" -> onOpenQrStudio()
+          "lan_share" -> onOpenLanShare()
+          "net_diag" -> onOpenNetDiagnostics()
+          "dns_ssl" -> onOpenDnsSsl()
+          "wifi_channel" -> onOpenWifiChannel()
           "hash_workshop" -> onOpenHashWorkshop()
           "crypto_vault" -> onOpenCryptoVault()
           "codec_hash" -> onOpenDevTools()
           "electronics_calc" -> onOpenElectronics()
-          "lan_share" -> onOpenLanShare()
+          "level_compass" -> onOpenCompassLevel()
+          "metal_detector" -> onOpenMetalDetector()
+          "decibel_meter" -> onOpenDecibelMeter()
+          "light_lux" -> onOpenLightLux()
+          "physical_ruler" -> onOpenPhysicalRuler()
+          "morse_torch" -> onOpenMorseTorch()
+          "battery_hardware" -> onOpenBatteryHardware()
+          "unit_calculator" -> onOpenDailyTools(null)
+          "qr_studio" -> onOpenQrStudio()
         }
       },
       onTogglePinTool = onTogglePinTool,
@@ -686,6 +749,7 @@ private fun QuickActionStrip(entries: List<QuickStripEntry>) {
 private fun WorkbenchOverviewSection(
   uiState: HomeUiState,
   onFilterChange: (CardFilter) -> Unit,
+  onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     // Borderless tonal overview card (no inner boxes around stat numbers)
@@ -763,6 +827,11 @@ private fun WorkbenchOverviewSection(
         }
       }
     }
+
+    DocumentDashboardCard(
+      stats = uiState.dashboardStats,
+      onOpenRecentFile = onOpenRecentFile,
+    )
 
     // Aligned borderless tonal filter tabs
     Row(
@@ -1104,4 +1173,173 @@ private fun NoteEditorDialog(
       TextButton(onClick = onDismiss) { Text("取消") }
     },
   )
+}
+
+@Composable
+private fun DocumentDashboardCard(
+  stats: DocumentDashboardStats,
+  onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
+) {
+  Surface(
+    shape = RoundedCornerShape(22.dp),
+    color = MaterialTheme.colorScheme.surfaceContainerLow,
+    tonalElevation = 0.dp,
+    shadowElevation = 0.dp,
+    modifier = Modifier.fillMaxWidth().testTag("document_dashboard_card"),
+  ) {
+    Column(
+      verticalArrangement = Arrangement.spacedBy(10.dp),
+      modifier = Modifier.padding(16.dp),
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Column {
+          Text(
+            text = "文档统计仪表盘",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
+          Text(
+            text = "累计管理 ${stats.totalItemsCount} 项本地资料与记录",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Surface(
+          shape = ContinuousCapsule(),
+          color = MaterialTheme.colorScheme.primaryContainer,
+        ) {
+          Text(
+            text = "本周新增 +${stats.thisWeekAddedCount}",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+          )
+        }
+      }
+
+      val totalCat = (stats.pdfCount + stats.docTextCount + stats.imageCount + stats.mediaArchiveCount).coerceAtLeast(1)
+      val pdfColor = MaterialTheme.colorScheme.primary
+      val docColor = MaterialTheme.colorScheme.secondary
+      val imgColor = MaterialTheme.colorScheme.tertiary
+      val mediaColor = MaterialTheme.colorScheme.outlineVariant
+
+      Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = Modifier.fillMaxWidth().height(8.dp),
+      ) {
+        if (stats.totalItemsCount == 0) {
+          Box(
+            modifier =
+              Modifier.fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, ContinuousCapsule()),
+          )
+        } else {
+          if (stats.pdfCount > 0) {
+            Box(
+              modifier =
+                Modifier.weight(stats.pdfCount.toFloat() / totalCat)
+                  .height(8.dp)
+                  .background(pdfColor, ContinuousCapsule()),
+            )
+          }
+          if (stats.docTextCount > 0) {
+            Box(
+              modifier =
+                Modifier.weight(stats.docTextCount.toFloat() / totalCat)
+                  .height(8.dp)
+                  .background(docColor, ContinuousCapsule()),
+            )
+          }
+          if (stats.imageCount > 0) {
+            Box(
+              modifier =
+                Modifier.weight(stats.imageCount.toFloat() / totalCat)
+                  .height(8.dp)
+                  .background(imgColor, ContinuousCapsule()),
+            )
+          }
+          if (stats.mediaArchiveCount > 0) {
+            Box(
+              modifier =
+                Modifier.weight(stats.mediaArchiveCount.toFloat() / totalCat)
+                  .height(8.dp)
+                  .background(mediaColor, ContinuousCapsule()),
+            )
+          }
+        }
+      }
+
+      Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        DashboardLegendItem("PDF ${stats.pdfCount}", pdfColor)
+        DashboardLegendItem("文档 ${stats.docTextCount}", docColor)
+        DashboardLegendItem("图片 ${stats.imageCount}", imgColor)
+        DashboardLegendItem("音视频 ${stats.mediaArchiveCount}", mediaColor)
+      }
+
+      if (stats.recentFiles.isNotEmpty()) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+          Text(
+            text = "最近处理文件",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          stats.recentFiles.forEach { file ->
+            Surface(
+              onClick = { onOpenRecentFile(file) },
+              shape = RoundedCornerShape(14.dp),
+              color = MaterialTheme.colorScheme.surfaceContainer,
+              modifier = Modifier.fillMaxWidth().testTag("dashboard_recent_${file.id}"),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+              ) {
+                Text(
+                  text = file.fileName,
+                  style = MaterialTheme.typography.bodySmall,
+                  fontWeight = FontWeight.Medium,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                  modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                  text = com.xialia.tactkit.util.FileInspectionHelper.formatBytes(file.fileSizeBytes),
+                  fontFamily = TactKitMono,
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun DashboardLegendItem(label: String, dotColor: Color) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Box(modifier = Modifier.size(8.dp).background(dotColor, ContinuousCapsule()))
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      maxLines = 1,
+      softWrap = false,
+    )
+  }
 }
