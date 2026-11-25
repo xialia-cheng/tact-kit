@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Preview
 import androidx.compose.material.icons.rounded.Sensors
+import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class ToolCategory(val title: String, val icon: ImageVector) {
@@ -82,6 +83,22 @@ object ToolCatalog {
         icon = Icons.Rounded.AutoAwesome,
         isAvailable = true,
       ),
+      ToolItem(
+        id = "docx_editor",
+        name = "Docx 文档工坊",
+        subtitle = "离线阅读、段落编辑与导出 Word (.docx)",
+        category = ToolCategory.DOCUMENT_OFFICE,
+        icon = Icons.Rounded.Description,
+        isAvailable = true,
+      ),
+      ToolItem(
+        id = "data_workshop",
+        name = "结构化数据工坊",
+        subtitle = "CSV / JSON / YAML / XML 互转、校验与表格编辑",
+        category = ToolCategory.DOCUMENT_OFFICE,
+        icon = Icons.Rounded.TableChart,
+        isAvailable = true,
+      ),
 
       // PDF 与图像
       ToolItem(
@@ -121,11 +138,10 @@ object ToolCatalog {
       ToolItem(
         id = "archive_box",
         name = "压缩包工坊",
-        subtitle = "ZIP / 7Z / TAR 本地打包与解压",
+        subtitle = "ZIP (AES-256) / 7Z / TAR / GZ / XZ 打包与解压",
         category = ToolCategory.MEDIA_ARCHIVE,
         icon = Icons.Rounded.Archive,
-        isAvailable = false,
-        roadmapNote = "Phase 3 即将上线 · Commons Compress 离线归档",
+        isAvailable = true,
       ),
 
       // 日常与传感器
@@ -136,7 +152,7 @@ object ToolCatalog {
         category = ToolCategory.DAILY_SENSOR,
         icon = Icons.Rounded.Explore,
         isAvailable = false,
-        roadmapNote = "Phase 3 即将上线 · Android SensorManager 实时融合",
+        roadmapNote = "Phase 4 即将上线 · Android SensorManager 实时融合",
       ),
       ToolItem(
         id = "unit_calculator",
@@ -145,7 +161,7 @@ object ToolCatalog {
         category = ToolCategory.DAILY_SENSOR,
         icon = Icons.Rounded.Calculate,
         isAvailable = false,
-        roadmapNote = "Phase 3 即将上线 · 离线公式求值器",
+        roadmapNote = "Phase 4 即将上线 · 离线公式求值器",
       ),
 
       // 开发与电子

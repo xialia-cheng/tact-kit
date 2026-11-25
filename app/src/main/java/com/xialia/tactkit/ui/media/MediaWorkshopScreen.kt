@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,7 +30,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AudioFile
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BurstMode
 import androidx.compose.material.icons.rounded.Colorize
 import androidx.compose.material.icons.rounded.ContentCut
@@ -513,7 +513,7 @@ fun MediaWorkshopScreen(
 
                     // One-tap send current frame to Image Privacy / Color Picker / AI Vision
                     Row(
-                      horizontalArrangement = Arrangement.spacedBy(6.dp),
+                      horizontalArrangement = Arrangement.spacedBy(8.dp),
                       modifier = Modifier.fillMaxWidth(),
                     ) {
                       FilledTonalButton(
@@ -525,12 +525,13 @@ fun MediaWorkshopScreen(
                             onOpenImageToolkit(cached.toString(), ImageToolTab.MOSAIC_WATERMARK)
                           }
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp),
                       ) {
                         Icon(Icons.Rounded.HideImage, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("打码")
+                        Text("打码", maxLines = 1, softWrap = false)
                       }
                       FilledTonalButton(
                         enabled = previewFrameBitmap != null && !isBusy,
@@ -541,12 +542,13 @@ fun MediaWorkshopScreen(
                             onOpenImageToolkit(cached.toString(), ImageToolTab.COLOR_PICKER)
                           }
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp),
                       ) {
                         Icon(Icons.Rounded.Colorize, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("取色")
+                        Text("取色", maxLines = 1, softWrap = false)
                       }
                       FilledTonalButton(
                         enabled = previewFrameBitmap != null && !isBusy,
@@ -557,12 +559,11 @@ fun MediaWorkshopScreen(
                             onOpenAiVision(cached.toString())
                           }
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.weight(1f).height(48.dp),
                       ) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("AI 识图")
+                        Text("✨ AI 识图", maxLines = 1, softWrap = false)
                       }
                     }
                   }
@@ -585,7 +586,7 @@ fun MediaWorkshopScreen(
                       horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                       Icon(Icons.Rounded.BurstMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                      Text("区间批量抽帧（流式防 OOM）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                      Text("区间批量抽帧", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     }
 
                     val bStart = (batchRange.start * info.durationMs).toLong()

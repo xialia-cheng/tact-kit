@@ -47,6 +47,11 @@ commonmark = "0.32.0"
 pdfboxAndroid = "2.0.27.0"
 exifinterface = "1.3.7"
 okhttpPhase2 = "4.12.0"
+apachePoi = "5.2.5"
+zip4j = "2.11.5"
+commonsCompress = "1.27.1"
+tukaaniXz = "1.10"
+snakeyaml = "2.3"
 
 
 [libraries]
@@ -110,6 +115,11 @@ commonmark-ext-task-list-items = { group = "org.commonmark", name = "commonmark-
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 okhttp-client = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttpPhase2" }
+apache-poi-ooxml = { group = "org.apache.poi", name = "poi-ooxml", version.ref = "apachePoi" }
+zip4j = { group = "net.lingala.zip4j", name = "zip4j", version.ref = "zip4j" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
+tukaani-xz = { group = "org.tukaani", name = "xz", version.ref = "tukaaniXz" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 
 
 [plugins]

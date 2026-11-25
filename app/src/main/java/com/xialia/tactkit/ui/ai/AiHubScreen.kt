@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,9 +72,9 @@ import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
 
 enum class AiHubMode(val label: String) {
-  VISION("识图转 Markdown"),
-  PDF_QA("PDF 摘要问答"),
-  CHECKLIST("整理为清单"),
+  VISION("识图提取"),
+  PDF_QA("PDF 问答"),
+  CHECKLIST("整理清单"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,10 +95,17 @@ fun AiHubScreen(
   val aiRepo = remember { AiHubRepository() }
   val settingsRepo = remember { SettingsRepository(context.applicationContext) }
 
-  var mode by remember(initialModeName) {
-    mutableStateOf(AiHubMode.entries.firstOrNull { it.name == initialModeName } ?: AiHubMode.VISION)
+  var mode by remember(initialModeName, initialImageUriString) {
+    mutableStateOf(
+      if (!initialImageUriString.isNullOrBlank()) {
+        AiHubMode.VISION
+      } else {
+        AiHubMode.entries.firstOrNull { it.name == initialModeName } ?: AiHubMode.VISION
+      }
+    )
   }
   var isBusy by remember { mutableStateOf(false) }
+  var aiErrorMessage by remember { mutableStateOf<String?>(null) }
 
   // Vision state
   var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -105,8 +114,16 @@ fun AiHubScreen(
 
   LaunchedEffect(initialImageUriString) {
     val raw = initialImageUriString ?: return@LaunchedEffect
-    val parsed = android.net.Uri.parse(raw)
-    selectedBitmap = ImageEngine.loadOrientedBitmap(context, parsed, maxDimension = 1400)
+    aiErrorMessage = null
+    runCatching {
+      val parsed = android.net.Uri.parse(raw)
+      ImageEngine.loadOrientedBitmap(context, parsed, maxDimension = 1400)
+        ?: error("图片解码为空")
+    }.onSuccess { bmp ->
+      selectedBitmap = bmp
+    }.onFailure { err ->
+      aiErrorMessage = "无法加载传入图片：${err.message ?: "请手动重新选图"}"
+    }
   }
 
   // PDF QA state
@@ -203,19 +220,35 @@ fun AiHubScreen(
           }
         }
 
-        Row(
+        LazyRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
-          AiHubMode.entries.forEach { tab ->
+          items(AiHubMode.entries, key = { it.name }) { tab ->
             FilterChip(
               selected = mode == tab,
               onClick = {
                 haptics.tick()
                 mode = tab
+                aiErrorMessage = null
               },
-              label = { Text(tab.label) },
+              label = { Text(tab.label, maxLines = 1, softWrap = false) },
               modifier = Modifier.testTag("ai_tab_${tab.name}"),
+            )
+          }
+        }
+
+        aiErrorMessage?.let { errMsg ->
+          Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth().testTag("ai_error_banner"),
+          ) {
+            Text(
+              text = errMsg,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onErrorContainer,
+              modifier = Modifier.padding(12.dp),
             )
           }
         }
@@ -271,6 +304,7 @@ fun AiHubScreen(
                     val bmp = selectedBitmap ?: return@Button
                     scope.launch {
                       isBusy = true
+                      aiErrorMessage = null
                       val res =
                         runCatching {
                           val key = settingsRepo.getDecryptedAiApiKey()
@@ -286,8 +320,10 @@ fun AiHubScreen(
                       res.onSuccess {
                         haptics.confirm()
                         aiMarkdownResult = it
-                      }.onFailure {
-                        Toast.makeText(context, "AI 识图失败：${it.message}", Toast.LENGTH_LONG).show()
+                      }.onFailure { err ->
+                        val msg = "AI 识图失败：${err.message ?: "未知错误"}"
+                        aiErrorMessage = msg
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                       }
                     }
                   },
@@ -336,6 +372,7 @@ fun AiHubScreen(
                   onClick = {
                     scope.launch {
                       isBusy = true
+                      aiErrorMessage = null
                       val res =
                         runCatching {
                           val key = settingsRepo.getDecryptedAiApiKey()
@@ -351,8 +388,10 @@ fun AiHubScreen(
                       res.onSuccess {
                         haptics.confirm()
                         aiMarkdownResult = it
-                      }.onFailure {
-                        Toast.makeText(context, "PDF 分析失败：${it.message}", Toast.LENGTH_LONG).show()
+                      }.onFailure { err ->
+                        val msg = "PDF 分析失败：${err.message ?: "未知错误"}"
+                        aiErrorMessage = msg
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                       }
                     }
                   },
@@ -393,6 +432,7 @@ fun AiHubScreen(
                   onClick = {
                     scope.launch {
                       isBusy = true
+                      aiErrorMessage = null
                       val res =
                         runCatching {
                           val key = settingsRepo.getDecryptedAiApiKey()
@@ -407,8 +447,10 @@ fun AiHubScreen(
                       res.onSuccess { draft ->
                         haptics.confirm()
                         checklistDraft = draft
-                      }.onFailure {
-                        Toast.makeText(context, "整理失败：${it.message}", Toast.LENGTH_LONG).show()
+                      }.onFailure { err ->
+                        val msg = "整理失败：${err.message ?: "未知错误"}"
+                        aiErrorMessage = msg
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                       }
                     }
                   },

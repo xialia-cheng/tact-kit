@@ -33,9 +33,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AddTask
+import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.HideImage
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -129,6 +132,9 @@ fun HomeScreen(
   onOpenImageToolkit: (String?) -> Unit,
   onOpenMediaWorkshop: (String?) -> Unit,
   onOpenAiHub: (String) -> Unit,
+  onOpenDocxEditor: (String?) -> Unit,
+  onOpenDataWorkshop: () -> Unit,
+  onOpenArchiveWorkshop: (String?) -> Unit,
 ) {
   val context = LocalContext.current
   val haptics = rememberAppHaptics()
@@ -302,11 +308,25 @@ fun HomeScreen(
           val openRecentFile: (WorkbenchCard.RecentFile) -> Unit = { fileCard ->
             val uriStr = fileCard.fileUri
             if (uriStr != null) {
+              val lowerName = fileCard.fileName.lowercase()
               when {
                 fileCard.mimeType == "application/pdf" -> onOpenPdfToolkit(uriStr)
                 fileCard.mimeType.startsWith("image/") -> onOpenImageToolkit(uriStr)
                 fileCard.mimeType.startsWith("video/") || fileCard.mimeType.startsWith("audio/") ->
                   onOpenMediaWorkshop(uriStr)
+                lowerName.endsWith(".docx") ||
+                  fileCard.mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                  onOpenDocxEditor(uriStr)
+                lowerName.endsWith(".zip") ||
+                  lowerName.endsWith(".7z") ||
+                  lowerName.endsWith(".tar") ||
+                  lowerName.endsWith(".tar.gz") ||
+                  lowerName.endsWith(".tgz") ||
+                  lowerName.endsWith(".tar.xz") ||
+                  lowerName.endsWith(".txz") ||
+                  lowerName.endsWith(".gz") ||
+                  lowerName.endsWith(".xz") ->
+                  onOpenArchiveWorkshop(uriStr)
                 else -> {
                   val intent =
                     Intent(context, QuickLookActivity::class.java).apply {
@@ -330,6 +350,18 @@ fun HomeScreen(
                 QuickStripEntry("strip_img", "图片隐私", Icons.Rounded.HideImage) {
                   haptics.tick()
                   onOpenImageToolkit(null)
+                },
+                QuickStripEntry("strip_docx", "Docx 文档", Icons.Rounded.Description) {
+                  haptics.tick()
+                  onOpenDocxEditor(null)
+                },
+                QuickStripEntry("strip_data", "数据工坊", Icons.Rounded.TableChart) {
+                  haptics.tick()
+                  onOpenDataWorkshop()
+                },
+                QuickStripEntry("strip_archive", "压缩包", Icons.Rounded.Archive) {
+                  haptics.tick()
+                  onOpenArchiveWorkshop(null)
                 },
                 QuickStripEntry("strip_ai", "AI 提取", Icons.Rounded.AutoAwesome) {
                   haptics.tick()
@@ -495,10 +527,13 @@ fun HomeScreen(
           "voice_memo" -> showVoiceMemoDialog = true
           "quick_look" -> quickLookLauncher.launch(arrayOf("*/*"))
           "ai_hub" -> onOpenAiHub("VISION")
+          "docx_editor" -> onOpenDocxEditor(null)
+          "data_workshop" -> onOpenDataWorkshop()
           "pdf_toolkit" -> onOpenPdfToolkit(null)
           "pdf_annotate" -> onOpenPdfAnnotate(null)
           "image_privacy" -> onOpenImageToolkit(null)
           "media_extractor" -> onOpenMediaWorkshop(null)
+          "archive_box" -> onOpenArchiveWorkshop(null)
         }
       },
       onTogglePinTool = onTogglePinTool,

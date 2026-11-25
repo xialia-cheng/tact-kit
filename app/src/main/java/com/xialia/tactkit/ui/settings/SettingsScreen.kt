@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -98,6 +100,46 @@ private data class AppVersionInfo(
   val versionCode: Long,
 )
 
+private data class AiProviderPreset(
+  val id: String,
+  val label: String,
+  val baseUrl: String,
+  val model: String,
+  val note: String,
+)
+
+private val AI_PROVIDER_PRESETS =
+  listOf(
+    AiProviderPreset(
+      id = "deepseek",
+      label = "DeepSeek",
+      baseUrl = "https://api.deepseek.com",
+      model = "deepseek-chat",
+      note = "DeepSeek 官方接口支持「PDF 问答」与「整理清单」（仅文本模型；若需「识图提取」请改用支持视觉的模型）",
+    ),
+    AiProviderPreset(
+      id = "openai",
+      label = "OpenAI",
+      baseUrl = "https://api.openai.com/v1",
+      model = "gpt-4o-mini",
+      note = "OpenAI gpt-4o-mini 同时支持文本、清单整理与多模态识图",
+    ),
+    AiProviderPreset(
+      id = "siliconflow",
+      label = "硅基流动",
+      baseUrl = "https://api.siliconflow.cn/v1",
+      model = "Qwen/Qwen2.5-72B-Instruct",
+      note = "硅基流动（如需识图可填写 Qwen/Qwen2.5-VL-72B-Instruct 等视觉模型）",
+    ),
+    AiProviderPreset(
+      id = "ollama",
+      label = "Ollama 本地",
+      baseUrl = "http://127.0.0.1:11434/v1",
+      model = "qwen2.5:7b",
+      note = "本地 Ollama 服务，API Key 可填任意占位字符（如 ollama）",
+    ),
+  )
+
 private const val AUTHOR_NAME = "xialia cheng"
 private const val AUTHOR_EMAIL = "zly080701@gmail.com"
 private const val MIT_LICENSE_TEXT = """MIT License
@@ -129,7 +171,7 @@ fun SettingsScreen(
   onThemeModeChange: (ThemeMode) -> Unit,
   onDynamicColorChange: (Boolean) -> Unit,
   onLiquidGlassPowerSaveChange: (Boolean) -> Unit,
-  onSaveAiSettings: (baseUrl: String, model: String, plainApiKey: String?) -> Unit,
+  onSaveAiSettings: suspend (baseUrl: String, model: String, plainApiKey: String?) -> Result<Unit>,
   onClearAiApiKey: () -> Unit,
   onGetDecryptedAiApiKey: suspend () -> String,
   onNavigateBack: () -> Unit,
@@ -459,7 +501,7 @@ fun SettingsScreen(
                 Text(
                   text =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                      "开启后关闭实时 AGSL 着色器折射渲染，改用 Material 3 半透明高对比卡片（自动保存至 DataStore）"
+                      "开启后关闭实时 AGSL 着色器折射渲染，改用 Material 3 半透明高对比卡片"
                     } else {
                       "当前系统低于 Android 13 (API 33)，已自动使用 Material 3 半透明兼容降级方案"
                     },
@@ -484,10 +526,32 @@ fun SettingsScreen(
             icon = Icons.Rounded.AutoAwesome,
           ) {
             Text(
-              text = "自备 OpenAI 兼容接口（如 OpenAI / DeepSeek / Ollama）。API Key 通过硬件 AndroidKeyStore AES-GCM 加密存放本地，零中转。",
+              text = "支持 OpenAI 兼容接口（可点下方预设一键填入）。API Key 仅通过硬件 AndroidKeyStore AES-GCM 加密保存在本地。",
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            LazyRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              items(AI_PROVIDER_PRESETS, key = { it.id }) { preset ->
+                val selected =
+                  baseUrl.trim().trimEnd('/').equals(preset.baseUrl.trimEnd('/'), ignoreCase = true) &&
+                    modelName.trim() == preset.model
+                FilterChip(
+                  selected = selected,
+                  onClick = {
+                    haptics.tick()
+                    baseUrl = preset.baseUrl
+                    modelName = preset.model
+                    aiTestResult = preset.note
+                  },
+                  label = { Text(preset.label, maxLines = 1, softWrap = false) },
+                  modifier = Modifier.testTag("ai_preset_${preset.id}"),
+                )
+              }
+            }
 
             OutlinedTextField(
               value = baseUrl,
@@ -497,6 +561,13 @@ fun SettingsScreen(
               singleLine = true,
               shape = RoundedCornerShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("ai_base_url_input"),
+            )
+
+            Text(
+              text = "实际请求地址：${AiHubRepository.normalizeChatCompletionsEndpoint(baseUrl)}",
+              style = MaterialTheme.typography.labelSmall,
+              fontFamily = TactKitMono,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             OutlinedTextField(
@@ -541,10 +612,20 @@ fun SettingsScreen(
             ) {
               Button(
                 onClick = {
-                  haptics.confirm()
-                  onSaveAiSettings(baseUrl, modelName, apiKeyInput.takeIf { it.isNotBlank() })
-                  apiKeyInput = ""
-                  aiTestResult = "已加密保存配置"
+                  scope.launch {
+                    val result =
+                      onSaveAiSettings(baseUrl, modelName, apiKeyInput.takeIf { it.isNotBlank() })
+                    result
+                      .onSuccess {
+                        haptics.confirm()
+                        apiKeyInput = ""
+                        aiTestResult =
+                          "已加密保存配置（请求地址：${AiHubRepository.normalizeChatCompletionsEndpoint(baseUrl)}）"
+                      }
+                      .onFailure { err ->
+                        aiTestResult = "保存失败：${err.message ?: "硬件密钥库不可用"}"
+                      }
+                  }
                 },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.weight(1f).testTag("ai_save_settings_btn"),
@@ -558,16 +639,26 @@ fun SettingsScreen(
                   scope.launch {
                     isTestingAi = true
                     aiTestResult = "正在测试连通性..."
-                    val key =
-                      if (apiKeyInput.isNotBlank()) apiKeyInput.trim()
-                      else runCatching { onGetDecryptedAiApiKey() }.getOrDefault("")
-                    aiRepo.testConnection(baseUrl, modelName, key)
-                      .onSuccess {
-                        haptics.confirm()
-                        aiTestResult = it
+                    val keyResult =
+                      if (apiKeyInput.isNotBlank()) {
+                        Result.success(apiKeyInput.trim())
+                      } else {
+                        runCatching { onGetDecryptedAiApiKey() }
                       }
-                      .onFailure {
-                        aiTestResult = "测试失败：${it.message ?: "网络异常"}"
+                    keyResult
+                      .onSuccess { resolvedKey ->
+                        aiRepo
+                          .testConnection(baseUrl, modelName, resolvedKey)
+                          .onSuccess {
+                            haptics.confirm()
+                            aiTestResult = it
+                          }
+                          .onFailure {
+                            aiTestResult = "测试失败：${it.message ?: "网络异常"}"
+                          }
+                      }
+                      .onFailure { err ->
+                        aiTestResult = "读取本地密钥失败：${err.message ?: "请重新输入并保存 API Key"}"
                       }
                     isTestingAi = false
                   }
@@ -652,6 +743,45 @@ fun SettingsScreen(
             Text(
               text =
                 "本地优先 · 零数据收集 · 无统计埋点与广告 SDK。您的便签、清单、录音及文件处理均完全留存在本地数据库与私有目录；BYOK API Key 经硬件 AndroidKeyStore AES-GCM 加密保管，仅在您发起 AI 请求或主动点击「检查更新」时才会发生出站网络请求。",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Text(
+                text = "检查更新",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+              )
+              Surface(
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                shape = RoundedCornerShape(999.dp),
+                modifier = Modifier.testTag("settings_update_version_pill"),
+              ) {
+                Text(
+                  text = "v${appVersionInfo.versionName}",
+                  style = MaterialTheme.typography.labelSmall,
+                  fontFamily = TactKitMono,
+                  fontWeight = FontWeight.SemiBold,
+                  color = MaterialTheme.colorScheme.onSecondaryContainer,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+              }
+            }
+            Text(
+              text =
+                if (releaseInfo == null) {
+                  "当前版本：v${appVersionInfo.versionName} (Build ${appVersionInfo.versionCode}) · 尚未检查"
+                } else if (releaseInfo?.isUpdateAvailable == true) {
+                  "当前版本：v${appVersionInfo.versionName} · 检测到新版本 ${releaseInfo?.tagName}"
+                } else {
+                  "当前版本：v${appVersionInfo.versionName} · 已是最新版本"
+                },
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

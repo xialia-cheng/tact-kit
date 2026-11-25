@@ -14,7 +14,7 @@ android {
     minSdk = 26
     targetSdk = 35
     versionCode = project.findProperty("appVersionCode")?.toString()?.toIntOrNull() ?: 1
-    versionName = project.findProperty("appVersionName")?.toString() ?: "0.2.0"
+    versionName = project.findProperty("appVersionName")?.toString() ?: "0.3.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -76,6 +76,9 @@ android {
         "META-INF/INDEX.LIST",
         "META-INF/io.netty.versions.properties",
         "META-INF/versions/**",
+        "META-INF/AL2.0",
+        "META-INF/LGPL2.1",
+        "schemaorg_apache_xmlbeans/**",
       )
     }
   }
@@ -116,6 +119,11 @@ dependencies {
   implementation(libs.pdfbox.android)
   implementation(libs.androidx.exifinterface)
   implementation(libs.okhttp.client)
+  implementation(libs.apache.poi.ooxml)
+  implementation(libs.zip4j)
+  implementation(libs.commons.compress)
+  implementation(libs.tukaani.xz)
+  implementation(libs.snakeyaml)
 
   "ksp"(libs.androidx.room.compiler)
 

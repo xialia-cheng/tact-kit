@@ -1,16 +1,30 @@
 package com.xialia.tactkit.util
 
 import android.content.ContentResolver
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.xialia.tactkit.engine.DocxEngine
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+enum class SpecialtyFileKind {
+  STANDARD,
+  DOCX,
+  CALENDAR_ICS,
+  CERTIFICATE,
+  KEYSTORE_SECRET,
+  APK_PACKAGE,
+  VCARD_CONTACT,
+  CONFIG_KV,
+  LOG_FILE,
+}
 
 data class QuickLookFileInspection(
   val uriString: String?,
@@ -21,12 +35,22 @@ data class QuickLookFileInspection(
   val textPreview: String?,
   val isTextTruncated: Boolean = false,
   val imagePreview: Bitmap? = null,
+  val specialtyKind: SpecialtyFileKind = SpecialtyFileKind.STANDARD,
+  val calendarEvents: List<CalendarEventInfo> = emptyList(),
+  val certificates: List<CertificateEntryInfo> = emptyList(),
+  val vcards: List<VCardContactInfo> = emptyList(),
+  val configEntries: List<ConfigKvEntry> = emptyList(),
+  val logSummary: LogSummaryInfo? = null,
+  val apkInfo: ApkInspectionInfo? = null,
+  val specialtyError: String? = null,
 )
 
 object FileInspectionHelper {
 
   private const val BUFFER_SIZE = 8 * 1024
   private const val MAX_TEXT_PREVIEW_BYTES = 32 * 1024
+  private const val DOCX_MIME =
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
   private val TEXT_EXTENSIONS =
     setOf(
@@ -51,6 +75,7 @@ object FileInspectionHelper {
       "sh",
       "ini",
       "toml",
+      "env",
       "properties",
       "c",
       "cpp",
@@ -58,6 +83,9 @@ object FileInspectionHelper {
       "rs",
       "go",
       "sql",
+      "ics",
+      "vcs",
+      "vcf",
     )
 
   /**
@@ -102,7 +130,9 @@ object FileInspectionHelper {
     ) {
       return true
     }
-    val ext = fileName.substringAfterLast('.', "").lowercase(Locale.US)
+    val lowerName = fileName.lowercase(Locale.US)
+    if (lowerName == ".env" || lowerName.startsWith(".env.")) return true
+    val ext = lowerName.substringAfterLast('.', "")
     return ext in TEXT_EXTENSIONS
   }
 
@@ -131,6 +161,7 @@ object FileInspectionHelper {
   suspend fun inspectUri(
     contentResolver: ContentResolver,
     uri: Uri,
+    context: Context? = null,
   ): QuickLookFileInspection =
     withContext(Dispatchers.IO) {
       var fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "未命名文件"
@@ -169,18 +200,120 @@ object FileInspectionHelper {
         fileSize = countedBytes
       }
 
+      val lowerName = fileName.lowercase(Locale.US)
+      val ext = lowerName.substringAfterLast('.', "")
+      val lowerMime = mimeType.lowercase(Locale.US)
+
+      val specialtyKind = detectSpecialtyKind(lowerName, ext, lowerMime)
+
       var textPreview: String? = null
       var isTruncated = false
-      if (isTextReadable(mimeType, fileName)) {
-        contentResolver.openInputStream(uri)?.use { stream ->
-          val (text, truncated) = readTextPreview(stream)
-          textPreview = text
-          isTruncated = truncated
+      var calendarEvents: List<CalendarEventInfo> = emptyList()
+      var certificates: List<CertificateEntryInfo> = emptyList()
+      var vcards: List<VCardContactInfo> = emptyList()
+      var configEntries: List<ConfigKvEntry> = emptyList()
+      var logSummary: LogSummaryInfo? = null
+      var apkInfo: ApkInspectionInfo? = null
+      var specialtyError: String? = null
+
+      when (specialtyKind) {
+        SpecialtyFileKind.DOCX -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { stream ->
+              DocxEngine.extractQuickLookText(stream)
+            }
+          }.onSuccess { text ->
+            textPreview = text
+          }.onFailure { err ->
+            specialtyError = "读取 .docx 正文失败：${err.message ?: "文件损坏"}"
+          }
+        }
+        SpecialtyFileKind.CALENDAR_ICS -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { readTextPreview(it, maxBytes = 256 * 1024).first }
+              .orEmpty()
+          }.onSuccess { raw ->
+            textPreview = raw.take(MAX_TEXT_PREVIEW_BYTES)
+            calendarEvents = SpecialtyFormatParser.parseIcsEvents(raw)
+          }.onFailure { err ->
+            specialtyError = "解析日历文件失败：${err.message}"
+          }
+        }
+        SpecialtyFileKind.CERTIFICATE -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0)
+          }.onSuccess { bytes ->
+            runCatching { SpecialtyFormatParser.parseCertificatesFromBytes(bytes) }
+              .onSuccess { certs -> certificates = certs }
+              .onFailure { err -> specialtyError = "解析 X.509 证书失败：${err.message}" }
+          }.onFailure { err ->
+            specialtyError = "读取证书文件失败：${err.message}"
+          }
+        }
+        SpecialtyFileKind.KEYSTORE_SECRET -> {
+          // Never auto-decrypt or retain keystores; QuickLookActivity unlocks ephemerally in memory.
+          textPreview = null
+        }
+        SpecialtyFileKind.APK_PACKAGE -> {
+          if (context != null) {
+            runCatching { SpecialtyFormatParser.inspectApkUri(context, uri) }
+              .onSuccess { apkInfo = it }
+              .onFailure { err -> specialtyError = "解析 APK 清单失败：${err.message}" }
+          } else {
+            specialtyError = "需要应用上下文以读取 APK 清单"
+          }
+        }
+        SpecialtyFileKind.VCARD_CONTACT -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { readTextPreview(it, maxBytes = 256 * 1024).first }
+              .orEmpty()
+          }.onSuccess { raw ->
+            vcards = SpecialtyFormatParser.parseVCardContacts(raw)
+            textPreview = raw.take(MAX_TEXT_PREVIEW_BYTES)
+          }.onFailure { err ->
+            specialtyError = "解析 vCard 名片失败：${err.message}"
+          }
+        }
+        SpecialtyFileKind.CONFIG_KV -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { readTextPreview(it, maxBytes = 128 * 1024) }
+          }.onSuccess { pair ->
+            if (pair != null) {
+              configEntries =
+                SpecialtyFormatParser.parseEnvOrTomlConfig(pair.first, isToml = ext == "toml")
+              textPreview = pair.first.take(MAX_TEXT_PREVIEW_BYTES)
+              isTruncated = pair.second
+            }
+          }.onFailure { err ->
+            specialtyError = "解析配置文件失败：${err.message}"
+          }
+        }
+        SpecialtyFileKind.LOG_FILE -> {
+          runCatching {
+            contentResolver.openInputStream(uri)?.use { readTextPreview(it, maxBytes = 256 * 1024) }
+          }.onSuccess { pair ->
+            if (pair != null) {
+              logSummary = SpecialtyFormatParser.summarizeLogText(pair.first)
+              textPreview = pair.first.take(MAX_TEXT_PREVIEW_BYTES)
+              isTruncated = pair.second
+            }
+          }.onFailure { err ->
+            specialtyError = "读取日志文件失败：${err.message}"
+          }
+        }
+        SpecialtyFileKind.STANDARD -> {
+          if (isTextReadable(mimeType, fileName)) {
+            contentResolver.openInputStream(uri)?.use { stream ->
+              val (text, truncated) = readTextPreview(stream)
+              textPreview = text
+              isTruncated = truncated
+            }
+          }
         }
       }
 
       var imagePreview: Bitmap? = null
-      if (mimeType.lowercase(Locale.US).startsWith("image/")) {
+      if (lowerMime.startsWith("image/")) {
         imagePreview = decodeSampledBitmap(contentResolver, uri, maxDimension = 960)
       }
 
@@ -193,8 +326,40 @@ object FileInspectionHelper {
         textPreview = textPreview,
         isTextTruncated = isTruncated,
         imagePreview = imagePreview,
+        specialtyKind = specialtyKind,
+        calendarEvents = calendarEvents,
+        certificates = certificates,
+        vcards = vcards,
+        configEntries = configEntries,
+        logSummary = logSummary,
+        apkInfo = apkInfo,
+        specialtyError = specialtyError,
       )
     }
+
+  private fun detectSpecialtyKind(
+    lowerName: String,
+    ext: String,
+    lowerMime: String,
+  ): SpecialtyFileKind {
+    return when {
+      ext == "docx" || lowerMime == DOCX_MIME -> SpecialtyFileKind.DOCX
+      ext == "ics" || ext == "vcs" || lowerMime == "text/calendar" -> SpecialtyFileKind.CALENDAR_ICS
+      ext in setOf("pem", "crt", "cer") ||
+        lowerMime == "application/x-x509-ca-cert" ||
+        lowerMime == "application/pkix-cert" -> SpecialtyFileKind.CERTIFICATE
+      ext in setOf("jks", "p12", "pfx") || lowerMime == "application/x-pkcs12" ->
+        SpecialtyFileKind.KEYSTORE_SECRET
+      ext == "apk" || lowerMime == "application/vnd.android.package-archive" ->
+        SpecialtyFileKind.APK_PACKAGE
+      ext == "vcf" || lowerMime == "text/vcard" || lowerMime == "text/x-vcard" ->
+        SpecialtyFileKind.VCARD_CONTACT
+      ext == "toml" || ext == "env" || lowerName == ".env" || lowerName.startsWith(".env.") ->
+        SpecialtyFileKind.CONFIG_KV
+      ext == "log" -> SpecialtyFileKind.LOG_FILE
+      else -> SpecialtyFileKind.STANDARD
+    }
+  }
 
   private fun decodeSampledBitmap(
     contentResolver: ContentResolver,
@@ -226,15 +391,30 @@ object FileInspectionHelper {
   }
 
   private fun guessMimeFromName(fileName: String): String {
-    return when (fileName.substringAfterLast('.', "").lowercase(Locale.US)) {
-      "txt", "log" -> "text/plain"
+    val lower = fileName.lowercase(Locale.US)
+    if (lower == ".env" || lower.startsWith(".env.")) return "text/plain"
+    return when (lower.substringAfterLast('.', "")) {
+      "txt", "log", "env", "toml" -> "text/plain"
       "md", "markdown" -> "text/markdown"
       "json" -> "application/json"
+      "xml" -> "application/xml"
+      "yaml", "yml" -> "application/x-yaml"
+      "csv" -> "text/csv"
       "pdf" -> "application/pdf"
+      "docx" -> DOCX_MIME
+      "ics", "vcs" -> "text/calendar"
+      "vcf" -> "text/vcard"
+      "pem", "crt", "cer" -> "application/x-x509-ca-cert"
+      "p12", "pfx" -> "application/x-pkcs12"
+      "apk" -> "application/vnd.android.package-archive"
       "png" -> "image/png"
       "jpg", "jpeg" -> "image/jpeg"
       "webp" -> "image/webp"
       "zip" -> "application/zip"
+      "7z" -> "application/x-7z-compressed"
+      "tar" -> "application/x-tar"
+      "gz" -> "application/gzip"
+      "xz" -> "application/x-xz"
       else -> "application/octet-stream"
     }
   }

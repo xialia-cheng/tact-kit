@@ -14,11 +14,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.xialia.tactkit.ui.ai.AiHubScreen
+import com.xialia.tactkit.ui.archive.ArchiveWorkshopScreen
+import com.xialia.tactkit.ui.data.DataWorkshopScreen
 import com.xialia.tactkit.ui.home.HomeScreen
 import com.xialia.tactkit.ui.home.HomeUiState
 import com.xialia.tactkit.ui.home.HomeViewModel
 import com.xialia.tactkit.ui.image.ImageToolkitScreen
 import com.xialia.tactkit.ui.media.MediaWorkshopScreen
+import com.xialia.tactkit.ui.office.DocxEditorScreen
 import com.xialia.tactkit.ui.pdf.PdfAnnotateScreen
 import com.xialia.tactkit.ui.pdf.PdfToolkitScreen
 import com.xialia.tactkit.ui.settings.SettingsScreen
@@ -37,6 +40,12 @@ import kotlinx.serialization.Serializable
 @Serializable data class MediaWorkshopRoute(val initialUri: String? = null)
 
 @Serializable data class AiHubRoute(val initialMode: String = "VISION", val initialImageUri: String? = null)
+
+@Serializable data class DocxEditorRoute(val initialUri: String? = null)
+
+@Serializable data object DataWorkshopRoute
+
+@Serializable data class ArchiveWorkshopRoute(val initialUri: String? = null)
 
 @Composable
 fun TactKitNavHost(
@@ -92,6 +101,9 @@ fun TactKitNavHost(
         onOpenImageToolkit = { uri -> navController.navigate(ImageToolkitRoute(initialUri = uri)) },
         onOpenMediaWorkshop = { uri -> navController.navigate(MediaWorkshopRoute(initialUri = uri)) },
         onOpenAiHub = { mode -> navController.navigate(AiHubRoute(initialMode = mode)) },
+        onOpenDocxEditor = { uri -> navController.navigate(DocxEditorRoute(initialUri = uri)) },
+        onOpenDataWorkshop = { navController.navigate(DataWorkshopRoute) },
+        onOpenArchiveWorkshop = { uri -> navController.navigate(ArchiveWorkshopRoute(initialUri = uri)) },
       )
     }
 
@@ -157,6 +169,28 @@ fun TactKitNavHost(
         onSaveNoteCard = viewModel::createNote,
         onSaveChecklistCard = viewModel::createChecklist,
         onNavigateToSettings = { navController.navigate(SettingsRoute) },
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<DocxEditorRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<DocxEditorRoute>()
+      DocxEditorScreen(
+        initialUriString = route.initialUri,
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<DataWorkshopRoute> {
+      DataWorkshopScreen(
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<ArchiveWorkshopRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<ArchiveWorkshopRoute>()
+      ArchiveWorkshopScreen(
+        initialUriString = route.initialUri,
         onNavigateBack = { navController.popBackStack() },
       )
     }

@@ -215,11 +215,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch { settingsRepository.setLiquidGlassPowerSave(enabled) }
   }
 
-  fun saveAiSettings(baseUrl: String, model: String, plainApiKey: String?) {
-    viewModelScope.launch {
-      runCatching { settingsRepository.saveAiSettings(baseUrl, model, plainApiKey) }
-        .onSuccess { statusMessage.value = "AI 中枢配置已加密保存至 Keystore" }
-        .onFailure { statusMessage.value = "保存 AI 配置失败：${it.message}" }
+  suspend fun saveAiSettings(baseUrl: String, model: String, plainApiKey: String?): Result<Unit> {
+    return runCatching {
+      settingsRepository.saveAiSettings(baseUrl, model, plainApiKey)
+    }.onSuccess {
+      statusMessage.value = "AI 中枢配置已加密保存至 Keystore"
+    }.onFailure {
+      statusMessage.value = "保存 AI 配置失败：${it.message ?: "硬件密钥库不可用"}"
     }
   }
 

@@ -2,23 +2,13 @@ package com.xialia.tactkit.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.xialia.tactkit.R
 
-val TactKitSans = FontFamily(
-  Font(R.font.plus_jakarta_sans, FontWeight.Normal),
-  Font(R.font.plus_jakarta_sans, FontWeight.Medium),
-  Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
-  Font(R.font.plus_jakarta_sans, FontWeight.Bold),
-)
+val TactKitSans = FontFamily.Default
 
-val TactKitMono = FontFamily(
-  Font(R.font.jetbrains_mono, FontWeight.Normal),
-  Font(R.font.jetbrains_mono, FontWeight.Medium),
-)
+val TactKitMono = FontFamily.Monospace
 
 val TactKitTypography =
   Typography(
@@ -81,7 +71,7 @@ val TactKitTypography =
       ),
     labelSmall =
       TextStyle(
-        fontFamily = TactKitMono,
+        fontFamily = TactKitSans,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 15.sp,

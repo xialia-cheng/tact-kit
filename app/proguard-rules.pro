@@ -45,3 +45,39 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.openjsse.**
 -dontwarn org.bouncycastle.jsse.**
+
+# Phase 3: Apache POI & XmlBeans
+-keep class org.apache.poi.** { *; }
+-keep class org.apache.xmlbeans.** { *; }
+-keep class org.openxmlformats.schemas.** { *; }
+-dontwarn org.apache.poi.**
+-dontwarn org.apache.xmlbeans.**
+-dontwarn org.openxmlformats.schemas.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn org.apache.commons.codec.**
+-dontwarn org.apache.commons.io.**
+-dontwarn org.apache.xmlgraphics.**
+-dontwarn org.apache.batik.**
+-dontwarn org.etsi.**
+-dontwarn org.w3.**
+-dontwarn org.w3c.dom.**
+-dontwarn javax.xml.**
+-dontwarn javax.swing.**
+-dontwarn javax.activation.**
+-dontwarn java.lang.invoke.**
+-dontwarn com.zaxxer.sparsebits.**
+
+# Phase 3: Commons Compress, XZ & zip4j
+-keep class org.apache.commons.compress.** { *; }
+-keep class net.lingala.zip4j.** { *; }
+-keep class org.tukaani.xz.** { *; }
+-dontwarn org.apache.commons.compress.**
+-dontwarn net.lingala.zip4j.**
+-dontwarn org.tukaani.xz.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.dec.**
+
+# Phase 3: SnakeYAML
+-keep class org.yaml.snakeyaml.** { *; }
+-dontwarn org.yaml.snakeyaml.**
+-dontwarn java.beans.**

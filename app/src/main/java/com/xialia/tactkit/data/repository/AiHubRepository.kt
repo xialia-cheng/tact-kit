@@ -3,6 +3,7 @@ package com.xialia.tactkit.data.repository
 import android.graphics.Bitmap
 import android.util.Base64
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,8 +46,9 @@ class AiHubRepository {
     withContext(Dispatchers.IO) {
       runCatching {
         require(apiKey.isNotBlank()) { "请先填写 API Key" }
+        require(model.isNotBlank()) { "请先填写模型名称" }
         val startMs = System.currentTimeMillis()
-        val endpoint = "${baseUrl.trimEnd('/')}/chat/completions"
+        val endpoint = normalizeChatCompletionsEndpoint(baseUrl)
         val bodyObj = buildJsonObject {
           put("model", model.trim())
           put("max_tokens", 16)
@@ -62,9 +64,9 @@ class AiHubRepository {
             },
           )
         }
-        val reply = executeChatRequest(endpoint, apiKey, bodyObj.toString())
+        val reply = executeChatRequest(endpoint, apiKey.trim(), bodyObj.toString())
         val elapsed = System.currentTimeMillis() - startMs
-        "连接成功 (${elapsed} ms)：${reply.take(40)}"
+        "连接成功 (${elapsed} ms · ${endpoint})：${reply.take(40)}"
       }
     }
 
@@ -83,7 +85,7 @@ class AiHubRepository {
         scaled.compress(Bitmap.CompressFormat.JPEG, 85, baos)
         val b64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
 
-        val endpoint = "${baseUrl.trimEnd('/')}/chat/completions"
+        val endpoint = normalizeChatCompletionsEndpoint(baseUrl)
         val prompt =
           instruction.trim().ifEmpty {
             "请精准识别图片中的文字、公式或表格，直接输出结构清晰的 Markdown（公式使用 LaTeX \$...\$ / \$\$...\$\$，表格使用 GFM 表格语法）。"
@@ -121,7 +123,7 @@ class AiHubRepository {
             },
           )
         }
-        executeChatRequest(endpoint, apiKey, bodyObj.toString())
+        executeChatRequest(endpoint, apiKey.trim(), bodyObj.toString())
       }
     }
 
@@ -136,7 +138,7 @@ class AiHubRepository {
       runCatching {
         require(apiKey.isNotBlank()) { "请先在设置中配置 API Key" }
         require(pdfText.isNotBlank()) { "未能从该 PDF 提取到文本（可能是纯扫描件）" }
-        val endpoint = "${baseUrl.trimEnd('/')}/chat/completions"
+        val endpoint = normalizeChatCompletionsEndpoint(baseUrl)
         val userPrompt =
           if (question.isBlank()) {
             "请用结构化 Markdown 总结以下 PDF 文档的核心要点、关键数据与待办行动：\n\n$pdfText"
@@ -157,7 +159,7 @@ class AiHubRepository {
             },
           )
         }
-        executeChatRequest(endpoint, apiKey, bodyObj.toString())
+        executeChatRequest(endpoint, apiKey.trim(), bodyObj.toString())
       }
     }
 
@@ -171,7 +173,7 @@ class AiHubRepository {
       runCatching {
         require(apiKey.isNotBlank()) { "请先在设置中配置 API Key" }
         require(rawText.isNotBlank()) { "请输入需要整理的文本或口述记录" }
-        val endpoint = "${baseUrl.trimEnd('/')}/chat/completions"
+        val endpoint = normalizeChatCompletionsEndpoint(baseUrl)
         val prompt =
           """
           请把下面杂乱的文本/语音转写内容整理成清晰的待办清单。
@@ -196,7 +198,7 @@ class AiHubRepository {
             },
           )
         }
-        val reply = executeChatRequest(endpoint, apiKey, bodyObj.toString())
+        val reply = executeChatRequest(endpoint, apiKey.trim(), bodyObj.toString())
         parseChecklistDraft(reply)
       }
     }
@@ -210,17 +212,21 @@ class AiHubRepository {
         .post(payload.toRequestBody(jsonMediaType))
         .build()
 
-    client.newCall(request).execute().use { response ->
-      val bodyText = response.body?.string().orEmpty()
-      if (!response.isSuccessful) {
-        error("HTTP ${response.code}: ${bodyText.take(240)}")
+    try {
+      client.newCall(request).execute().use { response ->
+        val bodyText = response.body?.string().orEmpty()
+        if (!response.isSuccessful) {
+          error(formatHttpError(response.code, bodyText))
+        }
+        val root = json.parseToJsonElement(bodyText).jsonObject
+        val choices = root["choices"]?.jsonArray ?: error("响应缺少 choices 字段")
+        val first = choices.firstOrNull()?.jsonObject ?: error("choices 为空")
+        val message = first["message"]?.jsonObject ?: error("缺少 message 字段")
+        return message["content"]?.jsonPrimitive?.contentOrNull?.trim()
+          ?: error("模型返回内容为空")
       }
-      val root = json.parseToJsonElement(bodyText).jsonObject
-      val choices = root["choices"]?.jsonArray ?: error("响应缺少 choices 字段")
-      val first = choices.firstOrNull()?.jsonObject ?: error("choices 为空")
-      val message = first["message"]?.jsonObject ?: error("缺少 message 字段")
-      return message["content"]?.jsonPrimitive?.contentOrNull?.trim()
-        ?: error("模型返回内容为空")
+    } catch (e: IOException) {
+      error("网络请求失败（${endpoint}）：${e.message ?: e.javaClass.simpleName}")
     }
   }
 
@@ -238,6 +244,41 @@ class AiHubRepository {
   }
 
   companion object {
+    private val VERSION_SEGMENT_REGEX =
+      Regex(".*/v\\d+(?:[a-zA-Z0-9._-]*)?$", RegexOption.IGNORE_CASE)
+    private val sharedLenientJson = Json { ignoreUnknownKeys = true }
+
+    fun normalizeChatCompletionsEndpoint(baseUrl: String): String {
+      val trimmed = baseUrl.trim().trimEnd('/')
+      if (trimmed.isEmpty()) {
+        return "${com.xialia.tactkit.data.datastore.UserPreferences.DEFAULT_AI_BASE_URL}/chat/completions"
+      }
+      if (trimmed.endsWith("/chat/completions", ignoreCase = true)) {
+        return trimmed
+      }
+      if (VERSION_SEGMENT_REGEX.matches(trimmed)) {
+        return "$trimmed/chat/completions"
+      }
+      return "$trimmed/v1/chat/completions"
+    }
+
+    fun formatHttpError(statusCode: Int, rawBody: String): String {
+      val serverMessage =
+        runCatching {
+          val obj = sharedLenientJson.parseToJsonElement(rawBody) as? JsonObject
+          val errObj = obj?.get("error") as? JsonObject
+          val nestedMsg = (errObj?.get("message") as? JsonPrimitive)?.contentOrNull
+          val topMsg = (obj?.get("message") as? JsonPrimitive)?.contentOrNull
+          val detailMsg = (obj?.get("detail") as? JsonPrimitive)?.contentOrNull
+          (nestedMsg ?: topMsg ?: detailMsg)?.trim()
+        }.getOrNull()
+
+      val detail =
+        serverMessage?.takeIf { it.isNotBlank() }
+          ?: rawBody.trim().take(260).ifEmpty { "服务端未返回错误详情" }
+      return "HTTP $statusCode: $detail"
+    }
+
     fun parseChecklistDraft(rawReply: String): ChecklistDraft {
       val cleaned =
         rawReply
@@ -252,7 +293,7 @@ class AiHubRepository {
       if (start >= 0 && end > start) {
         val jsonSlice = cleaned.substring(start, end + 1)
         runCatching {
-          val obj = Json { ignoreUnknownKeys = true }.parseToJsonElement(jsonSlice) as JsonObject
+          val obj = sharedLenientJson.parseToJsonElement(jsonSlice) as JsonObject
           val title =
             (obj["title"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty().ifEmpty { "AI 整理清单" }
           val items =

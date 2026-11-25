@@ -24,6 +24,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -99,6 +100,8 @@ fun ExpressiveEmptyFileScreen(
   onPickFile: () -> Unit,
   onNavigateBack: () -> Unit,
   fabText: String = "选择文件",
+  secondaryActionText: String? = null,
+  onSecondaryAction: (() -> Unit)? = null,
 ) {
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -176,6 +179,16 @@ fun ExpressiveEmptyFileScreen(
               color = MaterialTheme.colorScheme.onSurface,
               textAlign = TextAlign.Center,
             )
+
+            if (secondaryActionText != null && onSecondaryAction != null) {
+              OutlinedButton(
+                onClick = onSecondaryAction,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.testTag("expressive_secondary_action_btn"),
+              ) {
+                Text(secondaryActionText)
+              }
+            }
           }
         }
 
