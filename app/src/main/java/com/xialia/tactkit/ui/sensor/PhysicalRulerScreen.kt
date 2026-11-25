@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -134,7 +133,7 @@ fun PhysicalRulerScreen(
           val cursorColor = MaterialTheme.colorScheme.primary
           val bandColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
 
-          BoxWithConstraints(
+          Box(
             modifier =
               Modifier.weight(1f)
                 .fillMaxHeight()
