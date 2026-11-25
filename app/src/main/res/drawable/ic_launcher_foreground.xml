@@ -1,8 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:width="66dp"
-        android:height="66dp"
-        android:drawable="@drawable/img_tactkit_icon"
-        android:gravity="center" />
-</layer-list>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- All artwork strictly within safe zone 24..84 -->
+    <!-- Back card: soft lavender-blue (#9BB1FF), slightly offset bottom-left -->
+    <group
+        android:pivotX="50"
+        android:pivotY="58"
+        android:rotation="-8">
+        <path
+            android:fillColor="#9BB1FF"
+            android:pathData="M37,39 L59,39 A9,9 0 0,1 68,48 L68,70 A9,9 0 0,1 59,79 L37,79 A9,9 0 0,1 28,70 L28,48 A9,9 0 0,1 37,39 Z" />
+    </group>
+
+    <!-- Front card: crisp ice white (#F4F6FF), subtly offset top-right -->
+    <group
+        android:pivotX="57"
+        android:pivotY="54"
+        android:rotation="4">
+        <path
+            android:fillColor="#F4F6FF"
+            android:pathData="M45,33 L69,33 A9,9 0 0,1 78,42 L78,66 A9,9 0 0,1 69,75 L45,75 A9,9 0 0,1 36,66 L36,42 A9,9 0 0,1 45,33 Z" />
+        <!-- Subtle tactile card divider lines -->
+        <path
+            android:fillColor="#364570"
+            android:fillAlpha="0.22"
+            android:pathData="M46,47 L68,47 A2,2 0 0,1 70,49 A2,2 0 0,1 68,51 L46,51 A2,2 0 0,1 44,49 A2,2 0 0,1 46,47 Z" />
+        <path
+            android:fillColor="#364570"
+            android:fillAlpha="0.14"
+            android:pathData="M46,56 L61,56 A2,2 0 0,1 63,58 A2,2 0 0,1 61,60 L46,60 A2,2 0 0,1 44,58 A2,2 0 0,1 46,56 Z" />
+    </group>
+
+    <!-- Restrained four-point sparkle star (top-right inside safe zone) -->
+    <path
+        android:fillColor="#F4F6FF"
+        android:pathData="M77,25 Q77,31 83,31 Q77,31 77,37 Q77,31 71,31 Q77,31 77,25 Z" />
+</vector>

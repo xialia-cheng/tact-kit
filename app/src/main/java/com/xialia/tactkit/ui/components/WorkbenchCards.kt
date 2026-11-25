@@ -3,6 +3,7 @@ package com.xialia.tactkit.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
@@ -40,11 +42,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.kyant.capsule.ContinuousCapsule
-import com.kyant.capsule.ContinuousRoundedRectangle
 import com.xialia.tactkit.R
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.ui.theme.TactKitMono
@@ -69,67 +70,93 @@ fun WorkbenchCardView(
   val haptics = rememberAppHaptics()
 
   Surface(
-    shape = ContinuousRoundedRectangle(22.dp),
+    shape = RoundedCornerShape(22.dp),
     color = MaterialTheme.colorScheme.surface,
-    tonalElevation = if (card.pinned) 4.dp else 1.dp,
+    tonalElevation = 0.dp,
+    shadowElevation = 0.dp,
     border =
       BorderStroke(
-        width = if (card.pinned) 1.5.dp else 1.dp,
+        width = 1.dp,
         color =
           if (card.pinned) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
           } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
           },
       ),
     modifier = modifier.fillMaxWidth().testTag("workbench_card_${card.id}"),
   ) {
     Column(modifier = Modifier.padding(16.dp)) {
-      // Card Header
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        val (typeLabel, typeIcon, typeTint) =
-          when (card) {
-            is WorkbenchCard.Checklist ->
-              Triple("清单", Icons.Rounded.Checklist, MaterialTheme.colorScheme.primary)
-            is WorkbenchCard.Note ->
-              Triple("Markdown / 代码", Icons.Rounded.EditNote, MaterialTheme.colorScheme.secondary)
-            is WorkbenchCard.RecentFile ->
-              Triple("本地文件", fileIconForMime(card.mimeType), MaterialTheme.colorScheme.tertiary)
-          }
-
-        Surface(
-          color = typeTint.copy(alpha = 0.14f),
-          shape = ContinuousCapsule(),
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-          ) {
-            Icon(
-              imageVector = typeIcon,
-              contentDescription = null,
-              tint = typeTint,
-              modifier = Modifier.size(14.dp),
+      // Image Toolbox-inspired header: 44.dp rounded-square badge + 1-line title + 1-line subtitle
+      val (icon, containerColor, contentColor, subtitle) =
+        when (card) {
+          is WorkbenchCard.Checklist -> {
+            val done = card.items.count { it.checked }
+            Quadruple(
+              Icons.Rounded.Checklist,
+              MaterialTheme.colorScheme.primaryContainer,
+              MaterialTheme.colorScheme.onPrimaryContainer,
+              "已完成 $done/${card.items.size} 项 · ${formatTimestamp(card.updatedAt)}",
             )
-            Text(
-              text = typeLabel,
-              style = MaterialTheme.typography.labelSmall,
-              color = typeTint,
+          }
+          is WorkbenchCard.Note -> {
+            val charCount = card.markdownContent.length
+            Quadruple(
+              Icons.Rounded.EditNote,
+              MaterialTheme.colorScheme.secondaryContainer,
+              MaterialTheme.colorScheme.onSecondaryContainer,
+              "Markdown 便签 · $charCount 字 · ${formatTimestamp(card.updatedAt)}",
+            )
+          }
+          is WorkbenchCard.RecentFile -> {
+            Quadruple(
+              fileIconForMime(card.mimeType),
+              MaterialTheme.colorScheme.tertiaryContainer,
+              MaterialTheme.colorScheme.onTertiaryContainer,
+              "${FileInspectionHelper.formatBytes(card.fileSizeBytes)} · ${card.mimeType}",
             )
           }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Surface(
+          shape = RoundedCornerShape(14.dp),
+          color = containerColor,
+          modifier = Modifier.size(44.dp),
+        ) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(
+              imageVector = icon,
+              contentDescription = null,
+              tint = contentColor,
+              modifier = Modifier.size(22.dp),
+            )
+          }
+        }
 
-        Text(
-          text = formatTimestamp(card.updatedAt),
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = card.title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Spacer(modifier = Modifier.height(2.dp))
+          Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
 
         IconButton(
           onClick = {
@@ -167,17 +194,7 @@ fun WorkbenchCardView(
         }
       }
 
-      Spacer(modifier = Modifier.height(6.dp))
-
-      Text(
-        text = card.title,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-      )
-
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
       when (card) {
         is WorkbenchCard.Checklist -> {
@@ -204,15 +221,15 @@ fun WorkbenchCardView(
               haptics.tick()
               onEditNote(card)
             },
-            shape = ContinuousRoundedRectangle(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.fillMaxWidth().testTag("note_preview_${card.id}"),
           ) {
             Text(
               text = card.markdownContent.ifBlank { "点击编辑便签内容..." },
               style = MaterialTheme.typography.bodyMedium.copy(fontFamily = TactKitMono),
               color = MaterialTheme.colorScheme.onSurfaceVariant,
-              maxLines = 6,
+              maxLines = 5,
               overflow = TextOverflow.Ellipsis,
               modifier = Modifier.padding(12.dp),
             )
@@ -232,6 +249,13 @@ fun WorkbenchCardView(
     }
   }
 }
+
+private data class Quadruple<A, B, C, D>(
+  val first: A,
+  val second: B,
+  val third: C,
+  val fourth: D,
+)
 
 @Composable
 private fun ChecklistCardBody(
@@ -296,7 +320,7 @@ private fun ChecklistCardBody(
           onValueChange = { newItemText = it },
           placeholder = { Text("输入新待办条目") },
           singleLine = true,
-          shape = ContinuousRoundedRectangle(14.dp),
+          shape = RoundedCornerShape(14.dp),
           modifier = Modifier.weight(1f).testTag("checklist_add_input_${card.id}"),
         )
         TextButton(
@@ -331,46 +355,25 @@ private fun RecentFileCardBody(
   onOpenQuickLook: () -> Unit,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ContinuousRoundedRectangle(10.dp),
-      ) {
-        Text(
-          text = FileInspectionHelper.formatBytes(card.fileSizeBytes),
-          style = MaterialTheme.typography.labelSmall,
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        )
-      }
-      Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = ContinuousRoundedRectangle(10.dp),
-      ) {
-        Text(
-          text = card.mimeType,
-          style = MaterialTheme.typography.labelSmall,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        )
-      }
-    }
-
     card.sha256?.takeIf { it.isNotBlank() }?.let { digest ->
-      Text(
-        text = "SHA-256: ${digest.take(16)}…${digest.takeLast(8)}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
+      Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        Text(
+          text = "SHA-256 · ${digest.take(16)}…${digest.takeLast(8)}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        )
+      }
     }
 
     if (card.previewExcerpt.isNotBlank()) {
       Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        shape = ContinuousRoundedRectangle(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(
@@ -389,7 +392,11 @@ private fun RecentFileCardBody(
         onClick = onOpenQuickLook,
         modifier = Modifier.testTag("open_quick_look_${card.id}"),
       ) {
-        Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+        Icon(
+          Icons.AutoMirrored.Rounded.OpenInNew,
+          contentDescription = null,
+          modifier = Modifier.size(16.dp),
+        )
         Spacer(modifier = Modifier.width(6.dp))
         Text("在 Quick Look 中预览")
       }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -37,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.kyant.capsule.ContinuousRoundedRectangle
 import com.xialia.tactkit.BuildConfig
 import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
@@ -55,9 +55,14 @@ fun SettingsScreen(
   val haptics = rememberAppHaptics()
 
   Scaffold(
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     contentWindowInsets = WindowInsets.safeDrawing,
     topBar = {
       TopAppBar(
+        colors =
+          androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+          ),
         title = { Text("设置 · Settings") },
         navigationIcon = {
           IconButton(
@@ -208,8 +213,8 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
           Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-            shape = ContinuousRoundedRectangle(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(14.dp),
             modifier = Modifier.fillMaxWidth(),
           ) {
             Column(
@@ -252,13 +257,14 @@ private fun SettingsSectionCard(
   content: @Composable () -> Unit,
 ) {
   Surface(
-    shape = ContinuousRoundedRectangle(22.dp),
+    shape = RoundedCornerShape(22.dp),
     color = MaterialTheme.colorScheme.surface,
-    tonalElevation = 1.dp,
+    tonalElevation = 0.dp,
+    shadowElevation = 0.dp,
     border =
       BorderStroke(
         width = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
       ),
     modifier = Modifier.fillMaxWidth(),
   ) {

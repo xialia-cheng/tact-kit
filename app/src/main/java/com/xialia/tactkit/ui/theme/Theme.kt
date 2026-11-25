@@ -16,21 +16,26 @@ import com.xialia.tactkit.data.datastore.ThemeMode
 
 private val DarkColorScheme =
   darkColorScheme(
-    primary = TealPrimaryDark,
-    onPrimary = OnTealPrimaryDark,
-    primaryContainer = TealContainerDark,
-    onPrimaryContainer = OnTealContainerDark,
+    primary = IndigoPrimaryDark,
+    onPrimary = OnIndigoPrimaryDark,
+    primaryContainer = IndigoContainerDark,
+    onPrimaryContainer = OnIndigoContainerDark,
     secondary = SlateSecondaryDark,
     onSecondary = OnSlateSecondaryDark,
     secondaryContainer = SlateContainerDark,
     onSecondaryContainer = OnSlateContainerDark,
-    tertiary = AmberTertiaryDark,
-    onTertiary = OnAmberTertiaryDark,
-    tertiaryContainer = AmberContainerDark,
-    onTertiaryContainer = OnAmberContainerDark,
+    tertiary = VioletTertiaryDark,
+    onTertiary = OnVioletTertiaryDark,
+    tertiaryContainer = VioletContainerDark,
+    onTertiaryContainer = OnVioletContainerDark,
     background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceVariant = SurfaceVariantDark,
+    surface = SurfaceContainerDark,
+    surfaceVariant = SurfaceContainerHighDark,
+    surfaceContainerLowest = SurfaceContainerLowestDark,
+    surfaceContainerLow = SurfaceContainerLowDark,
+    surfaceContainer = SurfaceContainerDark,
+    surfaceContainerHigh = SurfaceContainerHighDark,
+    surfaceContainerHighest = SurfaceContainerHighestDark,
     onBackground = OnSurfaceDark,
     onSurface = OnSurfaceDark,
     onSurfaceVariant = OnSurfaceVariantDark,
@@ -40,21 +45,26 @@ private val DarkColorScheme =
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = TealPrimaryLight,
-    onPrimary = OnTealPrimaryLight,
-    primaryContainer = TealContainerLight,
-    onPrimaryContainer = OnTealContainerLight,
+    primary = IndigoPrimaryLight,
+    onPrimary = OnIndigoPrimaryLight,
+    primaryContainer = IndigoContainerLight,
+    onPrimaryContainer = OnIndigoContainerLight,
     secondary = SlateSecondaryLight,
     onSecondary = OnSlateSecondaryLight,
     secondaryContainer = SlateContainerLight,
     onSecondaryContainer = OnSlateContainerLight,
-    tertiary = AmberTertiaryLight,
-    onTertiary = OnAmberTertiaryLight,
-    tertiaryContainer = AmberContainerLight,
-    onTertiaryContainer = OnAmberContainerLight,
+    tertiary = VioletTertiaryLight,
+    onTertiary = OnVioletTertiaryLight,
+    tertiaryContainer = VioletContainerLight,
+    onTertiaryContainer = OnVioletContainerLight,
     background = BackgroundLight,
-    surface = SurfaceLight,
-    surfaceVariant = SurfaceVariantLight,
+    surface = SurfaceContainerLowestLight,
+    surfaceVariant = SurfaceContainerLight,
+    surfaceContainerLowest = SurfaceContainerLowestLight,
+    surfaceContainerLow = SurfaceContainerLowLight,
+    surfaceContainer = SurfaceContainerLight,
+    surfaceContainerHigh = SurfaceContainerHighLight,
+    surfaceContainerHighest = SurfaceContainerHighestLight,
     onBackground = OnSurfaceLight,
     onSurface = OnSurfaceLight,
     onSurfaceVariant = OnSurfaceVariantLight,
@@ -64,11 +74,21 @@ private val LightColorScheme =
 
 val TactKitShapes =
   Shapes(
-    small = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(14.dp),
     medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(22.dp),
     extraLarge = RoundedCornerShape(28.dp),
   )
+
+@Composable
+fun isTactKitDarkTheme(themeMode: ThemeMode): Boolean {
+  val systemDark = isSystemInDarkTheme()
+  return when (themeMode) {
+    ThemeMode.SYSTEM -> systemDark
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+  }
+}
 
 @Composable
 fun TactKitTheme(
@@ -76,19 +96,39 @@ fun TactKitTheme(
   dynamicColor: Boolean = true,
   content: @Composable () -> Unit,
 ) {
-  val systemDark = isSystemInDarkTheme()
-  val isDarkTheme =
-    when (themeMode) {
-      ThemeMode.SYSTEM -> systemDark
-      ThemeMode.LIGHT -> false
-      ThemeMode.DARK -> true
-    }
+  val isDarkTheme = isTactKitDarkTheme(themeMode)
 
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
-        if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        val dynamic =
+          if (isDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (isDarkTheme) {
+          dynamic.copy(
+            background = BackgroundDark,
+            surface = SurfaceContainerDark,
+            surfaceVariant = SurfaceContainerHighDark,
+            surfaceContainerLowest = SurfaceContainerLowestDark,
+            surfaceContainerLow = SurfaceContainerLowDark,
+            surfaceContainer = SurfaceContainerDark,
+            surfaceContainerHigh = SurfaceContainerHighDark,
+            surfaceContainerHighest = SurfaceContainerHighestDark,
+            outlineVariant = OutlineVariantDark,
+          )
+        } else {
+          dynamic.copy(
+            background = BackgroundLight,
+            surface = SurfaceContainerLowestLight,
+            surfaceVariant = SurfaceContainerLight,
+            surfaceContainerLowest = SurfaceContainerLowestLight,
+            surfaceContainerLow = SurfaceContainerLowLight,
+            surfaceContainer = SurfaceContainerLight,
+            surfaceContainerHigh = SurfaceContainerHighLight,
+            surfaceContainerHighest = SurfaceContainerHighestLight,
+            outlineVariant = OutlineVariantLight,
+          )
+        }
       }
       isDarkTheme -> DarkColorScheme
       else -> LightColorScheme

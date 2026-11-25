@@ -4,17 +4,19 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
@@ -71,7 +74,6 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.capsule.ContinuousCapsule
-import com.kyant.capsule.ContinuousRoundedRectangle
 import com.xialia.tactkit.R
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
@@ -79,9 +81,7 @@ import com.xialia.tactkit.domain.ToolItem
 import com.xialia.tactkit.util.rememberAppHaptics
 
 /**
- * Floating Liquid Glass Tool Ball & Expandable Drawer.
- * - API 33+ with power-save off: real-time AGSL RuntimeShader refraction/blur via Kyant0 Backdrop.
- * - API < 33 or power-save on: Material 3 high-contrast translucent fallback card.
+ * Compact 56.dp rounded-square (16.dp) Liquid Glass Tool Ball & 28.dp top-corner Bottom Sheet Drawer.
  */
 @Composable
 fun LiquidGlassToolBallOverlay(
@@ -98,6 +98,7 @@ fun LiquidGlassToolBallOverlay(
   var upcomingToolDialog by remember { mutableStateOf<ToolItem?>(null) }
 
   val useLiquidShader = !isPowerSaveMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+  val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
 
   val expandedCategories = remember {
     mutableStateMapOf<ToolCategory, Boolean>().apply {
@@ -113,7 +114,7 @@ fun LiquidGlassToolBallOverlay(
   }
 
   Box(modifier = modifier.fillMaxSize()) {
-    // Dimming scrim when drawer is open
+    // Scrim
     AnimatedVisibility(
       visible = isExpanded,
       enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
@@ -122,7 +123,7 @@ fun LiquidGlassToolBallOverlay(
       Box(
         modifier =
           Modifier.fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.32f))
+            .background(Color.Black.copy(alpha = 0.34f))
             .clickable(
               interactionSource = remember { MutableInteractionSource() },
               indication = null,
@@ -133,41 +134,63 @@ fun LiquidGlassToolBallOverlay(
       )
     }
 
-    // Expanded Tool Drawer Card
+    // 28.dp top-rounded Bottom Sheet Drawer
     AnimatedVisibility(
       visible = isExpanded,
       enter =
         fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-          scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = 0.82f)),
+          slideInVertically(initialOffsetY = { it / 3 }),
       exit =
         fadeOut(spring(stiffness = Spring.StiffnessMedium)) +
-          scaleOut(targetScale = 0.92f),
-      modifier =
-        Modifier.align(Alignment.BottomEnd)
-          .navigationBarsPadding()
-          .padding(horizontal = 16.dp, vertical = 16.dp),
+          slideOutVertically(targetOffsetY = { it / 3 }),
+      modifier = Modifier.align(Alignment.BottomCenter),
     ) {
-      val drawerShape = ContinuousRoundedRectangle(28.dp)
-      val glassTint = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-      val fallbackTint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)
-      val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+      val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+      val glassTint = MaterialTheme.colorScheme.surface.copy(alpha = if (isDark) 0.78f else 0.76f)
+      val fallbackTint = MaterialTheme.colorScheme.surface
+      val highlightBorder =
+        if (isDark) {
+          Color.White.copy(alpha = 0.16f)
+        } else {
+          Color.White.copy(alpha = 0.65f)
+        }
 
-      val drawerModifier =
-        Modifier.widthIn(max = 420.dp)
+      val sheetModifier =
+        Modifier.widthIn(max = 600.dp)
           .fillMaxWidth()
-          .heightIn(max = 560.dp)
+          .heightIn(max = 600.dp)
           .glassSurfaceModifier(
             useLiquidShader = useLiquidShader,
             backdrop = backdrop,
-            shape = drawerShape,
+            shape = sheetShape,
             glassTint = glassTint,
             fallbackTint = fallbackTint,
-            borderColor = borderColor,
+            borderColor = highlightBorder,
           )
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+          ) { /* Consume taps inside sheet */ }
+          .navigationBarsPadding()
+          .padding(horizontal = 16.dp, vertical = 14.dp)
           .testTag("tool_drawer_panel")
 
-      Column(modifier = drawerModifier.padding(16.dp)) {
-        // Drawer Header
+      Column(modifier = sheetModifier) {
+        // Bottom Sheet Drag Handle
+        Box(
+          modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+          contentAlignment = Alignment.Center,
+        ) {
+          Box(
+            modifier =
+              Modifier.width(36.dp)
+                .height(4.dp)
+                .clip(ContinuousCapsule())
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+          )
+        }
+
+        // Sheet Header
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
@@ -177,11 +200,12 @@ fun LiquidGlassToolBallOverlay(
             Text(
               text = "工坊工具抽屉",
               style = MaterialTheme.typography.titleLarge,
+              fontWeight = FontWeight.Bold,
               color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
               text =
-                if (useLiquidShader) "AGSL 实时折射玻璃" else "Material 3 省电半透明",
+                if (useLiquidShader) "AGSL 实时折射液态玻璃" else "Material 3 省电半透明模式",
               style = MaterialTheme.typography.labelSmall,
               color = MaterialTheme.colorScheme.primary,
             )
@@ -202,7 +226,7 @@ fun LiquidGlassToolBallOverlay(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Top Search Box
+        // Top Search Field
         OutlinedTextField(
           value = searchQuery,
           onValueChange = { searchQuery = it },
@@ -216,7 +240,7 @@ fun LiquidGlassToolBallOverlay(
             }
           },
           singleLine = true,
-          shape = ContinuousRoundedRectangle(18.dp),
+          shape = RoundedCornerShape(16.dp),
           modifier = Modifier.fillMaxWidth().testTag("tool_drawer_search_input"),
         )
 
@@ -227,7 +251,7 @@ fun LiquidGlassToolBallOverlay(
 
         // 4 Pinned Quick Slots
         Text(
-          text = "固定快捷位 (${pinnedTools.size}/4)",
+          text = "固定快捷槽位 (${pinnedTools.size}/4)",
           style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -235,12 +259,12 @@ fun LiquidGlassToolBallOverlay(
 
         if (pinnedTools.isEmpty()) {
           Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            shape = ContinuousRoundedRectangle(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
           ) {
             Text(
-              text = "点击下方任意工具卡片的图钉按钮，即可固定到最多 4 个快捷槽位。",
+              text = "点击下方工具卡片的图钉图标，即可固定到最多 4 个快捷槽位。",
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               modifier = Modifier.padding(12.dp),
@@ -270,7 +294,7 @@ fun LiquidGlassToolBallOverlay(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Categorized Collapsible Cards
+        // Categorized Collapsible Cards (Image Toolbox style rows inside)
         val normalizedQuery = searchQuery.trim().lowercase()
         LazyColumn(
           verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -319,7 +343,7 @@ fun LiquidGlassToolBallOverlay(
       }
     }
 
-    // Collapsed Liquid Glass Floating Orb (Bottom-Right)
+    // Compact 56.dp x 56.dp 16.dp-rounded Liquid Glass Action Button (Bottom-Right)
     AnimatedVisibility(
       visible = !isExpanded,
       enter = fadeIn() + scaleIn(initialScale = 0.85f),
@@ -327,46 +351,42 @@ fun LiquidGlassToolBallOverlay(
       modifier =
         Modifier.align(Alignment.BottomEnd)
           .navigationBarsPadding()
-          .padding(end = 20.dp, bottom = 20.dp),
+          .padding(end = 16.dp, bottom = 16.dp),
     ) {
-      val capsuleShape = ContinuousCapsule()
-      val ballTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+      val orbShape = RoundedCornerShape(16.dp)
+      val ballTint =
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.58f)
       val fallbackBallTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
-      val ballBorder = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+      val highlightBorder =
+        if (isDark) {
+          Color.White.copy(alpha = 0.24f)
+        } else {
+          Color.White.copy(alpha = 0.72f)
+        }
 
-      val ballScale by animateFloatAsState(targetValue = 1f, label = "orbScale")
-
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+      Box(
+        contentAlignment = Alignment.Center,
         modifier =
-          Modifier.height(58.dp)
+          Modifier.size(56.dp)
             .glassSurfaceModifier(
               useLiquidShader = useLiquidShader,
               backdrop = backdrop,
-              shape = capsuleShape,
+              shape = orbShape,
               glassTint = ballTint,
               fallbackTint = fallbackBallTint,
-              borderColor = ballBorder,
+              borderColor = highlightBorder,
             )
             .clickable {
               haptics.tick()
               isExpanded = true
             }
-            .padding(horizontal = 18.dp)
             .testTag("liquid_glass_tool_ball"),
       ) {
         Icon(
           imageVector = Icons.Rounded.Widgets,
           contentDescription = stringResource(R.string.cd_tool_ball),
           tint = MaterialTheme.colorScheme.onPrimaryContainer,
-          modifier = Modifier.size(22.dp),
-        )
-        Text(
-          text = "工具球",
-          style = MaterialTheme.typography.titleSmall,
-          fontWeight = FontWeight.SemiBold,
-          color = MaterialTheme.colorScheme.onPrimaryContainer,
+          modifier = Modifier.size(24.dp),
         )
       }
     }
@@ -390,8 +410,8 @@ fun LiquidGlassToolBallOverlay(
             style = MaterialTheme.typography.bodyMedium,
           )
           Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-            shape = ContinuousRoundedRectangle(12.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+            shape = RoundedCornerShape(14.dp),
           ) {
             Text(
               text = tool.roadmapNote.ifEmpty { "Phase 2–4 离线引擎建设中，保持零数据收集与本地执行。" },
@@ -424,17 +444,17 @@ private fun PinnedToolSlotChip(
 ) {
   Surface(
     onClick = onClick,
-    shape = ContinuousRoundedRectangle(16.dp),
+    shape = RoundedCornerShape(14.dp),
     color =
       if (tool.isAvailableInPhase1) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
+        MaterialTheme.colorScheme.primaryContainer
       } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+        MaterialTheme.colorScheme.surfaceVariant
       },
     border =
       BorderStroke(
         width = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
       ),
     modifier = Modifier.testTag("pinned_tool_${tool.id}"),
   ) {
@@ -475,8 +495,8 @@ private fun CategoryToolCard(
   onTogglePin: (String) -> Unit,
 ) {
   Surface(
-    shape = ContinuousRoundedRectangle(18.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+    shape = RoundedCornerShape(22.dp),
+    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     border =
       BorderStroke(
         width = 1.dp,
@@ -489,7 +509,7 @@ private fun CategoryToolCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
           Modifier.fillMaxWidth()
-            .clip(ContinuousRoundedRectangle(12.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onToggleExpand() }
             .padding(horizontal = 4.dp, vertical = 6.dp)
             .testTag("category_header_${category.name}"),
@@ -504,6 +524,7 @@ private fun CategoryToolCard(
         Text(
           text = category.title,
           style = MaterialTheme.typography.titleSmall,
+          fontWeight = FontWeight.SemiBold,
           modifier = Modifier.weight(1f),
         )
         Icon(
@@ -522,26 +543,44 @@ private fun CategoryToolCard(
             val isPinned = tool.id in pinnedIds
             Surface(
               onClick = { onToolClick(tool) },
-              shape = ContinuousRoundedRectangle(14.dp),
-              color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+              shape = RoundedCornerShape(16.dp),
+              color = MaterialTheme.colorScheme.surface,
+              border =
+                BorderStroke(
+                  width = 1.dp,
+                  color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                ),
               modifier = Modifier.fillMaxWidth().testTag("tool_item_${tool.id}"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                modifier = Modifier.padding(12.dp),
               ) {
-                Icon(
-                  imageVector = tool.icon,
-                  contentDescription = null,
-                  tint =
+                Surface(
+                  shape = RoundedCornerShape(14.dp),
+                  color =
                     if (tool.isAvailableInPhase1) {
-                      MaterialTheme.colorScheme.primary
+                      MaterialTheme.colorScheme.primaryContainer
                     } else {
-                      MaterialTheme.colorScheme.onSurfaceVariant
+                      MaterialTheme.colorScheme.surfaceVariant
                     },
-                  modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+                  modifier = Modifier.size(44.dp),
+                ) {
+                  Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                      imageVector = tool.icon,
+                      contentDescription = null,
+                      tint =
+                        if (tool.isAvailableInPhase1) {
+                          MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                          MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                      modifier = Modifier.size(22.dp),
+                    )
+                  }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                   Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -550,6 +589,7 @@ private fun CategoryToolCard(
                     Text(
                       text = tool.name,
                       style = MaterialTheme.typography.titleSmall,
+                      fontWeight = FontWeight.SemiBold,
                       maxLines = 1,
                       overflow = TextOverflow.Ellipsis,
                     )
@@ -567,6 +607,7 @@ private fun CategoryToolCard(
                       }
                     }
                   }
+                  Spacer(modifier = Modifier.height(2.dp))
                   Text(
                     text = tool.subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -615,7 +656,7 @@ private fun Modifier.glassSurfaceModifier(
         effects = {
           vibrancy()
           blur(14.dp.toPx())
-          lens(16.dp.toPx(), 32.dp.toPx())
+          lens(16.dp.toPx(), 28.dp.toPx())
         },
         onDrawSurface = { drawRect(glassTint) },
       )

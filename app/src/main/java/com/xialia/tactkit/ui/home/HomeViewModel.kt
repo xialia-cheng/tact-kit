@@ -26,6 +26,9 @@ enum class CardFilter(val label: String) {
 
 data class HomeUiState(
   val cards: List<WorkbenchCard> = emptyList(),
+  val totalChecklists: Int = 0,
+  val totalNotes: Int = 0,
+  val totalFiles: Int = 0,
   val searchQuery: String = "",
   val activeFilter: CardFilter = CardFilter.ALL,
   val preferences: UserPreferences = UserPreferences(),
@@ -62,6 +65,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val importing = values[4] as Boolean
         val message = values[5] as String?
 
+        val checklistCount = allCards.count { it is WorkbenchCard.Checklist }
+        val noteCount = allCards.count { it is WorkbenchCard.Note }
+        val fileCount = allCards.count { it is WorkbenchCard.RecentFile }
+
         val normalizedQuery = query.trim().lowercase()
         val filtered =
           allCards.filter { card ->
@@ -89,6 +96,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         HomeUiState(
           cards = filtered,
+          totalChecklists = checklistCount,
+          totalNotes = noteCount,
+          totalFiles = fileCount,
           searchQuery = query,
           activeFilter = filter,
           preferences = prefs,
@@ -151,7 +161,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
       isImportingFile.value = true
       try {
         workbenchRepository.importLocalFile(uri)
-        statusMessage.value = "已导入本地文件并计算 SHA-256"
+        statusMessage.value = "已导入本地文件并生成校验指纹"
       } catch (e: Exception) {
         statusMessage.value = "导入文件失败: ${e.message ?: "未知错误"}"
       } finally {

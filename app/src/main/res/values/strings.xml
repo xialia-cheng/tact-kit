@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">简工坊 TactKit</string>
     <string name="quick_look_label">简工坊 Quick Look</string>
-    <string name="local_first_badge">本地优先</string>
+    <string name="local_first_badge">本地优先 · 零数据收集</string>
     <string name="cd_settings">打开设置</string>
     <string name="cd_search">搜索桌面卡片</string>
     <string name="cd_tool_ball">打开工具抽屉</string>
@@ -9,5 +9,4 @@
     <string name="cd_pin">固定或取消固定</string>
     <string name="cd_delete">删除卡片</string>
     <string name="cd_copy">复制内容</string>
-    <string name="cd_empty_workbench">个人工作台空状态插图</string>
 </resources>
