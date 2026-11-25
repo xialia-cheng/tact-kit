@@ -52,6 +52,8 @@ zip4j = "2.11.5"
 commonsCompress = "1.27.1"
 tukaaniXz = "1.10"
 snakeyaml = "2.3"
+zxingCore = "3.5.3"
+graphicsShapes = "1.0.1"
 
 
 [libraries]
@@ -120,6 +122,8 @@ zip4j = { group = "net.lingala.zip4j", name = "zip4j", version.ref = "zip4j" }
 commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 tukaani-xz = { group = "org.tukaani", name = "xz", version.ref = "tukaaniXz" }
 snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
+androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 
 
 [plugins]

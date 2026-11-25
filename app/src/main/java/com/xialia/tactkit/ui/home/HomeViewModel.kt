@@ -234,6 +234,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
   suspend fun getDecryptedAiApiKey(): String = settingsRepository.getDecryptedAiApiKey()
 
+  fun stepCounter(direction: Int) {
+    viewModelScope.launch { settingsRepository.stepCounter(direction) }
+  }
+
+  fun resetCounter() {
+    viewModelScope.launch { settingsRepository.setCounterValue(0L) }
+  }
+
+  fun setCounterStep(step: Int) {
+    viewModelScope.launch { settingsRepository.setCounterStep(step) }
+  }
+
+  fun setCounterLabel(label: String) {
+    viewModelScope.launch { settingsRepository.setCounterLabel(label) }
+  }
+
   override fun onCleared() {
     voiceMemoManager.stopPlayback()
     voiceMemoManager.cancelRecording()

@@ -300,7 +300,7 @@ fun ImageToolkitScreen(
                 haptics.tick()
                 activeTab = tab
               },
-              label = { Text(tab.label, maxLines = 1) },
+              label = { Text(tab.label, maxLines = 1, softWrap = false) },
               modifier = Modifier.testTag("image_tab_${tab.name}"),
             )
           }

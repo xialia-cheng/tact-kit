@@ -2,6 +2,7 @@ package com.xialia.tactkit
 
 import android.graphics.Color
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -14,6 +15,14 @@ import com.xialia.tactkit.ui.home.HomeViewModel
 import com.xialia.tactkit.ui.navigation.TactKitNavHost
 import com.xialia.tactkit.ui.theme.TactKitTheme
 import com.xialia.tactkit.ui.theme.isTactKitDarkTheme
+
+/**
+ * Allows opt-in screens (such as the Persistent Counter) to capture hardware volume +/- keys
+ * without altering normal audio volume behavior on any other screen.
+ */
+object HardwareVolumeKeyDispatcher {
+  var onVolumeKey: ((delta: Int) -> Unit)? = null
+}
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,5 +58,22 @@ class MainActivity : ComponentActivity() {
         TactKitNavHost(uiState = uiState, viewModel = homeViewModel)
       }
     }
+  }
+
+  override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    val handler = HardwareVolumeKeyDispatcher.onVolumeKey
+    if (handler != null) {
+      when (keyCode) {
+        KeyEvent.KEYCODE_VOLUME_UP -> {
+          handler(1)
+          return true
+        }
+        KeyEvent.KEYCODE_VOLUME_DOWN -> {
+          handler(-1)
+          return true
+        }
+      }
+    }
+    return super.onKeyDown(keyCode, event)
   }
 }

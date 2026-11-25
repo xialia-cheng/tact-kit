@@ -15,7 +15,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.xialia.tactkit.ui.ai.AiHubScreen
 import com.xialia.tactkit.ui.archive.ArchiveWorkshopScreen
+import com.xialia.tactkit.ui.daily.DailyToolsScreen
+import com.xialia.tactkit.ui.daily.QrStudioScreen
 import com.xialia.tactkit.ui.data.DataWorkshopScreen
+import com.xialia.tactkit.ui.dev.CryptoVaultScreen
+import com.xialia.tactkit.ui.dev.DevToolsScreen
+import com.xialia.tactkit.ui.dev.ElectronicsScreen
+import com.xialia.tactkit.ui.dev.HashWorkshopScreen
+import com.xialia.tactkit.ui.dev.LanShareScreen
 import com.xialia.tactkit.ui.home.HomeScreen
 import com.xialia.tactkit.ui.home.HomeUiState
 import com.xialia.tactkit.ui.home.HomeViewModel
@@ -24,6 +31,8 @@ import com.xialia.tactkit.ui.media.MediaWorkshopScreen
 import com.xialia.tactkit.ui.office.DocxEditorScreen
 import com.xialia.tactkit.ui.pdf.PdfAnnotateScreen
 import com.xialia.tactkit.ui.pdf.PdfToolkitScreen
+import com.xialia.tactkit.ui.sensor.CompassLevelScreen
+import com.xialia.tactkit.ui.sensor.MetalDetectorScreen
 import com.xialia.tactkit.ui.settings.SettingsScreen
 import kotlinx.serialization.Serializable
 
@@ -46,6 +55,24 @@ import kotlinx.serialization.Serializable
 @Serializable data object DataWorkshopRoute
 
 @Serializable data class ArchiveWorkshopRoute(val initialUri: String? = null)
+
+@Serializable data object HashWorkshopRoute
+
+@Serializable data object CryptoVaultRoute
+
+@Serializable data object DevToolsRoute
+
+@Serializable data object ElectronicsRoute
+
+@Serializable data object LanShareRoute
+
+@Serializable data object CompassLevelRoute
+
+@Serializable data object MetalDetectorRoute
+
+@Serializable data class DailyToolsRoute(val initialTab: String? = null)
+
+@Serializable data object QrStudioRoute
 
 @Composable
 fun TactKitNavHost(
@@ -104,6 +131,15 @@ fun TactKitNavHost(
         onOpenDocxEditor = { uri -> navController.navigate(DocxEditorRoute(initialUri = uri)) },
         onOpenDataWorkshop = { navController.navigate(DataWorkshopRoute) },
         onOpenArchiveWorkshop = { uri -> navController.navigate(ArchiveWorkshopRoute(initialUri = uri)) },
+        onOpenHashWorkshop = { navController.navigate(HashWorkshopRoute) },
+        onOpenCryptoVault = { navController.navigate(CryptoVaultRoute) },
+        onOpenDevTools = { navController.navigate(DevToolsRoute) },
+        onOpenElectronics = { navController.navigate(ElectronicsRoute) },
+        onOpenLanShare = { navController.navigate(LanShareRoute) },
+        onOpenCompassLevel = { navController.navigate(CompassLevelRoute) },
+        onOpenMetalDetector = { navController.navigate(MetalDetectorRoute) },
+        onOpenDailyTools = { tab -> navController.navigate(DailyToolsRoute(initialTab = tab)) },
+        onOpenQrStudio = { navController.navigate(QrStudioRoute) },
       )
     }
 
@@ -193,6 +229,51 @@ fun TactKitNavHost(
         initialUriString = route.initialUri,
         onNavigateBack = { navController.popBackStack() },
       )
+    }
+
+    composable<HashWorkshopRoute> {
+      HashWorkshopScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<CryptoVaultRoute> {
+      CryptoVaultScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<DevToolsRoute> {
+      DevToolsScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<ElectronicsRoute> {
+      ElectronicsScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<LanShareRoute> {
+      LanShareScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<CompassLevelRoute> {
+      CompassLevelScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<MetalDetectorRoute> {
+      MetalDetectorScreen(onNavigateBack = { navController.popBackStack() })
+    }
+
+    composable<DailyToolsRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<DailyToolsRoute>()
+      DailyToolsScreen(
+        initialTabName = route.initialTab,
+        preferences = uiState.preferences,
+        onStepCounter = viewModel::stepCounter,
+        onResetCounter = viewModel::resetCounter,
+        onSetCounterStep = viewModel::setCounterStep,
+        onSetCounterLabel = viewModel::setCounterLabel,
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<QrStudioRoute> {
+      QrStudioScreen(onNavigateBack = { navController.popBackStack() })
     }
   }
 }

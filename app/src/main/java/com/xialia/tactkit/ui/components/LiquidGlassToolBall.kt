@@ -37,20 +37,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Widgets
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -95,7 +92,6 @@ fun LiquidGlassToolBallOverlay(
   val haptics = rememberAppHaptics()
   var isExpanded by remember { mutableStateOf(false) }
   var searchQuery by remember { mutableStateOf("") }
-  var upcomingToolDialog by remember { mutableStateOf<ToolItem?>(null) }
 
   val useLiquidShader = !isPowerSaveMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
@@ -288,12 +284,8 @@ fun LiquidGlassToolBallOverlay(
                 tool = tool,
                 onClick = {
                   haptics.tick()
-                  if (tool.isAvailable) {
-                    isExpanded = false
-                    onLaunchTool(tool)
-                  } else {
-                    upcomingToolDialog = tool
-                  }
+                  isExpanded = false
+                  onLaunchTool(tool)
                 },
               )
             }
@@ -331,12 +323,8 @@ fun LiquidGlassToolBallOverlay(
                   },
                   onToolClick = { tool ->
                     haptics.tick()
-                    if (tool.isAvailable) {
-                      isExpanded = false
-                      onLaunchTool(tool)
-                    } else {
-                      upcomingToolDialog = tool
-                    }
+                    isExpanded = false
+                    onLaunchTool(tool)
                   },
                   onTogglePin = { toolId ->
                     haptics.confirm()
@@ -370,10 +358,18 @@ fun LiquidGlassToolBallOverlay(
           Color.White.copy(alpha = 0.72f)
         }
 
+      val orbInteraction = remember { MutableInteractionSource() }
       Box(
         contentAlignment = Alignment.Center,
         modifier =
           Modifier.size(56.dp)
+            .tactilePress(
+              interactionSource = orbInteraction,
+              pressedScale = 0.90f,
+              baseCorner = 16.dp,
+              pressedCorner = 24.dp,
+              enableHapticOnPress = false,
+            )
             .glassSurfaceModifier(
               useLiquidShader = useLiquidShader,
               backdrop = backdrop,
@@ -382,7 +378,10 @@ fun LiquidGlassToolBallOverlay(
               fallbackTint = fallbackBallTint,
               borderColor = highlightBorder,
             )
-            .clickable {
+            .clickable(
+              interactionSource = orbInteraction,
+              indication = null,
+            ) {
               haptics.tick()
               isExpanded = true
             }
@@ -397,50 +396,6 @@ fun LiquidGlassToolBallOverlay(
       }
     }
   }
-
-  upcomingToolDialog?.let { tool ->
-    AlertDialog(
-      onDismissRequest = { upcomingToolDialog = null },
-      icon = {
-        Icon(
-          imageVector = Icons.Rounded.AutoAwesome,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-        )
-      },
-      title = { Text("${tool.name} · 即将上线") },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text(
-            text = tool.subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-          )
-          Surface(
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-            shape = RoundedCornerShape(14.dp),
-          ) {
-            Text(
-              text = tool.roadmapNote.ifEmpty { "离线引擎建设中，保持零数据收集与本地执行。" },
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSecondaryContainer,
-              modifier = Modifier.padding(12.dp),
-            )
-          }
-        }
-      },
-      confirmButton = {
-        TextButton(
-          onClick = {
-            haptics.tick()
-            upcomingToolDialog = null
-          },
-          modifier = Modifier.testTag("upcoming_dialog_ok"),
-        ) {
-          Text("知道了")
-        }
-      },
-    )
-  }
 }
 
 @Composable
@@ -448,16 +403,20 @@ private fun PinnedToolSlotChip(
   tool: ToolItem,
   onClick: () -> Unit,
 ) {
+  val chipInteraction = remember { MutableInteractionSource() }
   Surface(
     onClick = onClick,
+    interactionSource = chipInteraction,
     shape = ContinuousCapsule(),
-    color =
-      if (tool.isAvailable) {
-        MaterialTheme.colorScheme.primaryContainer
-      } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
-      },
-    modifier = Modifier.testTag("pinned_tool_${tool.id}"),
+    color = MaterialTheme.colorScheme.primaryContainer,
+    modifier =
+      Modifier.tactilePress(
+          interactionSource = chipInteraction,
+          baseCorner = 24.dp,
+          pressedCorner = 28.dp,
+          enableHapticOnPress = false,
+        )
+        .testTag("pinned_tool_${tool.id}"),
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
@@ -467,12 +426,7 @@ private fun PinnedToolSlotChip(
       Icon(
         imageVector = tool.icon,
         contentDescription = null,
-        tint =
-          if (tool.isAvailable) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-          } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-          },
+        tint = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier = Modifier.size(16.dp),
       )
       Text(
@@ -480,6 +434,7 @@ private fun PinnedToolSlotChip(
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
+        softWrap = false,
         overflow = TextOverflow.Ellipsis,
       )
     }
@@ -540,67 +495,35 @@ private fun CategoryToolCard(
         ) {
           tools.forEach { tool ->
             val isPinned = tool.id in pinnedIds
-            Surface(
+            TactileCard(
               onClick = { onToolClick(tool) },
-              shape = RoundedCornerShape(16.dp),
-              color = MaterialTheme.colorScheme.surfaceContainerLow,
+              containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+              baseCorner = 16.dp,
+              pressedCorner = 24.dp,
+              pressedScale = 0.96f,
               modifier = Modifier.fillMaxWidth().testTag("tool_item_${tool.id}"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(12.dp),
               ) {
-                Surface(
-                  shape = RoundedCornerShape(14.dp),
-                  color =
-                    if (tool.isAvailable) {
-                      MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                      MaterialTheme.colorScheme.surfaceContainerHigh
-                    },
-                  modifier = Modifier.size(44.dp),
-                ) {
-                  Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                      imageVector = tool.icon,
-                      contentDescription = null,
-                      tint =
-                        if (tool.isAvailable) {
-                          MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                          MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                      modifier = Modifier.size(22.dp),
-                    )
-                  }
-                }
+                PetalIconBadge(
+                  icon = tool.icon,
+                  size = 44.dp,
+                  iconSize = 21.dp,
+                  petals = 8,
+                  containerColor = MaterialTheme.colorScheme.primaryContainer,
+                  contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                  Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                  ) {
-                    Text(
-                      text = tool.name,
-                      style = MaterialTheme.typography.titleSmall,
-                      fontWeight = FontWeight.SemiBold,
-                      maxLines = 1,
-                      overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!tool.isAvailable) {
-                      Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = ContinuousCapsule(),
-                      ) {
-                        Text(
-                          text = "即将上线",
-                          style = MaterialTheme.typography.labelSmall,
-                          color = MaterialTheme.colorScheme.onTertiaryContainer,
-                          modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                      }
-                    }
-                  }
+                  Text(
+                    text = tool.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                  )
                   Spacer(modifier = Modifier.height(2.dp))
                   Text(
                     text = tool.subtitle,

@@ -81,3 +81,14 @@
 -keep class org.yaml.snakeyaml.** { *; }
 -dontwarn org.yaml.snakeyaml.**
 -dontwarn java.beans.**
+
+# Phase 4: ZXing, CameraX & Graphics Shapes
+-keep class com.google.zxing.** { *; }
+-dontwarn com.google.zxing.**
+-keep class androidx.camera.** { *; }
+-dontwarn androidx.camera.**
+-keep class androidx.graphics.shapes.** { *; }
+-dontwarn androidx.graphics.shapes.**
+-dontwarn java.nio.file.**
+-dontwarn javax.naming.**
+

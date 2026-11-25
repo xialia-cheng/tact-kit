@@ -158,6 +158,24 @@ object FileInspectionHelper {
     return String(output.toByteArray(), Charsets.UTF_8) to truncated
   }
 
+  fun queryNameAndSize(context: Context, uri: Uri): Pair<String, Long> {
+    var fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "未命名文件"
+    var fileSize = 0L
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+      val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+      val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+      if (cursor.moveToFirst()) {
+        if (nameIndex >= 0) {
+          cursor.getString(nameIndex)?.takeIf { it.isNotBlank() }?.let { fileName = it }
+        }
+        if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+          fileSize = cursor.getLong(sizeIndex).coerceAtLeast(0L)
+        }
+      }
+    }
+    return fileName to fileSize
+  }
+
   suspend fun inspectUri(
     contentResolver: ContentResolver,
     uri: Uri,

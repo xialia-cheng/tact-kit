@@ -1,6 +1,7 @@
 package com.xialia.tactkit.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -133,20 +134,14 @@ fun WorkbenchCardView(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Surface(
-          shape = RoundedCornerShape(14.dp),
-          color = containerColor,
-          modifier = Modifier.size(44.dp),
-        ) {
-          Box(contentAlignment = Alignment.Center) {
-            Icon(
-              imageVector = icon,
-              contentDescription = null,
-              tint = contentColor,
-              modifier = Modifier.size(22.dp),
-            )
-          }
-        }
+        PetalIconBadge(
+          icon = icon,
+          size = 44.dp,
+          iconSize = 21.dp,
+          petals = 8,
+          containerColor = containerColor,
+          contentColor = contentColor,
+        )
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -227,14 +222,19 @@ fun WorkbenchCardView(
         }
 
         is WorkbenchCard.Note -> {
+          val noteInteraction = remember { MutableInteractionSource() }
           Surface(
             onClick = {
               haptics.tick()
               onEditNote(card)
             },
+            interactionSource = noteInteraction,
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),
-            modifier = Modifier.fillMaxWidth().testTag("note_preview_${card.id}"),
+            modifier =
+              Modifier.fillMaxWidth()
+                .tactilePress(noteInteraction, baseCorner = 16.dp, pressedCorner = 24.dp, enableHapticOnPress = false)
+                .testTag("note_preview_${card.id}"),
           ) {
             if (card.markdownContent.isBlank()) {
               Text(

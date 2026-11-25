@@ -14,7 +14,7 @@ android {
     minSdk = 26
     targetSdk = 35
     versionCode = project.findProperty("appVersionCode")?.toString()?.toIntOrNull() ?: 1
-    versionName = project.findProperty("appVersionName")?.toString() ?: "0.3.0"
+    versionName = project.findProperty("appVersionName")?.toString() ?: "0.4.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -124,6 +124,12 @@ dependencies {
   implementation(libs.commons.compress)
   implementation(libs.tukaani.xz)
   implementation(libs.snakeyaml)
+  implementation(libs.zxing.core)
+  implementation(libs.androidx.graphics.shapes)
+  implementation(libs.androidx.camera.core)
+  implementation(libs.androidx.camera.camera2)
+  implementation(libs.androidx.camera.lifecycle)
+  implementation(libs.androidx.camera.view)
 
   "ksp"(libs.androidx.room.compiler)
 

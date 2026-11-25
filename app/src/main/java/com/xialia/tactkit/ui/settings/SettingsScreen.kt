@@ -437,18 +437,18 @@ fun SettingsScreen(
               text = "主题模式",
               style = MaterialTheme.typography.titleSmall,
             )
-            Row(
+            LazyRow(
               horizontalArrangement = Arrangement.spacedBy(8.dp),
               modifier = Modifier.fillMaxWidth(),
             ) {
-              ThemeMode.entries.forEach { mode ->
+              items(ThemeMode.entries, key = { it.name }) { mode ->
                 FilterChip(
                   selected = preferences.themeMode == mode,
                   onClick = {
                     haptics.tick()
                     onThemeModeChange(mode)
                   },
-                  label = { Text(mode.label) },
+                  label = { Text(mode.label, maxLines = 1, softWrap = false) },
                   modifier = Modifier.testTag("theme_mode_${mode.name}"),
                 )
               }
@@ -501,9 +501,9 @@ fun SettingsScreen(
                 Text(
                   text =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                      "开启后关闭实时 AGSL 着色器折射渲染，改用 Material 3 半透明高对比卡片"
+                      "开启后关闭实时液态玻璃折射效果，改用 Material 3 半透明高对比卡片"
                     } else {
-                      "当前系统低于 Android 13 (API 33)，已自动使用 Material 3 半透明兼容降级方案"
+                      "当前系统版本已自动切换至 Material 3 半透明高对比渲染方案"
                     },
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,

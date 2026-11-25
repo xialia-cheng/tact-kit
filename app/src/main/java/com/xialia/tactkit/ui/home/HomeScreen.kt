@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,17 +37,22 @@ import androidx.compose.material.icons.rounded.AddTask
 import androidx.compose.material.icons.rounded.Archive
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Calculate
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.TableChart
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,8 +97,11 @@ import com.xialia.tactkit.domain.ToolItem
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.components.LiquidGlassToolBallOverlay
+import com.xialia.tactkit.ui.components.PetalIconBadge
+import com.xialia.tactkit.ui.components.TactileCard
 import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
+import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -135,6 +144,15 @@ fun HomeScreen(
   onOpenDocxEditor: (String?) -> Unit,
   onOpenDataWorkshop: () -> Unit,
   onOpenArchiveWorkshop: (String?) -> Unit,
+  onOpenHashWorkshop: () -> Unit,
+  onOpenCryptoVault: () -> Unit,
+  onOpenDevTools: () -> Unit,
+  onOpenElectronics: () -> Unit,
+  onOpenLanShare: () -> Unit,
+  onOpenCompassLevel: () -> Unit,
+  onOpenMetalDetector: () -> Unit,
+  onOpenDailyTools: (String?) -> Unit,
+  onOpenQrStudio: () -> Unit,
 ) {
   val context = LocalContext.current
   val haptics = rememberAppHaptics()
@@ -351,6 +369,26 @@ fun HomeScreen(
                   haptics.tick()
                   onOpenImageToolkit(null)
                 },
+                QuickStripEntry("strip_qr", "二维码", Icons.Rounded.QrCode2) {
+                  haptics.tick()
+                  onOpenQrStudio()
+                },
+                QuickStripEntry("strip_lan", "局域网快传", Icons.Rounded.WifiTethering) {
+                  haptics.tick()
+                  onOpenLanShare()
+                },
+                QuickStripEntry("strip_hash", "哈希校验", Icons.Rounded.Fingerprint) {
+                  haptics.tick()
+                  onOpenHashWorkshop()
+                },
+                QuickStripEntry("strip_daily", "日常工具", Icons.Rounded.Calculate) {
+                  haptics.tick()
+                  onOpenDailyTools(null)
+                },
+                QuickStripEntry("strip_compass", "指南针", Icons.Rounded.Explore) {
+                  haptics.tick()
+                  onOpenCompassLevel()
+                },
                 QuickStripEntry("strip_docx", "Docx 文档", Icons.Rounded.Description) {
                   haptics.tick()
                   onOpenDocxEditor(null)
@@ -534,6 +572,15 @@ fun HomeScreen(
           "image_privacy" -> onOpenImageToolkit(null)
           "media_extractor" -> onOpenMediaWorkshop(null)
           "archive_box" -> onOpenArchiveWorkshop(null)
+          "level_compass" -> onOpenCompassLevel()
+          "metal_detector" -> onOpenMetalDetector()
+          "unit_calculator" -> onOpenDailyTools(null)
+          "qr_studio" -> onOpenQrStudio()
+          "hash_workshop" -> onOpenHashWorkshop()
+          "crypto_vault" -> onOpenCryptoVault()
+          "codec_hash" -> onOpenDevTools()
+          "electronics_calc" -> onOpenElectronics()
+          "lan_share" -> onOpenLanShare()
         }
       },
       onTogglePinTool = onTogglePinTool,
@@ -593,13 +640,22 @@ private fun QuickActionStrip(entries: List<QuickStripEntry>) {
     modifier = Modifier.fillMaxWidth().testTag("quick_action_strip"),
   ) {
     items(entries, key = { it.id }) { entry ->
+      val interaction = remember { MutableInteractionSource() }
       Surface(
         onClick = entry.onClick,
+        interactionSource = interaction,
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
-        modifier = Modifier.testTag(entry.id),
+        modifier =
+          Modifier.tactilePress(
+              interactionSource = interaction,
+              baseCorner = 18.dp,
+              pressedCorner = 24.dp,
+              enableHapticOnPress = false,
+            )
+            .testTag(entry.id),
       ) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
@@ -617,6 +673,8 @@ private fun QuickActionStrip(entries: List<QuickStripEntry>) {
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
           )
         }
       }
@@ -713,8 +771,10 @@ private fun WorkbenchOverviewSection(
     ) {
       CardFilter.entries.forEach { filter ->
         val selected = uiState.activeFilter == filter
+        val filterInteraction = remember { MutableInteractionSource() }
         Surface(
           onClick = { onFilterChange(filter) },
+          interactionSource = filterInteraction,
           shape = RoundedCornerShape(14.dp),
           color =
             if (selected) {
@@ -722,7 +782,15 @@ private fun WorkbenchOverviewSection(
             } else {
               MaterialTheme.colorScheme.surfaceContainerLow
             },
-          modifier = Modifier.weight(1f).testTag("filter_chip_${filter.name}"),
+          modifier =
+            Modifier.weight(1f)
+              .tactilePress(
+                interactionSource = filterInteraction,
+                baseCorner = 14.dp,
+                pressedCorner = 22.dp,
+                enableHapticOnPress = false,
+              )
+              .testTag("filter_chip_${filter.name}"),
         ) {
           Text(
             text = filter.label,
@@ -736,6 +804,7 @@ private fun WorkbenchOverviewSection(
               },
             textAlign = TextAlign.Center,
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(vertical = 10.dp),
           )
@@ -886,32 +955,26 @@ private fun ImageToolboxActionCard(
   onClick: () -> Unit,
   testTag: String,
 ) {
-  Surface(
+  TactileCard(
     onClick = onClick,
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerLow,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    baseCorner = 22.dp,
+    pressedCorner = 26.dp,
+    pressedScale = 0.95f,
     modifier = Modifier.fillMaxWidth().testTag(testTag),
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier.padding(14.dp),
     ) {
-      Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = containerColor,
-        modifier = Modifier.size(44.dp),
-      ) {
-        Box(contentAlignment = Alignment.Center) {
-          Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(22.dp),
-          )
-        }
-      }
+      PetalIconBadge(
+        icon = icon,
+        size = 44.dp,
+        iconSize = 21.dp,
+        petals = 8,
+        containerColor = containerColor,
+        contentColor = contentColor,
+      )
       Spacer(modifier = Modifier.width(14.dp))
       Column(modifier = Modifier.weight(1f)) {
         Text(

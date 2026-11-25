@@ -211,7 +211,7 @@ fun PdfAnnotateScreen(
               leadingIcon = {
                 Icon(Icons.Rounded.Pinch, contentDescription = null, modifier = Modifier.size(16.dp))
               },
-              label = { Text(if (isZoomMode) "缩放中" else "缩放预览") },
+              label = { Text(if (isZoomMode) "缩放中" else "缩放预览", maxLines = 1, softWrap = false) },
               modifier = Modifier.padding(end = 8.dp).testTag("pdf_annotate_zoom_toggle"),
             )
           },

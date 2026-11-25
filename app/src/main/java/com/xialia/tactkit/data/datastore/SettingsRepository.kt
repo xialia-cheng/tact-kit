@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.xialia.tactkit.security.AndroidKeyStoreCipher
@@ -32,6 +34,9 @@ data class UserPreferences(
   val aiBaseUrl: String = DEFAULT_AI_BASE_URL,
   val aiModel: String = DEFAULT_AI_MODEL,
   val hasAiApiKey: Boolean = false,
+  val counterValue: Long = 0L,
+  val counterStep: Int = 1,
+  val counterLabel: String = "日常计数",
 ) {
   companion object {
     const val DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
@@ -53,6 +58,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val AI_BASE_URL = stringPreferencesKey("ai_base_url")
     val AI_MODEL = stringPreferencesKey("ai_model")
     val AI_API_KEY_ENC = stringPreferencesKey("ai_api_key_encrypted")
+    val COUNTER_VALUE = longPreferencesKey("counter_value")
+    val COUNTER_STEP = intPreferencesKey("counter_step")
+    val COUNTER_LABEL = stringPreferencesKey("counter_label")
   }
 
   val preferencesFlow: Flow<UserPreferences> =
@@ -96,6 +104,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
             prefs[Keys.AI_MODEL]?.takeIf { it.isNotBlank() }
               ?: UserPreferences.DEFAULT_AI_MODEL,
           hasAiApiKey = !prefs[Keys.AI_API_KEY_ENC].isNullOrBlank(),
+          counterValue = prefs[Keys.COUNTER_VALUE] ?: 0L,
+          counterStep = (prefs[Keys.COUNTER_STEP] ?: 1).coerceIn(1, 1000),
+          counterLabel = prefs[Keys.COUNTER_LABEL]?.takeIf { it.isNotBlank() } ?: "日常计数",
         )
       }
 
@@ -157,5 +168,26 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val encrypted = dataStore.data.first()[Keys.AI_API_KEY_ENC].orEmpty()
     if (encrypted.isBlank()) return ""
     return AndroidKeyStoreCipher.decrypt(encrypted)
+  }
+
+  suspend fun stepCounter(direction: Int) {
+    dataStore.edit { prefs ->
+      val step = (prefs[Keys.COUNTER_STEP] ?: 1).coerceIn(1, 1000)
+      val current = prefs[Keys.COUNTER_VALUE] ?: 0L
+      prefs[Keys.COUNTER_VALUE] = current + direction * step
+    }
+  }
+
+  suspend fun setCounterValue(value: Long) {
+    dataStore.edit { it[Keys.COUNTER_VALUE] = value }
+  }
+
+  suspend fun setCounterStep(step: Int) {
+    dataStore.edit { it[Keys.COUNTER_STEP] = step.coerceIn(1, 1000) }
+  }
+
+  suspend fun setCounterLabel(label: String) {
+    val clean = label.trim().ifEmpty { "日常计数" }
+    dataStore.edit { it[Keys.COUNTER_LABEL] = clean }
   }
 }
