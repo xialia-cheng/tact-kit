@@ -168,6 +168,7 @@ fun HomeScreen(
   onOpenDnsSsl: () -> Unit,
   onOpenWifiChannel: () -> Unit,
   onOpenLedClock: () -> Unit,
+  onOpenFileManager: () -> Unit,
   pendingHomeDialog: String? = null,
   onConsumedHomeDialog: () -> Unit = {},
 ) {
@@ -395,6 +396,10 @@ fun HomeScreen(
           val quickStripEntries =
             remember {
               listOf(
+                QuickStripEntry("strip_files", "文件管理", Icons.Rounded.FolderOpen) {
+                  haptics.tick()
+                  onOpenFileManager()
+                },
                 QuickStripEntry("strip_scan", "文档扫描", Icons.Rounded.DocumentScanner) {
                   haptics.tick()
                   onOpenDocScanner()
@@ -491,6 +496,10 @@ fun HomeScreen(
                       onFilterChange(it)
                     },
                     onOpenRecentFile = openRecentFile,
+                    onOpenFileManager = {
+                      haptics.tick()
+                      onOpenFileManager()
+                    },
                   )
                 }
 
@@ -554,6 +563,10 @@ fun HomeScreen(
                       onFilterChange(it)
                     },
                     onOpenRecentFile = openRecentFile,
+                    onOpenFileManager = {
+                      haptics.tick()
+                      onOpenFileManager()
+                    },
                   )
                 }
 
@@ -626,6 +639,7 @@ fun HomeScreen(
           "image_long" -> onOpenImageLongPdf()
           "media_extractor" -> onOpenMediaWorkshop(null)
           "led_clock" -> onOpenLedClock()
+          "file_manager" -> onOpenFileManager()
           "archive_box" -> onOpenArchiveWorkshop(null)
           "lan_share" -> onOpenLanShare()
           "net_diag" -> onOpenNetDiagnostics()
@@ -750,6 +764,7 @@ private fun WorkbenchOverviewSection(
   uiState: HomeUiState,
   onFilterChange: (CardFilter) -> Unit,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
+  onOpenFileManager: () -> Unit,
 ) {
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     // Borderless tonal overview card (no inner boxes around stat numbers)
@@ -831,6 +846,7 @@ private fun WorkbenchOverviewSection(
     DocumentDashboardCard(
       stats = uiState.dashboardStats,
       onOpenRecentFile = onOpenRecentFile,
+      onOpenFileManager = onOpenFileManager,
     )
 
     // Aligned borderless tonal filter tabs
@@ -1179,6 +1195,7 @@ private fun NoteEditorDialog(
 private fun DocumentDashboardCard(
   stats: DocumentDashboardStats,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
+  onOpenFileManager: () -> Unit,
 ) {
   Surface(
     shape = RoundedCornerShape(22.dp),
@@ -1196,7 +1213,7 @@ private fun DocumentDashboardCard(
         horizontalArrangement = Arrangement.SpaceBetween,
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
           Text(
             text = "文档统计仪表盘",
             style = MaterialTheme.typography.titleMedium,
@@ -1209,17 +1226,47 @@ private fun DocumentDashboardCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
-        Surface(
-          shape = ContinuousCapsule(),
-          color = MaterialTheme.colorScheme.primaryContainer,
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          Text(
-            text = "本周新增 +${stats.thisWeekAddedCount}",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-          )
+          Surface(
+            onClick = onOpenFileManager,
+            shape = ContinuousCapsule(),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.testTag("dashboard_open_file_manager"),
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(13.dp),
+              )
+              Text(
+                text = "文件管理",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+              )
+            }
+          }
+          Surface(
+            shape = ContinuousCapsule(),
+            color = MaterialTheme.colorScheme.primaryContainer,
+          ) {
+            Text(
+              text = "本周新增 +${stats.thisWeekAddedCount}",
+              style = MaterialTheme.typography.labelSmall,
+              fontWeight = FontWeight.SemiBold,
+              color = MaterialTheme.colorScheme.onPrimaryContainer,
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            )
+          }
         }
       }
 

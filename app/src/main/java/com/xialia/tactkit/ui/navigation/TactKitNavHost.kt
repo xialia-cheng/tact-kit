@@ -28,6 +28,8 @@ import com.xialia.tactkit.ui.dev.DevToolsScreen
 import com.xialia.tactkit.ui.dev.ElectronicsScreen
 import com.xialia.tactkit.ui.dev.HashWorkshopScreen
 import com.xialia.tactkit.ui.dev.LanShareScreen
+import com.xialia.tactkit.ui.files.FileManagerScreen
+import com.xialia.tactkit.ui.files.TactKitToolLaunch
 import com.xialia.tactkit.ui.home.HomeScreen
 import com.xialia.tactkit.ui.home.HomeUiState
 import com.xialia.tactkit.ui.home.HomeViewModel
@@ -62,23 +64,29 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class MediaWorkshopRoute(val initialUri: String? = null)
 
-@Serializable data class AiHubRoute(val initialMode: String = "VISION", val initialImageUri: String? = null)
+@Serializable data class AiHubRoute(
+  val initialMode: String = "VISION",
+  val initialImageUri: String? = null,
+  val initialTextUri: String? = null,
+)
 
 @Serializable data class DocxEditorRoute(val initialUri: String? = null)
 
-@Serializable data object DataWorkshopRoute
+@Serializable data class DataWorkshopRoute(val initialUri: String? = null)
 
 @Serializable data class ArchiveWorkshopRoute(val initialUri: String? = null)
 
-@Serializable data object HashWorkshopRoute
+@Serializable data class HashWorkshopRoute(val initialUri: String? = null)
 
-@Serializable data object CryptoVaultRoute
+@Serializable data class CryptoVaultRoute(val initialUri: String? = null)
 
 @Serializable data object DevToolsRoute
 
 @Serializable data object ElectronicsRoute
 
-@Serializable data object LanShareRoute
+@Serializable data class LanShareRoute(val initialUri: String? = null)
+
+@Serializable data object FileManagerRoute
 
 @Serializable data object CompassLevelRoute
 
@@ -128,7 +136,8 @@ fun TactKitNavHost(
       "qr_studio" -> navController.navigate(QrStudioRoute)
       "image_privacy" -> navController.navigate(ImageToolkitRoute())
       "image_long" -> navController.navigate(ImageToolkitRoute(initialTab = "STITCH_PDF"))
-      "lan_share" -> navController.navigate(LanShareRoute)
+      "lan_share" -> navController.navigate(LanShareRoute())
+      "file_manager" -> navController.navigate(FileManagerRoute)
       "net_diag" -> navController.navigate(NetDiagnosticsRoute)
       "dns_ssl" -> navController.navigate(DnsSslRoute)
       "wifi_channel" -> navController.navigate(WifiChannelRoute)
@@ -193,13 +202,13 @@ fun TactKitNavHost(
         onOpenMediaWorkshop = { uri -> navController.navigate(MediaWorkshopRoute(initialUri = uri)) },
         onOpenAiHub = { mode -> navController.navigate(AiHubRoute(initialMode = mode)) },
         onOpenDocxEditor = { uri -> navController.navigate(DocxEditorRoute(initialUri = uri)) },
-        onOpenDataWorkshop = { navController.navigate(DataWorkshopRoute) },
+        onOpenDataWorkshop = { navController.navigate(DataWorkshopRoute()) },
         onOpenArchiveWorkshop = { uri -> navController.navigate(ArchiveWorkshopRoute(initialUri = uri)) },
-        onOpenHashWorkshop = { navController.navigate(HashWorkshopRoute) },
-        onOpenCryptoVault = { navController.navigate(CryptoVaultRoute) },
+        onOpenHashWorkshop = { navController.navigate(HashWorkshopRoute()) },
+        onOpenCryptoVault = { navController.navigate(CryptoVaultRoute()) },
         onOpenDevTools = { navController.navigate(DevToolsRoute) },
         onOpenElectronics = { navController.navigate(ElectronicsRoute) },
-        onOpenLanShare = { navController.navigate(LanShareRoute) },
+        onOpenLanShare = { navController.navigate(LanShareRoute()) },
         onOpenCompassLevel = { navController.navigate(CompassLevelRoute) },
         onOpenMetalDetector = { navController.navigate(MetalDetectorRoute) },
         onOpenDailyTools = { tab -> navController.navigate(DailyToolsRoute(initialTab = tab)) },
@@ -215,6 +224,7 @@ fun TactKitNavHost(
         onOpenDnsSsl = { navController.navigate(DnsSslRoute) },
         onOpenWifiChannel = { navController.navigate(WifiChannelRoute) },
         onOpenLedClock = { navController.navigate(LedClockRoute) },
+        onOpenFileManager = { navController.navigate(FileManagerRoute) },
         pendingHomeDialog = pendingHomeDialog,
         onConsumedHomeDialog = { pendingHomeDialog = null },
       )
@@ -278,6 +288,7 @@ fun TactKitNavHost(
       AiHubScreen(
         initialModeName = route.initialMode,
         initialImageUriString = route.initialImageUri,
+        initialTextUriString = route.initialTextUri,
         preferences = uiState.preferences,
         onSaveNoteCard = viewModel::createNote,
         onSaveChecklistCard = viewModel::createChecklist,
@@ -294,8 +305,10 @@ fun TactKitNavHost(
       )
     }
 
-    composable<DataWorkshopRoute> {
+    composable<DataWorkshopRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<DataWorkshopRoute>()
       DataWorkshopScreen(
+        initialUriString = route.initialUri,
         onNavigateBack = { navController.popBackStack() },
       )
     }
@@ -308,12 +321,20 @@ fun TactKitNavHost(
       )
     }
 
-    composable<HashWorkshopRoute> {
-      HashWorkshopScreen(onNavigateBack = { navController.popBackStack() })
+    composable<HashWorkshopRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<HashWorkshopRoute>()
+      HashWorkshopScreen(
+        initialUriString = route.initialUri,
+        onNavigateBack = { navController.popBackStack() },
+      )
     }
 
-    composable<CryptoVaultRoute> {
-      CryptoVaultScreen(onNavigateBack = { navController.popBackStack() })
+    composable<CryptoVaultRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<CryptoVaultRoute>()
+      CryptoVaultScreen(
+        initialUriString = route.initialUri,
+        onNavigateBack = { navController.popBackStack() },
+      )
     }
 
     composable<DevToolsRoute> {
@@ -324,9 +345,39 @@ fun TactKitNavHost(
       ElectronicsScreen(onNavigateBack = { navController.popBackStack() })
     }
 
-    composable<LanShareRoute> {
+    composable<LanShareRoute> { backStackEntry ->
+      val route = backStackEntry.toRoute<LanShareRoute>()
       LanShareScreen(
+        initialUriString = route.initialUri,
         onSaveNoteCard = viewModel::createNote,
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<FileManagerRoute> {
+      FileManagerScreen(
+        preferences = uiState.preferences,
+        onTogglePinnedDir = viewModel::togglePinnedDir,
+        onAddLinkedSafTreeUri = viewModel::addLinkedSafTreeUri,
+        onLaunchTool = { uriStr, launch ->
+          when (launch) {
+            TactKitToolLaunch.PDF_TOOLKIT -> navController.navigate(PdfToolkitRoute(initialUri = uriStr))
+            TactKitToolLaunch.PDF_ANNOTATE -> navController.navigate(PdfAnnotateRoute(initialUri = uriStr))
+            TactKitToolLaunch.DOCX_EDITOR -> navController.navigate(DocxEditorRoute(initialUri = uriStr))
+            TactKitToolLaunch.DATA_WORKSHOP -> navController.navigate(DataWorkshopRoute(initialUri = uriStr))
+            TactKitToolLaunch.ARCHIVE_WORKSHOP -> navController.navigate(ArchiveWorkshopRoute(initialUri = uriStr))
+            TactKitToolLaunch.IMAGE_TOOLKIT -> navController.navigate(ImageToolkitRoute(initialUri = uriStr))
+            TactKitToolLaunch.MEDIA_WORKSHOP -> navController.navigate(MediaWorkshopRoute(initialUri = uriStr))
+            TactKitToolLaunch.AI_VISION ->
+              navController.navigate(AiHubRoute(initialMode = "VISION", initialImageUri = uriStr))
+            TactKitToolLaunch.AI_TEXT_ORGANIZE ->
+              navController.navigate(AiHubRoute(initialMode = "CHECKLIST", initialTextUri = uriStr))
+            TactKitToolLaunch.HASH_WORKSHOP -> navController.navigate(HashWorkshopRoute(initialUri = uriStr))
+            TactKitToolLaunch.CRYPTO_VAULT -> navController.navigate(CryptoVaultRoute(initialUri = uriStr))
+            TactKitToolLaunch.LAN_SHARE -> navController.navigate(LanShareRoute(initialUri = uriStr))
+            TactKitToolLaunch.QUICK_LOOK -> Unit
+          }
+        },
         onNavigateBack = { navController.popBackStack() },
       )
     }

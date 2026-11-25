@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,7 @@ private const val SAMPLE_JSON = """[
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DataWorkshopScreen(
+  initialUriString: String? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -132,6 +134,31 @@ fun DataWorkshopScreen(
     return DataFormatEngine.serializeCsvTable(
       CsvTableData(headers = csvHeaders.toList(), rows = csvRows.map { it.toList() })
     )
+  }
+
+  LaunchedEffect(initialUriString) {
+    val raw = initialUriString ?: return@LaunchedEffect
+    runCatching {
+      val uri = android.net.Uri.parse(raw)
+      withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use {
+          it.bufferedReader(Charsets.UTF_8).readText()
+        } ?: error("无法读取文件内容")
+      }
+    }.onSuccess { content ->
+      inputText = content
+      val trimmed = content.trimStart()
+      sourceFormat =
+        when {
+          trimmed.startsWith("{") || trimmed.startsWith("[") -> DataFormat.JSON
+          trimmed.startsWith("<") -> DataFormat.XML
+          content.contains(",") && !content.contains(": ") -> DataFormat.CSV
+          else -> DataFormat.YAML
+        }
+      if (sourceFormat == DataFormat.CSV) syncTextToCsvTable()
+    }.onFailure { err ->
+      Toast.makeText(context, "打开失败：${err.message}", Toast.LENGTH_SHORT).show()
+    }
   }
 
   val openFileLauncher =

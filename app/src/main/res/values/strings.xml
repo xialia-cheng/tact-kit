@@ -11,4 +11,6 @@
     <string name="cd_copy">复制内容</string>
     <string name="widget_pinned_checklist_desc">在桌面快速查看并勾选简工坊置顶待办清单</string>
     <string name="widget_quick_shortcuts_desc">一键直达文档扫描、PDF 工具箱、便签与扫码</string>
+    <string name="file_picker_label">简工坊 · 文件选择</string>
+    <string name="documents_provider_title">简工坊 · 全盘文件</string>
 </resources>

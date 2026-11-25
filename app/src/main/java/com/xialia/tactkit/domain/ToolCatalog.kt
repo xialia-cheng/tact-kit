@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.FlashlightOn
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.HideImage
 import androidx.compose.material.icons.rounded.Image
@@ -154,6 +155,13 @@ object ToolCatalog {
       ),
 
       // 3. 文件与网络
+      ToolItem(
+        id = "file_manager",
+        name = "文件管理",
+        subtitle = "全盘分类检索整理",
+        category = ToolCategory.FILE_NETWORK,
+        icon = Icons.Rounded.FolderOpen,
+      ),
       ToolItem(
         id = "archive_box",
         name = "压缩包工坊",

@@ -37,12 +37,16 @@ data class UserPreferences(
   val counterValue: Long = 0L,
   val counterStep: Int = 1,
   val counterLabel: String = "日常计数",
+  val pinnedDirs: List<String> = DEFAULT_PINNED_DIRS,
+  val linkedSafTreeUris: List<String> = emptyList(),
 ) {
   companion object {
     const val DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
     const val DEFAULT_AI_MODEL = "gpt-4o-mini"
     val DEFAULT_PINNED_TOOL_IDS =
       listOf("pdf_toolkit", "image_privacy", "ai_hub", "quick_note")
+    val DEFAULT_PINNED_DIRS =
+      listOf("Download", "Documents", "Pictures", "Download/WeiXin", "Download/QQ")
   }
 }
 
@@ -61,6 +65,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     val COUNTER_VALUE = longPreferencesKey("counter_value")
     val COUNTER_STEP = intPreferencesKey("counter_step")
     val COUNTER_LABEL = stringPreferencesKey("counter_label")
+    val PINNED_DIRS = stringPreferencesKey("fm_pinned_dirs")
+    val LINKED_SAF_TREE_URIS = stringPreferencesKey("fm_linked_saf_tree_uris")
   }
 
   val preferencesFlow: Flow<UserPreferences> =
@@ -92,6 +98,21 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
               .distinct()
           }
 
+        val rawDirs = prefs[Keys.PINNED_DIRS]
+        val pinnedDirs =
+          if (rawDirs == null) {
+            UserPreferences.DEFAULT_PINNED_DIRS
+          } else if (rawDirs.isBlank()) {
+            emptyList()
+          } else {
+            rawDirs.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+          }
+
+        val rawSafUris = prefs[Keys.LINKED_SAF_TREE_URIS]
+        val linkedSafUris =
+          if (rawSafUris.isNullOrBlank()) emptyList()
+          else rawSafUris.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
         UserPreferences(
           themeMode = themeMode,
           dynamicColor = dynamicColor,
@@ -107,6 +128,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
           counterValue = prefs[Keys.COUNTER_VALUE] ?: 0L,
           counterStep = (prefs[Keys.COUNTER_STEP] ?: 1).coerceIn(1, 1000),
           counterLabel = prefs[Keys.COUNTER_LABEL]?.takeIf { it.isNotBlank() } ?: "日常计数",
+          pinnedDirs = pinnedDirs,
+          linkedSafTreeUris = linkedSafUris,
         )
       }
 
@@ -189,5 +212,55 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
   suspend fun setCounterLabel(label: String) {
     val clean = label.trim().ifEmpty { "日常计数" }
     dataStore.edit { it[Keys.COUNTER_LABEL] = clean }
+  }
+
+  suspend fun togglePinnedDir(relativePath: String) {
+    val clean = relativePath.trim().trim('/')
+    if (clean.isEmpty()) return
+    dataStore.edit { prefs ->
+      val currentRaw = prefs[Keys.PINNED_DIRS]
+      val current =
+        if (currentRaw == null) {
+          UserPreferences.DEFAULT_PINNED_DIRS.toMutableList()
+        } else {
+          currentRaw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        }
+      if (clean in current) {
+        current.remove(clean)
+      } else {
+        current.add(clean)
+      }
+      prefs[Keys.PINNED_DIRS] = current.joinToString("\n")
+    }
+  }
+
+  suspend fun addLinkedSafTreeUri(uriString: String) {
+    val clean = uriString.trim()
+    if (clean.isEmpty()) return
+    dataStore.edit { prefs ->
+      val current =
+        prefs[Keys.LINKED_SAF_TREE_URIS]
+          ?.split("\n")
+          ?.map { it.trim() }
+          ?.filter { it.isNotEmpty() }
+          ?.toMutableList() ?: mutableListOf()
+      if (clean !in current) {
+        current.add(clean)
+      }
+      prefs[Keys.LINKED_SAF_TREE_URIS] = current.joinToString("\n")
+    }
+  }
+
+  suspend fun removeLinkedSafTreeUri(uriString: String) {
+    val clean = uriString.trim()
+    dataStore.edit { prefs ->
+      val current =
+        prefs[Keys.LINKED_SAF_TREE_URIS]
+          ?.split("\n")
+          ?.map { it.trim() }
+          ?.filter { it.isNotEmpty() && it != clean }
+          .orEmpty()
+      prefs[Keys.LINKED_SAF_TREE_URIS] = current.joinToString("\n")
+    }
   }
 }

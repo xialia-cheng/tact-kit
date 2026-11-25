@@ -259,6 +259,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     viewModelScope.launch { settingsRepository.togglePinnedTool(toolId) }
   }
 
+  fun togglePinnedDir(relativePath: String) {
+    viewModelScope.launch { settingsRepository.togglePinnedDir(relativePath) }
+  }
+
+  fun addLinkedSafTreeUri(uriString: String) {
+    viewModelScope.launch { settingsRepository.addLinkedSafTreeUri(uriString) }
+  }
+
+  fun removeLinkedSafTreeUri(uriString: String) {
+    viewModelScope.launch { settingsRepository.removeLinkedSafTreeUri(uriString) }
+  }
+
   fun setThemeMode(mode: ThemeMode) {
     viewModelScope.launch { settingsRepository.setThemeMode(mode) }
   }

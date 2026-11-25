@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +79,7 @@ private enum class VaultTab(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CryptoVaultScreen(
+  initialUriString: String? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -99,6 +101,14 @@ fun CryptoVaultScreen(
   var noteInput by remember { mutableStateOf("") }
   var noteOutput by remember { mutableStateOf("") }
   var noteError by remember { mutableStateOf<String?>(null) }
+
+  LaunchedEffect(initialUriString) {
+    val raw = initialUriString ?: return@LaunchedEffect
+    val uri = Uri.parse(raw)
+    selectedUri = uri
+    selectedFileName = FileInspectionHelper.queryNameAndSize(context, uri).first
+    fileStatusMsg = null
+  }
 
   val pickFileLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->

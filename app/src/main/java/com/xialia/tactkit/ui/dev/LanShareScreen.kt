@@ -48,6 +48,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -86,6 +87,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanShareScreen(
+  initialUriString: String? = null,
   onSaveNoteCard: (String, String) -> Unit = { _, _ -> },
   onNavigateBack: () -> Unit,
 ) {
@@ -133,6 +135,29 @@ fun LanShareScreen(
     onDispose {
       server.stop()
       stagedOutDir.deleteRecursively()
+    }
+  }
+
+  LaunchedEffect(initialUriString) {
+    val raw = initialUriString ?: return@LaunchedEffect
+    val uri = android.net.Uri.parse(raw)
+    stagedOutDir.mkdirs()
+    runCatching {
+      withContext(Dispatchers.IO) {
+        val (displayName, _) = FileInspectionHelper.queryNameAndSize(context, uri)
+        val dest = File(stagedOutDir, "${System.currentTimeMillis()}_$displayName")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+          FileOutputStream(dest).use { out -> input.copyTo(out) }
+        }
+        LanSharedOutFile(
+          displayName = displayName,
+          byteSize = dest.length(),
+          stagedFile = dest,
+        )
+      }
+    }.onSuccess { staged ->
+      sharedOutFiles.add(staged)
+      server.sharedOutFiles.add(staged)
     }
   }
 

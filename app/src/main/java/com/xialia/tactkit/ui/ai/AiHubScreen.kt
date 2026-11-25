@@ -82,6 +82,7 @@ enum class AiHubMode(val label: String) {
 fun AiHubScreen(
   initialModeName: String,
   initialImageUriString: String? = null,
+  initialTextUriString: String? = null,
   preferences: UserPreferences,
   onSaveNoteCard: (title: String, markdown: String) -> Unit,
   onSaveChecklistCard: (title: String, items: List<String>) -> Unit,
@@ -95,12 +96,12 @@ fun AiHubScreen(
   val aiRepo = remember { AiHubRepository() }
   val settingsRepo = remember { SettingsRepository(context.applicationContext) }
 
-  var mode by remember(initialModeName, initialImageUriString) {
+  var mode by remember(initialModeName, initialImageUriString, initialTextUriString) {
     mutableStateOf(
-      if (!initialImageUriString.isNullOrBlank()) {
-        AiHubMode.VISION
-      } else {
-        AiHubMode.entries.firstOrNull { it.name == initialModeName } ?: AiHubMode.VISION
+      when {
+        !initialImageUriString.isNullOrBlank() -> AiHubMode.VISION
+        !initialTextUriString.isNullOrBlank() -> AiHubMode.CHECKLIST
+        else -> AiHubMode.entries.firstOrNull { it.name == initialModeName } ?: AiHubMode.VISION
       }
     )
   }
@@ -133,6 +134,27 @@ fun AiHubScreen(
   // Checklist state
   var messyTextInput by remember { mutableStateOf("") }
   var checklistDraft by remember { mutableStateOf<ChecklistDraft?>(null) }
+
+  LaunchedEffect(initialTextUriString) {
+    val raw = initialTextUriString ?: return@LaunchedEffect
+    runCatching {
+      val uri = android.net.Uri.parse(raw)
+      kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+          val buffer = ByteArray(16 * 1024)
+          var totalRead = 0
+          while (totalRead < buffer.size) {
+            val read = stream.read(buffer, totalRead, buffer.size - totalRead)
+            if (read <= 0) break
+            totalRead += read
+          }
+          String(buffer, 0, totalRead, Charsets.UTF_8)
+        }.orEmpty()
+      }
+    }.onSuccess { text ->
+      if (text.isNotBlank()) messyTextInput = text
+    }
+  }
 
   val pickImageLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->

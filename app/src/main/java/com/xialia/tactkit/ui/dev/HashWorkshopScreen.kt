@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,6 +83,7 @@ private enum class HashTab(val label: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HashWorkshopScreen(
+  initialUriString: String? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -106,6 +108,33 @@ fun HashWorkshopScreen(
 
   // Tab 4: Batch Compare
   var batchResults by remember { mutableStateOf<List<FileHashResult>>(emptyList()) }
+
+  LaunchedEffect(initialUriString) {
+    val raw = initialUriString ?: return@LaunchedEffect
+    isBusy = true
+    runCatching {
+      val uri = Uri.parse(raw)
+      val (name, reportedSize) = FileInspectionHelper.queryNameAndSize(context, uri)
+      val hashes =
+        withContext(Dispatchers.IO) {
+          HashAndCryptoEngine.hashAllAlgorithms {
+            context.contentResolver.openInputStream(uri)
+              ?: throw IllegalStateException("无法打开文件")
+          }
+        }
+      val actualSize =
+        if (reportedSize > 0L) reportedSize
+        else context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length.coerceAtLeast(0L) } ?: 0L
+      Triple(name, actualSize, hashes)
+    }.onSuccess { (name, size, hashes) ->
+      pickedFileName = name
+      pickedFileSize = size
+      allFileHashes = hashes
+    }.onFailure { err ->
+      Toast.makeText(context, "计算失败：${err.message}", Toast.LENGTH_SHORT).show()
+    }
+    isBusy = false
+  }
 
   val singleFilePicker =
     rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
