@@ -66,10 +66,22 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk "TactKit-v${{ steps.version.outputs.VERSION }}.apk"
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: "v${{ steps.version.outputs.VERSION }}"
-          name: "简工坊 TactKit v${{ steps.version.outputs.VERSION }}"
-          files: "TactKit-v${{ steps.version.outputs.VERSION }}.apk"
-          generate_release_notes: true
+          name: "TactKit-v${{ steps.version.outputs.VERSION }}"
+          path: "TactKit-v${{ steps.version.outputs.VERSION }}.apk"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.VERSION }}"
+          APK="TactKit-v${{ steps.version.outputs.VERSION }}.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --title "简工坊 TactKit $TAG" \
+              --generate-notes
+          fi
