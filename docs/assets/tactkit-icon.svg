@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#263150"/>
+      <stop offset="100%" stop-color="#364570"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#0F172A" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224" fill="url(#bgGrad)"/>
+
+  <!-- Back Card (Periwinkle Lavender) -->
+  <g transform="translate(476 528) rotate(-13)">
+    <rect x="-200" y="-215" width="400" height="430" rx="64" ry="64" fill="#9BB1FF"/>
+  </g>
+
+  <!-- Front Card (Ice White) -->
+  <g transform="translate(534 510) rotate(5)" filter="url(#cardShadow)">
+    <rect x="-215" y="-205" width="430" height="410" rx="68" ry="68" fill="#F4F6FF"/>
+    <!-- Two Clean Lines -->
+    <rect x="-128" y="-68" width="256" height="40" rx="20" ry="20" fill="#B6C4F0"/>
+    <rect x="-128" y="14" width="182" height="40" rx="20" ry="20" fill="#B6C4F0"/>
+  </g>
+
+  <!-- Top-Right 4-Point Sparkle -->
+  <path d="M 796 168 Q 796 244 872 244 Q 796 244 796 320 Q 796 244 720 244 Q 796 244 796 168 Z" fill="#F4F6FF"/>
+</svg>

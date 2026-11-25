@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="144" height="144" alt="简工坊应用图标">
+  <img src="docs/assets/tactkit-icon.svg" width="144" height="144" alt="简工坊应用图标">
 </p>
 
 <h1 align="center">简工坊 · TactKit</h1>
