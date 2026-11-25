@@ -202,7 +202,12 @@ fun HomeScreen(
   var hasDismissedWelcomeThisSession by remember { mutableStateOf(false) }
   val targetBoundsMap = remember { mutableStateMapOf<OnboardingStep, Rect>() }
 
-  LaunchedEffect(uiState.preferences.hasCompletedOnboarding, hasDismissedWelcomeThisSession) {
+  LaunchedEffect(
+    uiState.isPreferencesLoaded,
+    uiState.preferences.hasCompletedOnboarding,
+    hasDismissedWelcomeThisSession,
+  ) {
+    if (!uiState.isPreferencesLoaded) return@LaunchedEffect
     if (!uiState.preferences.hasCompletedOnboarding && !hasDismissedWelcomeThisSession && activeOnboardingStep == null) {
       showOnboardingWelcome = true
     } else if (uiState.preferences.hasCompletedOnboarding) {

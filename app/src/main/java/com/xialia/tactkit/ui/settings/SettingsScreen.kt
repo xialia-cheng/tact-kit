@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -71,6 +72,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -85,6 +87,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -102,7 +105,9 @@ import com.xialia.tactkit.data.repository.AiHubRepository
 import com.xialia.tactkit.data.repository.AppUpdateRepository
 import com.xialia.tactkit.data.repository.ReleaseInfo
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
 
@@ -205,8 +210,12 @@ fun SettingsScreen(
   var isTestingAi by remember { mutableStateOf(false) }
   var aiTestResult by remember { mutableStateOf<String?>(null) }
 
+  var appearanceExpanded by remember { mutableStateOf(false) }
+  var powerSaveExpanded by remember { mutableStateOf(false) }
+  var aiExpanded by remember { mutableStateOf(false) }
+  var storageExpanded by remember { mutableStateOf(false) }
   var helpExpanded by remember { mutableStateOf(false) }
-  var privacyExpanded by remember { mutableStateOf(true) }
+  var privacyExpanded by remember { mutableStateOf(false) }
   var licenseExpanded by remember { mutableStateOf(false) }
 
   var isCheckingUpdate by remember { mutableStateOf(false) }
@@ -497,10 +506,21 @@ fun SettingsScreen(
             }
           }
 
-          // 2. Appearance Card
-          SettingsSectionCard(
+          // 2. Appearance Card (Expandable, default collapsed)
+          val appearanceSummary =
+            buildString {
+              append(preferences.themeMode.label)
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                append(if (preferences.dynamicColor) " · 动态取色已开启" else " · 动态取色已关闭")
+              }
+            }
+          ExpandableSettingsCard(
             title = "外观与主题",
+            subtitle = appearanceSummary,
             icon = Icons.Rounded.Palette,
+            expanded = appearanceExpanded,
+            onToggle = { appearanceExpanded = !appearanceExpanded },
+            testTag = "settings_appearance_card",
           ) {
             Text(
               text = "主题模式",
@@ -552,10 +572,22 @@ fun SettingsScreen(
             }
           }
 
-          // 3. Liquid Glass Power Save Card
-          SettingsSectionCard(
+          // 3. Liquid Glass Power Save Card (Expandable, default collapsed)
+          val powerSaveSummary =
+            if (preferences.liquidGlassPowerSave) {
+              "省电模式已开启 · M3 半透明卡片"
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+              "实时液态玻璃折射已开启"
+            } else {
+              "已自动启用 M3 半透明高对比渲染"
+            }
+          ExpandableSettingsCard(
             title = "渲染与省电",
+            subtitle = powerSaveSummary,
             icon = Icons.Rounded.BatterySaver,
+            expanded = powerSaveExpanded,
+            onToggle = { powerSaveExpanded = !powerSaveExpanded },
+            testTag = "settings_power_save_card",
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
@@ -589,10 +621,21 @@ fun SettingsScreen(
             }
           }
 
-          // 4. BYOK AI Hub Card
-          SettingsSectionCard(
-            title = "AI 中枢设置 (BYOK)",
+          // 4. AI Hub Card (Expandable, default collapsed)
+          val aiProviderLabel =
+            AI_PROVIDER_PRESETS.firstOrNull {
+              preferences.aiBaseUrl.trim().trimEnd('/').equals(it.baseUrl.trimEnd('/'), ignoreCase = true)
+            }?.label ?: "自定义接口"
+          val aiSummary =
+            if (preferences.hasAiApiKey) "$aiProviderLabel · 已加密保存 Key"
+            else "$aiProviderLabel · 未配置 Key"
+          ExpandableSettingsCard(
+            title = "AI 中枢设置",
+            subtitle = aiSummary,
             icon = Icons.Rounded.AutoAwesome,
+            expanded = aiExpanded,
+            onToggle = { aiExpanded = !aiExpanded },
+            testTag = "settings_ai_card",
           ) {
             Text(
               text = "支持 OpenAI 兼容接口（可点下方预设一键填入）。API Key 仅通过硬件 AndroidKeyStore AES-GCM 加密保存在本地。",
@@ -771,10 +814,17 @@ fun SettingsScreen(
             }
           }
 
-          // 5. All-Files Access & Permissions Diagnostic Card
-          SettingsSectionCard(
+          // 5. All-Files Access & Permissions Diagnostic Card (Expandable, default collapsed)
+          val storageSummary =
+            if (hasAllFilesAccess) "所有文件权限已授权"
+            else "未授权 · 仅使用 SAF 单文件/目录模式"
+          ExpandableSettingsCard(
             title = "所有文件访问权限",
+            subtitle = storageSummary,
             icon = Icons.Rounded.FolderShared,
+            expanded = storageExpanded,
+            onToggle = { storageExpanded = !storageExpanded },
+            testTag = "settings_storage_card",
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
@@ -848,16 +898,13 @@ fun SettingsScreen(
             }
           }
 
-          // 6. Usage Help & Permissions Guide (Expandable)
+          // 6. Usage Help & Permissions Guide (Expandable, default collapsed)
           ExpandableSettingsCard(
             title = "使用帮助与权限指南",
             subtitle = "全盘文件可选授权、SAF 文档选择与按需动态权限",
             icon = Icons.AutoMirrored.Rounded.HelpOutline,
             expanded = helpExpanded,
-            onToggle = {
-              haptics.tick()
-              helpExpanded = !helpExpanded
-            },
+            onToggle = { helpExpanded = !helpExpanded },
             testTag = "settings_help_card",
           ) {
             HelpBullet(
@@ -874,16 +921,19 @@ fun SettingsScreen(
             )
           }
 
-          // 6. Privacy & GitHub Update Check (Expandable)
+          // 7. Update & Privacy (Expandable, default collapsed)
+          val updatePrivacySummary =
+            when {
+              releaseInfo?.isUpdateAvailable == true -> "发现新版本 ${releaseInfo?.tagName} · 零数据收集"
+              preferences.autoCheckUpdates -> "启动自动检查已开启 · 零数据收集"
+              else -> "手动检查更新 · 零数据收集"
+            }
           ExpandableSettingsCard(
-            title = "隐私说明与检查更新",
-            subtitle = "本地优先 · 零数据收集 · GitHub Releases 更新检查",
+            title = "更新与隐私",
+            subtitle = updatePrivacySummary,
             icon = Icons.Rounded.Shield,
             expanded = privacyExpanded,
-            onToggle = {
-              haptics.tick()
-              privacyExpanded = !privacyExpanded
-            },
+            onToggle = { privacyExpanded = !privacyExpanded },
             testTag = "settings_privacy_update_card",
           ) {
             Text(
@@ -1109,44 +1159,6 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsSectionCard(
-  title: String,
-  icon: ImageVector,
-  content: @Composable () -> Unit,
-) {
-  Surface(
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerLow,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
-    modifier = Modifier.fillMaxWidth(),
-  ) {
-    Column(
-      verticalArrangement = Arrangement.spacedBy(10.dp),
-      modifier = Modifier.padding(18.dp),
-    ) {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-          text = title,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.onSurface,
-        )
-      }
-      content()
-    }
-  }
-}
-
-@Composable
 private fun ExpandableSettingsCard(
   title: String,
   subtitle: String,
@@ -1156,19 +1168,35 @@ private fun ExpandableSettingsCard(
   testTag: String,
   content: @Composable () -> Unit,
 ) {
+  val view = LocalView.current
+  val interactionSource = remember { MutableInteractionSource() }
   Surface(
     shape = RoundedCornerShape(22.dp),
     color = MaterialTheme.colorScheme.surfaceContainerLow,
     tonalElevation = 0.dp,
     shadowElevation = 0.dp,
-    modifier = Modifier.fillMaxWidth().testTag(testTag),
+    modifier =
+      Modifier.fillMaxWidth()
+        .tactilePress(
+          interactionSource = interactionSource,
+          pressedScale = 0.98f,
+          baseCorner = 22.dp,
+          pressedCorner = 26.dp,
+        )
+        .testTag(testTag),
   ) {
     Column(modifier = Modifier.fillMaxWidth()) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
           Modifier.fillMaxWidth()
-            .clickable(onClick = onToggle)
+            .clickable(
+              interactionSource = interactionSource,
+              indication = ripple(),
+            ) {
+              AppHaptics.click(view)
+              onToggle()
+            }
             .padding(18.dp),
       ) {
         Icon(

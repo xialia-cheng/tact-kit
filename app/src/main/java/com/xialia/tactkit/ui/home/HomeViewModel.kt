@@ -51,6 +51,7 @@ data class HomeUiState(
   val searchQuery: String = "",
   val activeFilter: CardFilter = CardFilter.ALL,
   val preferences: UserPreferences = UserPreferences(),
+  val isPreferencesLoaded: Boolean = false,
   val isImportingFile: Boolean = false,
   val statusMessage: String? = null,
   val availableUpdate: ReleaseInfo? = null,
@@ -181,6 +182,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
           searchQuery = query,
           activeFilter = filter,
           preferences = prefs,
+          isPreferencesLoaded = true,
           isImportingFile = importing,
           statusMessage = message,
           availableUpdate = updateInfo,
@@ -311,7 +313,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   }
 
   fun setHasCompletedOnboarding(completed: Boolean) {
-    viewModelScope.launch { settingsRepository.setHasCompletedOnboarding(completed) }
+    viewModelScope.launch(kotlinx.coroutines.NonCancellable) {
+      settingsRepository.setHasCompletedOnboarding(completed)
+    }
   }
 
   fun dismissAvailableUpdate() {

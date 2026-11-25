@@ -80,7 +80,6 @@ import com.xialia.tactkit.engine.DirectorySortBy
 import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.FileManagerEngine
 import com.xialia.tactkit.engine.ManagedFileEntry
-import com.xialia.tactkit.engine.SizeFilterMode
 import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileModeChip
@@ -178,7 +177,6 @@ fun FileManagerWorkspace(
   var isScanningRecent by remember { mutableStateOf(false) }
   var recentScanJob by remember { mutableStateOf<Job?>(null) }
   var selectedCategory by remember { mutableStateOf<FileCategory?>(null) }
-  var sizeFilter by remember { mutableStateOf(SizeFilterMode.ALL) }
 
   // Directory tree state
   var currentDir by remember { mutableStateOf(rootDir) }
@@ -660,7 +658,6 @@ fun FileManagerWorkspace(
             RecentFilesTabContent(
               allRecentFiles = recentFiles,
               selectedCategory = selectedCategory,
-              sizeFilter = sizeFilter,
               isScanning = isScanningRecent,
               isPickerMode = isPickerMode,
               selectedIds = selectedIds,
@@ -670,7 +667,6 @@ fun FileManagerWorkspace(
                 isScanningRecent = false
               },
               onSelectCategory = { selectedCategory = it },
-              onSelectSizeFilter = { sizeFilter = it },
               onEntryClick = ::handleEntryClick,
               onEntryLongClick = ::handleEntryLongClick,
               onLocateDirectory = ::locateEntryDirectory,

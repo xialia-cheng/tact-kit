@@ -98,6 +98,11 @@ fun OnboardingWelcomeDialog(
   val view = LocalView.current
   AlertDialog(
     onDismissRequest = {},
+    properties =
+      androidx.compose.ui.window.DialogProperties(
+        dismissOnBackPress = false,
+        dismissOnClickOutside = false,
+      ),
     icon = {
       PetalIconBadge(
         icon = Icons.Rounded.AutoAwesome,
@@ -137,7 +142,7 @@ fun OnboardingWelcomeDialog(
         },
         modifier = Modifier.testTag("onboarding_skip_forever_btn"),
       ) {
-        Text("跳过（不再显示）")
+        Text("不再显示")
       }
     },
   )
@@ -216,40 +221,17 @@ fun SpotlightOnboardingOverlay(
       )
     }
 
-    // Top-right persistent "跳过教程" button
-    Surface(
-      onClick = {
-        AppHaptics.click(view)
-        onSkipTutorial()
-      },
-      shape = ContinuousCapsule(),
-      color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-      modifier =
-        Modifier.align(Alignment.TopEnd)
-          .statusBarsPadding()
-          .padding(top = 12.dp, end = 16.dp)
-          .testTag("spotlight_skip_btn"),
-    ) {
-      Text(
-        text = "跳过教程",
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-      )
-    }
-
     // Bubble card placed above or below the highlighted region
     val placeAbove = animatedTarget.center.y > rootHeightPx * 0.55f
     val bubbleMarginPx = with(density) { 14.dp.toPx() }
 
     val bubbleYOffsetPx =
       if (placeAbove) {
-        (animatedTarget.top - with(density) { 190.dp.toPx() } - bubbleMarginPx)
-          .coerceAtLeast(with(density) { 80.dp.toPx() })
+        (animatedTarget.top - with(density) { 235.dp.toPx() } - bubbleMarginPx)
+          .coerceAtLeast(with(density) { 72.dp.toPx() })
       } else {
         (animatedTarget.bottom + bubbleMarginPx)
-          .coerceAtMost(rootHeightPx - with(density) { 210.dp.toPx() })
+          .coerceAtMost(rootHeightPx - with(density) { 255.dp.toPx() })
       }
 
     Box(
@@ -323,6 +305,26 @@ fun SpotlightOnboardingOverlay(
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.Start,
+              modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            ) {
+              TextButton(
+                onClick = {
+                  AppHaptics.click(view)
+                  onSkipTutorial()
+                },
+                modifier = Modifier.testTag("spotlight_skip_btn"),
+              ) {
+                Text(
+                  text = "跳过（不再显示）",
+                  style = MaterialTheme.typography.labelLarge,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
           }
         }
       }

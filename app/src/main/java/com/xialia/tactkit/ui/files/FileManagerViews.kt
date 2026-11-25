@@ -74,7 +74,6 @@ import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.FileManagerEngine
 import com.xialia.tactkit.engine.ManagedFileEntry
 import com.xialia.tactkit.engine.MessengerDirHint
-import com.xialia.tactkit.engine.SizeFilterMode
 import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.engine.StorageOverview
 import com.xialia.tactkit.ui.components.PetalIconBadge
@@ -285,14 +284,12 @@ fun StorageOverviewAndQuickLinks(
 fun RecentFilesTabContent(
   allRecentFiles: List<ManagedFileEntry>,
   selectedCategory: FileCategory?,
-  sizeFilter: SizeFilterMode,
   isScanning: Boolean,
   isPickerMode: Boolean,
   selectedIds: Set<String>,
   headerContent: (@Composable () -> Unit)? = null,
   onCancelScan: () -> Unit = {},
   onSelectCategory: (FileCategory?) -> Unit,
-  onSelectSizeFilter: (SizeFilterMode) -> Unit,
   onEntryClick: (ManagedFileEntry) -> Unit,
   onEntryLongClick: (ManagedFileEntry) -> Unit,
   onLocateDirectory: (ManagedFileEntry) -> Unit,
@@ -302,12 +299,9 @@ fun RecentFilesTabContent(
       allRecentFiles.groupingBy { it.category }.eachCount()
     }
   val filteredFiles =
-    remember(allRecentFiles, selectedCategory, sizeFilter) {
-      allRecentFiles.filter { entry ->
-        val matchesCat = selectedCategory == null || entry.category == selectedCategory
-        val matchesSize = entry.sizeBytes >= sizeFilter.minBytes
-        matchesCat && matchesSize
-      }
+    remember(allRecentFiles, selectedCategory) {
+      if (selectedCategory == null) allRecentFiles
+      else allRecentFiles.filter { it.category == selectedCategory }
     }
 
   Column(modifier = Modifier.fillMaxSize()) {
@@ -329,20 +323,6 @@ fun RecentFilesTabContent(
           selected = selectedCategory == cat,
           onClick = { onSelectCategory(if (selectedCategory == cat) null else cat) },
           label = { Text("${cat.label} ($count)", maxLines = 1, softWrap = false) },
-        )
-      }
-    }
-
-    LazyRow(
-      contentPadding = PaddingValues(horizontal = 16.dp),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-    ) {
-      items(SizeFilterMode.entries, key = { it.name }) { mode ->
-        FilterChip(
-          selected = sizeFilter == mode,
-          onClick = { onSelectSizeFilter(mode) },
-          label = { Text(mode.label, maxLines = 1, softWrap = false) },
         )
       }
     }
