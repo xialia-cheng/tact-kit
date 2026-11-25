@@ -214,7 +214,6 @@ fun SettingsScreen(
   var powerSaveExpanded by remember { mutableStateOf(false) }
   var aiExpanded by remember { mutableStateOf(false) }
   var storageExpanded by remember { mutableStateOf(false) }
-  var helpExpanded by remember { mutableStateOf(false) }
   var privacyExpanded by remember { mutableStateOf(false) }
   var licenseExpanded by remember { mutableStateOf(false) }
 
@@ -466,41 +465,43 @@ fun SettingsScreen(
             }
           }
 
-          // 1.5 Prominent Help & Tips Entry Card
+          // 1.5 Help & Tips Entry Card
           com.xialia.tactkit.ui.components.TactileCard(
             onClick = onOpenHelpTips,
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             baseCorner = 22.dp,
             pressedCorner = 26.dp,
             modifier = Modifier.fillMaxWidth().testTag("settings_help_tips_entry"),
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(14.dp),
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
               modifier = Modifier.fillMaxWidth().padding(18.dp),
             ) {
               Icon(
                 imageVector = Icons.AutoMirrored.Rounded.HelpOutline,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(26.dp),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
               )
               Column(modifier = Modifier.weight(1f)) {
                 Text(
                   text = "帮助和提示",
                   style = MaterialTheme.typography.titleMedium,
                   fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                   text = "全功能图文指南、权限排查、关键词搜索与重播新手引导",
                   style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
               }
               Icon(
                 imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
                 contentDescription = "进入帮助和提示",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
               )
             }
@@ -898,30 +899,7 @@ fun SettingsScreen(
             }
           }
 
-          // 6. Usage Help & Permissions Guide (Expandable, default collapsed)
-          ExpandableSettingsCard(
-            title = "使用帮助与权限指南",
-            subtitle = "全盘文件可选授权、SAF 文档选择与按需动态权限",
-            icon = Icons.AutoMirrored.Rounded.HelpOutline,
-            expanded = helpExpanded,
-            onToggle = { helpExpanded = !helpExpanded },
-            testTag = "settings_help_card",
-          ) {
-            HelpBullet(
-              title = "所有文件访问与 SAF 双模式",
-              detail = "简工坊支持通过系统 Photo Picker 与 SAF 选择单文件，也支持在上方授权「所有文件访问权限」以便高效管理本地文档与导出文件；所有文件均仅在本地处理。",
-            )
-            HelpBullet(
-              title = "相机、麦克风与 Wi-Fi 扫描权限（按需动态申请）",
-              detail = "仅在您使用文档扫描/扫码（CAMERA）、语音备忘/分贝仪（RECORD_AUDIO）或 Wi-Fi 信道分析（ACCESS_FINE_LOCATION）时请求对应权限，拒绝后其余功能完全不受影响。",
-            )
-            HelpBullet(
-              title = "Quick Look 悬浮速览窗",
-              detail = "在微信、浏览器或文件管理器中点击「分享」，选择「简工坊 · Quick Look」即可在不离开当前应用的情况下速览 Markdown、加密 PDF 或一键导入工作台。",
-            )
-          }
-
-          // 7. Update & Privacy (Expandable, default collapsed)
+          // 6. Update & Privacy (Expandable, default collapsed)
           val updatePrivacySummary =
             when {
               releaseInfo?.isUpdateAvailable == true -> "发现新版本 ${releaseInfo?.tagName} · 零数据收集"
@@ -1239,23 +1217,6 @@ private fun ExpandableSettingsCard(
         }
       }
     }
-  }
-}
-
-@Composable
-private fun HelpBullet(title: String, detail: String) {
-  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-    Text(
-      text = title,
-      style = MaterialTheme.typography.labelLarge,
-      fontWeight = FontWeight.SemiBold,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
-    Text(
-      text = detail,
-      style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
   }
 }
 

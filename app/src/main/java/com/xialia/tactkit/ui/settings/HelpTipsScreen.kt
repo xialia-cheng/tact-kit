@@ -281,9 +281,14 @@ private val HELP_CATEGORIES =
       items =
         listOf(
           HelpTipItem(
-            title = "常见权限排查指南",
-            steps = "1. 文件管理看不到文件：请在系统设置开启「所有文件访问权限」，或点击「关联 QQ/微信目录」授权。\n2. 分贝仪/语音备忘无反应：请授予麦克风 (RECORD_AUDIO) 权限。\n3. Wi-Fi 信道列表为空：Android 系统要求开启定位权限 (ACCESS_FINE_LOCATION) 与位置信息开关。",
-            keywords = "权限 排查 麦克风 定位 所有文件",
+            title = "所有文件访问与 SAF 双模式",
+            steps = "简工坊支持通过系统 Photo Picker 与 SAF 选择单文件，也支持在设置中授权「所有文件访问权限」以便高效管理本地文档与导出文件；所有文件均仅在本地处理。",
+            keywords = "所有文件 saf photo picker 权限 本地",
+          ),
+          HelpTipItem(
+            title = "常见权限排查与按需动态申请",
+            steps = "1. 相机、麦克风与 Wi-Fi 权限均按需动态申请：仅在使用文档扫描/扫码 (CAMERA)、语音备忘/分贝仪 (RECORD_AUDIO) 或 Wi-Fi 信道分析 (ACCESS_FINE_LOCATION + 位置开关) 时请求，拒绝后其余功能不受影响。\n2. 文件管理看不到文件：请在系统设置开启「所有文件访问权限」，或点击「关联 QQ/微信目录」通过 SAF 授权。",
+            keywords = "权限 排查 相机 麦克风 定位 所有文件",
           ),
         ),
     ),
