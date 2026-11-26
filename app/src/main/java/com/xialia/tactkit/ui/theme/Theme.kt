@@ -21,6 +21,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.data.datastore.AppThemeStyle
 import com.xialia.tactkit.data.datastore.ThemeMode
@@ -341,42 +350,40 @@ val MinecraftPixelShapes =
     extraLarge = RoundedCornerShape(0.dp),
   )
 
+private val McPixelShadow =
+  Shadow(
+    color = Color(0xFF3F3F3F).copy(alpha = 0.55f),
+    offset = Offset(2f, 2f),
+    blurRadius = 0f,
+  )
+
 val MinecraftTypography =
   Typography(
-    headlineSmall = TactKitTypography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
-    titleLarge = TactKitTypography.titleLarge.copy(fontFamily = FontFamily.Monospace),
-    titleMedium = TactKitTypography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-    titleSmall = TactKitTypography.titleSmall.copy(fontFamily = FontFamily.Monospace),
+    headlineSmall =
+      TactKitTypography.headlineSmall.copy(
+        fontFamily = FontFamily.Monospace,
+        shadow = McPixelShadow,
+      ),
+    titleLarge =
+      TactKitTypography.titleLarge.copy(
+        fontFamily = FontFamily.Monospace,
+        shadow = McPixelShadow,
+      ),
+    titleMedium =
+      TactKitTypography.titleMedium.copy(
+        fontFamily = FontFamily.Monospace,
+        shadow = McPixelShadow,
+      ),
+    titleSmall =
+      TactKitTypography.titleSmall.copy(
+        fontFamily = FontFamily.Monospace,
+      ),
     bodyLarge = TactKitTypography.bodyLarge,
     bodyMedium = TactKitTypography.bodyMedium,
     bodySmall = TactKitTypography.bodySmall,
     labelMedium = TactKitTypography.labelMedium.copy(fontFamily = FontFamily.Monospace),
     labelSmall = TactKitTypography.labelSmall.copy(fontFamily = FontFamily.Monospace),
   )
-
-fun Modifier.minecraftPixelBevel(
-  pressed: Boolean = false,
-  isDark: Boolean = false,
-): Modifier =
-  this.drawBehind {
-    val strokePx = 2.dp.toPx()
-    val half = strokePx / 2f
-    val highlight =
-      if (isDark) Color(0xFF5C5C68) else Color.White.copy(alpha = 0.78f)
-    val shadow =
-      if (isDark) Color(0xFF0E0E11) else Color(0xFF555555)
-    val topLeftColor = if (pressed) shadow else highlight
-    val bottomRightColor = if (pressed) highlight else shadow
-
-    // Top edge
-    drawLine(topLeftColor, Offset(0f, half), Offset(size.width, half), strokePx)
-    // Left edge
-    drawLine(topLeftColor, Offset(half, 0f), Offset(half, size.height), strokePx)
-    // Bottom edge
-    drawLine(bottomRightColor, Offset(0f, size.height - half), Offset(size.width, size.height - half), strokePx)
-    // Right edge
-    drawLine(bottomRightColor, Offset(size.width - half, 0f), Offset(size.width - half, size.height), strokePx)
-  }
 
 fun themeCardBorder(
   style: AppThemeStyle,

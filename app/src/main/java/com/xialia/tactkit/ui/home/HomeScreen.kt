@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,6 +119,8 @@ import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.mcGrassButtonBox
+import com.xialia.tactkit.ui.theme.mcPixelBox
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -252,53 +255,59 @@ fun HomeScreen(
   val topBarSurfaceBg = MaterialTheme.colorScheme.surfaceContainer
   val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
+  val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
+  val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
 
   Box(modifier = Modifier.fillMaxSize()) {
     Box(
-      modifier = Modifier.fillMaxSize().layerBackdrop(backdrop).background(bodySurfaceBg),
+      modifier =
+        Modifier.fillMaxSize()
+          .let { if (isMinecraft) it else it.layerBackdrop(backdrop) }
+          .background(bodySurfaceBg),
     ) {
       Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-          TopAppBar(
-            colors =
-              TopAppBarDefaults.topAppBarColors(
-                containerColor = topBarSurfaceBg,
-                scrolledContainerColor = topBarSurfaceBg,
-              ),
-            title = {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-              ) {
-                Text(
-                  text = "简工坊",
-                  fontSize = 30.sp,
-                  lineHeight = 36.sp,
-                  fontWeight = FontWeight.ExtraBold,
-                  color = MaterialTheme.colorScheme.onSurface,
-                )
-                Surface(
-                  color = if (isDark) Color(0xFF2D3240) else Color(0xFF1C1F27),
-                  shape = ContinuousCapsule(),
+          Column(modifier = Modifier.fillMaxWidth()) {
+            TopAppBar(
+              colors =
+                TopAppBarDefaults.topAppBarColors(
+                  containerColor = topBarSurfaceBg,
+                  scrolledContainerColor = topBarSurfaceBg,
+                ),
+              title = {
+                Row(
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                   Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                    text = "简工坊",
+                    fontSize = 30.sp,
+                    lineHeight = 36.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                  )
+                  Surface(
+                    color = if (isDark) Color(0xFF2D3240) else Color(0xFF1C1F27),
+                    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
+                  ) {
+                    Text(
+                      text = "v${BuildConfig.VERSION_NAME}",
+                      style = MaterialTheme.typography.labelSmall,
+                      fontWeight = FontWeight.SemiBold,
+                      color = Color.White,
+                      modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+                    )
+                  }
+                  Text(
+                    text = "✨",
+                    fontSize = 15.sp,
+                    color = Color(0xFFD99B26),
                   )
                 }
-                Text(
-                  text = "✨",
-                  fontSize = 15.sp,
-                  color = Color(0xFFD99B26),
-                )
-              }
-            },
+              },
             actions = {
               IconButton(
                 onClick = {
@@ -331,7 +340,11 @@ fun HomeScreen(
                 )
               }
             },
-          )
+            )
+            if (isMinecraft) {
+              com.xialia.tactkit.ui.theme.McGrassDirtTrim()
+            }
+          }
         },
       ) { innerPadding ->
         Column(
@@ -1139,24 +1152,32 @@ private fun WorkbenchOverviewSection(
       CardFilter.entries.forEach { filter ->
         val selected = uiState.activeFilter == filter
         val filterInteraction = remember { MutableInteractionSource() }
+        val filterPressed by filterInteraction.collectIsPressedAsState()
         Surface(
           onClick = { onFilterChange(filter) },
           interactionSource = filterInteraction,
-          shape = RoundedCornerShape(14.dp),
+          shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(14.dp),
           color =
-            if (selected) {
-              MaterialTheme.colorScheme.primaryContainer
-            } else {
-              MaterialTheme.colorScheme.surfaceContainerLow
+            when {
+              isMinecraft && selected -> Color(0xFF3C8527)
+              selected -> MaterialTheme.colorScheme.primaryContainer
+              else -> MaterialTheme.colorScheme.surfaceContainerLow
             },
           modifier =
             Modifier.weight(1f)
               .tactilePress(
                 interactionSource = filterInteraction,
-                baseCorner = 14.dp,
-                pressedCorner = 22.dp,
+                baseCorner = if (isMinecraft) 0.dp else 14.dp,
+                pressedCorner = if (isMinecraft) 0.dp else 22.dp,
                 enableHapticOnPress = false,
               )
+              .let {
+                if (isMinecraft) {
+                  it.let { m -> if (selected) m.mcGrassButtonBox(pressed = filterPressed) else m.mcPixelBox(pressed = filterPressed, isDark = isDark) }
+                } else {
+                  it
+                }
+              }
               .testTag("filter_chip_${filter.name}"),
         ) {
           Text(
@@ -1164,10 +1185,10 @@ private fun WorkbenchOverviewSection(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             color =
-              if (selected) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+              when {
+                isMinecraft && selected -> Color.White
+                selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
               },
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -1480,12 +1501,35 @@ private fun DocumentDashboardCard(
   onOpenFileManager: () -> Unit,
   onFileManagerButtonPositioned: (Rect) -> Unit = {},
 ) {
+  val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+  val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val cardCorner =
+    when (themeStyle) {
+      com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
+      com.xialia.tactkit.data.datastore.AppThemeStyle.PRECISION_LAB -> 16.dp
+      else -> 22.dp
+    }
+  val cardBorder =
+    com.xialia.tactkit.ui.theme.themeCardBorder(
+      themeStyle,
+      isDark,
+      MaterialTheme.colorScheme.outlineVariant,
+    )
+
   Surface(
-    shape = RoundedCornerShape(22.dp),
+    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(cardCorner),
     color = MaterialTheme.colorScheme.surfaceContainerLow,
+    border = cardBorder,
     tonalElevation = 0.dp,
     shadowElevation = 0.dp,
-    modifier = Modifier.fillMaxWidth().testTag("document_dashboard_card"),
+    modifier =
+      Modifier.fillMaxWidth()
+        .let {
+          if (isMinecraft) it.minecraftPixelBevel(isDark = isDark)
+          else it
+        }
+        .testTag("document_dashboard_card"),
   ) {
     Column(
       verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1515,10 +1559,17 @@ private fun DocumentDashboardCard(
         ) {
           Surface(
             onClick = onOpenFileManager,
-            shape = ContinuousCapsule(),
-            color = MaterialTheme.colorScheme.secondaryContainer,
+            shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
+            color = if (isMinecraft) Color(0xFF3C8527) else MaterialTheme.colorScheme.secondaryContainer,
             modifier =
-              Modifier.onGloballyPositioned { coords ->
+              Modifier.let {
+                  if (isMinecraft) {
+                    it.mcGrassButtonBox()
+                  } else {
+                    it
+                  }
+                }
+                .onGloballyPositioned { coords ->
                   onFileManagerButtonPositioned(coords.boundsInRoot())
                 }
                 .testTag("dashboard_open_file_manager"),
@@ -1531,19 +1582,19 @@ private fun DocumentDashboardCard(
               Icon(
                 imageVector = Icons.Rounded.FolderOpen,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.size(13.dp),
               )
               Text(
                 text = "文件管理",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
               )
             }
           }
           Surface(
-            shape = ContinuousCapsule(),
+            shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
             color = MaterialTheme.colorScheme.primaryContainer,
           ) {
             Text(
@@ -1563,48 +1614,53 @@ private fun DocumentDashboardCard(
       val imgColor = MaterialTheme.colorScheme.tertiary
       val mediaColor = MaterialTheme.colorScheme.outlineVariant
 
-      Row(
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        modifier = Modifier.fillMaxWidth().height(8.dp),
-      ) {
-        if (stats.totalItemsCount == 0) {
-          Box(
-            modifier =
-              Modifier.fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh, ContinuousCapsule()),
-          )
-        } else {
-          if (stats.pdfCount > 0) {
+      if (isMinecraft) {
+        val ratio = if (stats.totalItemsCount == 0) 0f else (stats.pdfCount + stats.docTextCount + stats.imageCount).toFloat() / totalCat.toFloat()
+        com.xialia.tactkit.ui.theme.McXpBar(progress = ratio)
+      } else {
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(3.dp),
+          modifier = Modifier.fillMaxWidth().height(8.dp),
+        ) {
+          if (stats.totalItemsCount == 0) {
             Box(
               modifier =
-                Modifier.weight(stats.pdfCount.toFloat() / totalCat)
-                  .height(8.dp)
-                  .background(pdfColor, ContinuousCapsule()),
+                Modifier.fillMaxSize()
+                  .background(MaterialTheme.colorScheme.surfaceContainerHigh, ContinuousCapsule()),
             )
-          }
-          if (stats.docTextCount > 0) {
-            Box(
-              modifier =
-                Modifier.weight(stats.docTextCount.toFloat() / totalCat)
-                  .height(8.dp)
-                  .background(docColor, ContinuousCapsule()),
-            )
-          }
-          if (stats.imageCount > 0) {
-            Box(
-              modifier =
-                Modifier.weight(stats.imageCount.toFloat() / totalCat)
-                  .height(8.dp)
-                  .background(imgColor, ContinuousCapsule()),
-            )
-          }
-          if (stats.mediaArchiveCount > 0) {
-            Box(
-              modifier =
-                Modifier.weight(stats.mediaArchiveCount.toFloat() / totalCat)
-                  .height(8.dp)
-                  .background(mediaColor, ContinuousCapsule()),
-            )
+          } else {
+            if (stats.pdfCount > 0) {
+              Box(
+                modifier =
+                  Modifier.weight(stats.pdfCount.toFloat() / totalCat)
+                    .height(8.dp)
+                    .background(pdfColor, ContinuousCapsule()),
+              )
+            }
+            if (stats.docTextCount > 0) {
+              Box(
+                modifier =
+                  Modifier.weight(stats.docTextCount.toFloat() / totalCat)
+                    .height(8.dp)
+                    .background(docColor, ContinuousCapsule()),
+              )
+            }
+            if (stats.imageCount > 0) {
+              Box(
+                modifier =
+                  Modifier.weight(stats.imageCount.toFloat() / totalCat)
+                    .height(8.dp)
+                    .background(imgColor, ContinuousCapsule()),
+              )
+            }
+            if (stats.mediaArchiveCount > 0) {
+              Box(
+                modifier =
+                  Modifier.weight(stats.mediaArchiveCount.toFloat() / totalCat)
+                    .height(8.dp)
+                    .background(mediaColor, ContinuousCapsule()),
+              )
+            }
           }
         }
       }
@@ -1629,9 +1685,12 @@ private fun DocumentDashboardCard(
           stats.recentFiles.forEach { file ->
             Surface(
               onClick = { onOpenRecentFile(file) },
-              shape = RoundedCornerShape(14.dp),
+              shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(14.dp),
               color = MaterialTheme.colorScheme.surfaceContainer,
-              modifier = Modifier.fillMaxWidth().testTag("dashboard_recent_${file.id}"),
+              modifier =
+                Modifier.fillMaxWidth()
+                  .let { if (isMinecraft) it.minecraftPixelBevel(isDark = isDark) else it }
+                  .testTag("dashboard_recent_${file.id}"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1663,11 +1722,21 @@ private fun DocumentDashboardCard(
 
 @Composable
 private fun DashboardLegendItem(label: String, dotColor: Color) {
+  val isMinecraft =
+    com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current ==
+      com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(4.dp),
   ) {
-    Box(modifier = Modifier.size(8.dp).background(dotColor, ContinuousCapsule()))
+    Box(
+      modifier =
+        Modifier.size(8.dp)
+          .background(
+            dotColor,
+            if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
+          ),
+    )
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall,

@@ -69,6 +69,9 @@ import androidx.graphics.shapes.star
 import androidx.graphics.shapes.toPath
 import com.xialia.tactkit.data.datastore.AppThemeStyle
 import com.xialia.tactkit.ui.theme.LocalAppThemeStyle
+import com.xialia.tactkit.ui.theme.mcGrassButtonBox
+import com.xialia.tactkit.ui.theme.mcInventorySlotBox
+import com.xialia.tactkit.ui.theme.mcPixelBox
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.ui.theme.themeCardBorder
 import com.xialia.tactkit.util.AppHaptics
@@ -156,10 +159,13 @@ fun Modifier.tactilePress(
     label = "tactile_corner",
   )
 
+  val themeStyle = LocalAppThemeStyle.current
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+
   this.graphicsLayer {
     scaleX = scale
     scaleY = scale
-    shape = RoundedCornerShape(cornerRadius)
+    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp))
     clip = true
   }
 }
@@ -249,7 +255,7 @@ fun TactileCard(
   )
 
   Surface(
-    shape = RoundedCornerShape(corner),
+    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
     color = containerColor,
     contentColor = contentColor,
     border = resolvedBorder,
@@ -262,8 +268,13 @@ fun TactileCard(
           scaleY = scale
         }
         .let {
-          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed && enabled, isDark = isDark)
-          else it
+          if (isMinecraft) {
+            it.mcPixelBox(pressed = isPressed && enabled,
+                isDark = isDark,
+              )
+          } else {
+            it
+          }
         }
         .clickable(
           interactionSource = interactionSource,
@@ -316,18 +327,18 @@ fun TactileModeChip(
   )
 
   Surface(
-    shape = RoundedCornerShape(corner),
+    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
     color =
-      if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-      } else {
-        MaterialTheme.colorScheme.surfaceContainerLow
+      when {
+        isMinecraft && selected -> Color(0xFF3C8527)
+        selected -> MaterialTheme.colorScheme.primaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
       },
     contentColor =
-      if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-      } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+      when {
+        isMinecraft && selected -> Color.White
+        selected -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
       },
     border = themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant),
     modifier =
@@ -337,8 +348,11 @@ fun TactileModeChip(
           scaleY = scale
         }
         .let {
-          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed || selected, isDark = isDark)
-          else it
+          if (isMinecraft) {
+            it.let { m -> if (selected) m.mcGrassButtonBox(pressed = isPressed) else m.mcPixelBox(pressed = isPressed, isDark = isDark) }
+          } else {
+            it
+          }
         }
         .clickable(
           interactionSource = interactionSource,
@@ -410,9 +424,18 @@ fun TactileActionButton(
   )
 
   Surface(
-    shape = RoundedCornerShape(corner),
-    color = if (enabled) containerColor else MaterialTheme.colorScheme.surfaceContainerHigh,
-    contentColor = if (enabled) contentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+    color =
+      when {
+        isMinecraft && enabled -> Color(0xFF3C8527)
+        isMinecraft && !enabled -> Color(0xFF8B8B8B)
+        enabled -> containerColor
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+      },
+    contentColor =
+      if (isMinecraft) Color.White
+      else if (enabled) contentColor
+      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
     modifier =
       modifier
         .graphicsLayer {
@@ -420,8 +443,11 @@ fun TactileActionButton(
           scaleY = scale
         }
         .let {
-          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed && enabled, isDark = isDark)
-          else it
+          if (isMinecraft) {
+            it.mcGrassButtonBox(pressed = isPressed && enabled)
+          } else {
+            it
+          }
         }
         .clickable(
           interactionSource = interactionSource,
@@ -489,19 +515,39 @@ fun PetalIconBadge(
   containerColor: Color = MaterialTheme.colorScheme.primaryContainer,
   contentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
 ) {
-  val shape = remember(petals) { PetalPolygonShape(petals = petals) }
-  Box(
-    contentAlignment = Alignment.Center,
-    modifier =
-      modifier
-        .size(size)
-        .background(color = containerColor, shape = shape),
-  ) {
-    Icon(
-      imageVector = icon,
-      contentDescription = null,
-      tint = contentColor,
-      modifier = Modifier.size(iconSize),
-    )
+  val themeStyle = LocalAppThemeStyle.current
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+  if (isMinecraft) {
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+        modifier
+          .size(size)
+          .background(color = Color(0xFF8B8B8B), shape = androidx.compose.ui.graphics.RectangleShape)
+          .mcInventorySlotBox(),
+    ) {
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = Color.White,
+        modifier = Modifier.size(iconSize),
+      )
+    }
+  } else {
+    val shape = remember(petals) { PetalPolygonShape(petals = petals) }
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+        modifier
+          .size(size)
+          .background(color = containerColor, shape = shape),
+    ) {
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = contentColor,
+        modifier = Modifier.size(iconSize),
+      )
+    }
   }
 }

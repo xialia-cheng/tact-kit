@@ -140,6 +140,9 @@ fun StorageOverviewAndQuickLinks(
   onOpenPinnedPath: (String) -> Unit,
   onLinkMessengerSaf: () -> Unit,
 ) {
+  val isMinecraft =
+    com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current ==
+      com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
   Column(
     verticalArrangement = Arrangement.spacedBy(8.dp),
     modifier = Modifier.fillMaxWidth(),
@@ -148,7 +151,7 @@ fun StorageOverviewAndQuickLinks(
       val progress =
         (storage.usedBytes.toFloat() / storage.totalBytes.toFloat()).coerceIn(0f, 1f)
       Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
       ) {
@@ -174,10 +177,14 @@ fun StorageOverviewAndQuickLinks(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
-          LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(ContinuousCapsule()),
-          )
+          if (isMinecraft) {
+            com.xialia.tactkit.ui.theme.McXpBar(progress = progress)
+          } else {
+            LinearProgressIndicator(
+              progress = { progress },
+              modifier = Modifier.fillMaxWidth().height(6.dp).clip(ContinuousCapsule()),
+            )
+          }
         }
       }
     }

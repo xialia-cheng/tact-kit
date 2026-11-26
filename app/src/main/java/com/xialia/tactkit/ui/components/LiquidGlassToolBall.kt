@@ -77,6 +77,8 @@ import com.xialia.tactkit.R
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.ui.theme.mcGrassButtonBox
+import com.xialia.tactkit.ui.theme.mcPixelBox
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -145,7 +147,11 @@ fun LiquidGlassToolBallOverlay(
           slideOutVertically(targetOffsetY = { it / 3 }),
       modifier = Modifier.align(Alignment.BottomCenter),
     ) {
-      val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+      val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
+      val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+      val sheetShape =
+        if (isMinecraft) androidx.compose.ui.graphics.RectangleShape
+        else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
       val glassTint =
         MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = if (isDark) 0.84f else 0.82f)
       val fallbackTint = MaterialTheme.colorScheme.surfaceContainerLowest
@@ -160,14 +166,23 @@ fun LiquidGlassToolBallOverlay(
         Modifier.widthIn(max = 600.dp)
           .fillMaxWidth()
           .heightIn(max = 640.dp)
-          .glassSurfaceModifier(
-            useLiquidShader = useLiquidShader,
-            backdrop = backdrop,
-            shape = sheetShape,
-            glassTint = glassTint,
-            fallbackTint = fallbackTint,
-            borderColor = highlightBorder,
-          )
+          .let { base ->
+            if (isMinecraft) {
+              base
+                .background(fallbackTint, androidx.compose.ui.graphics.RectangleShape)
+                .mcPixelBox(isDark = isDark,
+                  )
+            } else {
+              base.glassSurfaceModifier(
+                useLiquidShader = useLiquidShader,
+                backdrop = backdrop,
+                shape = sheetShape,
+                glassTint = glassTint,
+                fallbackTint = fallbackTint,
+                borderColor = highlightBorder,
+              )
+            }
+          }
           .clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -185,7 +200,7 @@ fun LiquidGlassToolBallOverlay(
             modifier =
               Modifier.width(36.dp)
                 .height(4.dp)
-                .clip(ContinuousCapsule())
+                .clip(if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule())
                 .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
           )
         }
@@ -220,9 +235,19 @@ fun LiquidGlassToolBallOverlay(
 
         // Compact 50.dp single-line search bar
         Surface(
-          shape = RoundedCornerShape(16.dp),
+          shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(16.dp),
           color = MaterialTheme.colorScheme.surfaceContainerLow,
-          modifier = Modifier.fillMaxWidth().height(50.dp),
+          modifier =
+            Modifier.fillMaxWidth()
+              .height(50.dp)
+              .let {
+                if (isMinecraft) {
+                  it.mcPixelBox(isDark = isDark,
+                    )
+                } else {
+                  it
+                }
+              },
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -387,22 +412,20 @@ fun LiquidGlassToolBallOverlay(
               pressedCorner = if (isMinecraft) 0.dp else 24.dp,
               enableHapticOnPress = false,
             )
-            .glassSurfaceModifier(
-              useLiquidShader = useLiquidShader && !isMinecraft,
-              backdrop = backdrop,
-              shape = orbShape,
-              glassTint = ballTint,
-              fallbackTint = fallbackBallTint,
-              borderColor = highlightBorder,
-            )
-            .let {
+            .let { base ->
               if (isMinecraft) {
-                it.minecraftPixelBevel(
-                  pressed = orbPressed,
-                  isDark = isDark,
-                )
+                base
+                  .background(Color(0xFF3C8527), androidx.compose.ui.graphics.RectangleShape)
+                  .mcGrassButtonBox(pressed = orbPressed)
               } else {
-                it
+                base.glassSurfaceModifier(
+                  useLiquidShader = useLiquidShader,
+                  backdrop = backdrop,
+                  shape = orbShape,
+                  glassTint = ballTint,
+                  fallbackTint = fallbackBallTint,
+                  borderColor = highlightBorder,
+                )
               }
             }
             .clickable(
@@ -417,7 +440,7 @@ fun LiquidGlassToolBallOverlay(
         Icon(
           imageVector = Icons.Rounded.Widgets,
           contentDescription = stringResource(R.string.cd_tool_ball),
-          tint = MaterialTheme.colorScheme.onPrimaryContainer,
+          tint = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
           modifier = Modifier.size(24.dp),
         )
       }
