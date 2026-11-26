@@ -55,6 +55,7 @@ import com.xialia.tactkit.R
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
+import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -79,16 +80,14 @@ fun WorkbenchCardView(
 ) {
   val haptics = rememberAppHaptics()
 
-  Surface(
-    shape = RoundedCornerShape(22.dp),
-    color =
+  TactKitCard(
+    corner = 22.dp,
+    containerColor =
       if (card.pinned) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
       } else {
         MaterialTheme.colorScheme.surfaceContainerLow
       },
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
     modifier = modifier.fillMaxWidth().testTag("workbench_card_${card.id}"),
   ) {
     Column(modifier = Modifier.padding(16.dp)) {

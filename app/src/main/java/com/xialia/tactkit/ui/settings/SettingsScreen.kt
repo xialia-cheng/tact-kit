@@ -106,7 +106,10 @@ import com.xialia.tactkit.data.repository.AppUpdateRepository
 import com.xialia.tactkit.data.repository.ReleaseInfo
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.tactilePress
+import com.xialia.tactkit.ui.theme.TactKitCard
+import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
@@ -281,11 +284,9 @@ fun SettingsScreen(
           modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
         ) {
           // 1. About App & Author Header Card
-          Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp,
+          TactKitCard(
+            corner = 22.dp,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth().testTag("settings_about_card"),
           ) {
             Column(
@@ -301,11 +302,11 @@ fun SettingsScreen(
                   Image(
                     bitmap = appIconBitmap,
                     contentDescription = "简工坊应用图标",
-                    modifier = Modifier.size(58.dp).clip(RoundedCornerShape(16.dp)),
+                    modifier = Modifier.size(58.dp).clip(themeShape(16.dp)),
                   )
                 } else {
                   Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = themeShape(16.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.size(58.dp),
                   ) {
@@ -329,7 +330,7 @@ fun SettingsScreen(
                   )
                   Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = RoundedCornerShape(999.dp),
+                    shape = themeShape(999.dp),
                   ) {
                     Text(
                       text = "v${appVersionInfo.versionName} · Build ${appVersionInfo.versionCode}",
@@ -371,10 +372,10 @@ fun SettingsScreen(
               // Email row: tap to mailto + copy button
               Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier =
                   Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(themeShape(14.dp))
                     .clickable {
                       haptics.tick()
                       openEmailClient(context)
@@ -423,10 +424,10 @@ fun SettingsScreen(
               // GitHub repo row: tap to open browser
               Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier =
                   Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(themeShape(14.dp))
                     .clickable {
                       haptics.tick()
                       openBrowserUrl(context, AppUpdateRepository.REPO_URL)
@@ -714,7 +715,7 @@ fun SettingsScreen(
               label = { Text("Base URL") },
               placeholder = { Text(UserPreferences.DEFAULT_AI_BASE_URL) },
               singleLine = true,
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("ai_base_url_input"),
             )
 
@@ -731,7 +732,7 @@ fun SettingsScreen(
               label = { Text("模型名称") },
               placeholder = { Text(UserPreferences.DEFAULT_AI_MODEL) },
               singleLine = true,
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("ai_model_input"),
             )
 
@@ -757,7 +758,7 @@ fun SettingsScreen(
                   )
                 }
               },
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("ai_api_key_input"),
             )
 
@@ -782,7 +783,7 @@ fun SettingsScreen(
                       }
                   }
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier = Modifier.weight(1f).testTag("ai_save_settings_btn"),
               ) {
                 Text("保存配置")
@@ -818,7 +819,7 @@ fun SettingsScreen(
                     isTestingAi = false
                   }
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier = Modifier.weight(1f).testTag("ai_test_conn_btn"),
               ) {
                 Text(if (isTestingAi) "测试中..." else "测试连通性")
@@ -832,7 +833,7 @@ fun SettingsScreen(
                   onClearAiApiKey()
                   aiTestResult = "已清除密钥"
                 },
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier = Modifier.fillMaxWidth().testTag("ai_clear_key_btn"),
               ) {
                 Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
@@ -844,7 +845,7 @@ fun SettingsScreen(
             aiTestResult?.let { resultMsg ->
               Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(12.dp),
+                shape = themeShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
               ) {
                 Text(
@@ -894,7 +895,7 @@ fun SettingsScreen(
                 color =
                   if (hasAllFilesAccess) MaterialTheme.colorScheme.primaryContainer
                   else MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(999.dp),
+                shape = themeShape(999.dp),
                 modifier = Modifier.testTag("settings_all_files_status_pill"),
               ) {
                 Text(
@@ -934,7 +935,7 @@ fun SettingsScreen(
                   )
                 }
               },
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("settings_all_files_grant_btn"),
             ) {
               Text(if (hasAllFilesAccess) "管理文件访问权限" else "前往授权所有文件访问权限")
@@ -1003,7 +1004,7 @@ fun SettingsScreen(
               )
               Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(999.dp),
+                shape = themeShape(999.dp),
                 modifier = Modifier.testTag("settings_update_version_pill"),
               ) {
                 Text(
@@ -1052,7 +1053,7 @@ fun SettingsScreen(
                   isCheckingUpdate = false
                 }
               },
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth().testTag("settings_check_update_btn"),
             ) {
               if (isCheckingUpdate) {
@@ -1082,7 +1083,7 @@ fun SettingsScreen(
             releaseInfo?.let { info ->
               Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(14.dp),
+                shape = themeShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
               ) {
                 Column(
@@ -1112,7 +1113,7 @@ fun SettingsScreen(
                         haptics.tick()
                         showUpdateDialog = true
                       },
-                      shape = RoundedCornerShape(12.dp),
+                      shape = themeShape(12.dp),
                       modifier = Modifier.fillMaxWidth().testTag("settings_download_update_btn"),
                     ) {
                       Icon(
@@ -1131,7 +1132,7 @@ fun SettingsScreen(
             updateError?.let { msg ->
               Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shape = RoundedCornerShape(12.dp),
+                shape = themeShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
               ) {
                 Text(
@@ -1158,7 +1159,7 @@ fun SettingsScreen(
           ) {
             Surface(
               color = MaterialTheme.colorScheme.surfaceContainer,
-              shape = RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               modifier = Modifier.fillMaxWidth(),
             ) {
               Text(
@@ -1190,11 +1191,9 @@ private fun ExpandableSettingsCard(
 ) {
   val view = LocalView.current
   val interactionSource = remember { MutableInteractionSource() }
-  Surface(
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerLow,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
+  TactKitCard(
+    corner = 22.dp,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     modifier =
       Modifier.fillMaxWidth()
         .tactilePress(

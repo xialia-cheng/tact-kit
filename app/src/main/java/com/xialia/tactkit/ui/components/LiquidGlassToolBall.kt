@@ -77,7 +77,11 @@ import com.xialia.tactkit.R
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.ui.theme.TactKitCard
+import com.xialia.tactkit.ui.theme.TactKitChip
+import com.xialia.tactkit.ui.theme.TactKitThumbnailBox
 import com.xialia.tactkit.ui.theme.mcGrassButtonBox
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.ui.theme.mcPixelBox
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.AppHaptics
@@ -501,11 +505,9 @@ private fun CategoryToolCard(
   onToolClick: (ToolItem) -> Unit,
   onTogglePin: (String) -> Unit,
 ) {
-  Surface(
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surfaceContainer,
-    tonalElevation = 0.dp,
-    shadowElevation = 0.dp,
+  TactKitCard(
+    corner = 22.dp,
+    containerColor = MaterialTheme.colorScheme.surfaceContainer,
     modifier = Modifier.fillMaxWidth(),
   ) {
     Column(modifier = Modifier.padding(12.dp)) {
@@ -513,7 +515,7 @@ private fun CategoryToolCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
           Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(themeShape(12.dp))
             .clickable { onToggleExpand() }
             .padding(horizontal = 4.dp, vertical = 6.dp)
             .testTag("category_header_${category.name}"),
@@ -531,9 +533,9 @@ private fun CategoryToolCard(
           fontWeight = FontWeight.SemiBold,
         )
         Spacer(modifier = Modifier.width(6.dp))
-        Surface(
-          shape = ContinuousCapsule(),
-          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        TactKitChip(
+          corner = 999.dp,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
           Text(
             text = "${tools.size}",
@@ -573,19 +575,17 @@ private fun CategoryToolCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(12.dp),
               ) {
-                Surface(
-                  shape = RoundedCornerShape(14.dp),
-                  color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                TactKitThumbnailBox(
+                  corner = 14.dp,
+                  containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                   modifier = Modifier.size(42.dp),
                 ) {
-                  Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                      imageVector = tool.icon,
-                      contentDescription = null,
-                      tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                      modifier = Modifier.size(21.dp),
-                    )
-                  }
+                  Icon(
+                    imageVector = tool.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(21.dp),
+                  )
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {

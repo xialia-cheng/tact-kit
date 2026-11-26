@@ -118,6 +118,7 @@ import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
+import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.ui.theme.mcGrassButtonBox
 import com.xialia.tactkit.ui.theme.mcPixelBox
@@ -820,16 +821,14 @@ private fun QuickActionStrip(
   ) {
     items(entries, key = { it.id }) { entry ->
       val interaction = remember { MutableInteractionSource() }
-      Surface(
+      TactKitChip(
         onClick = {
           AppHaptics.click(view)
           entry.onClick()
         },
         interactionSource = interaction,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
+        corner = 18.dp,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier =
           Modifier.tactilePress(
               interactionSource = interaction,

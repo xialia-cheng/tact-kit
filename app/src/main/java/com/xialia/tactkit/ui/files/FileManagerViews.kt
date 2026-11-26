@@ -64,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,7 +79,12 @@ import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.engine.StorageOverview
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.theme.TactKitCard
+import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.isMcPixelTheme
+import com.xialia.tactkit.ui.theme.mcPixelBox
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.FileInspectionHelper
 import java.io.File
 
@@ -87,9 +93,9 @@ fun StoragePermissionOnboardingCard(
   onGrantPermission: () -> Unit,
   onLinkSafTree: () -> Unit,
 ) {
-  Surface(
-    shape = RoundedCornerShape(22.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerLow,
+  TactKitCard(
+    corner = 22.dp,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("all_files_onboarding_card"),
   ) {
     Column(
@@ -195,10 +201,10 @@ fun StorageOverviewAndQuickLinks(
     ) {
       items(pinnedDirs, key = { "pin_$it" }) { relPath ->
         val label = relPath.substringAfterLast('/').ifBlank { relPath }
-        Surface(
+        TactKitChip(
           onClick = { onOpenPinnedPath(relPath) },
-          shape = ContinuousCapsule(),
-          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          corner = 999.dp,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -225,10 +231,10 @@ fun StorageOverviewAndQuickLinks(
         messengerDirs.filter { hint -> pinnedDirs.none { it.equals(hint.relativePath, ignoreCase = true) } },
         key = { "msg_${it.relativePath}" },
       ) { hint ->
-        Surface(
+        TactKitChip(
           onClick = { onOpenPinnedPath(hint.relativePath) },
-          shape = ContinuousCapsule(),
-          color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+          corner = 999.dp,
+          containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -253,10 +259,10 @@ fun StorageOverviewAndQuickLinks(
       }
 
       item(key = "link_saf_btn") {
-        Surface(
+        TactKitChip(
           onClick = onLinkMessengerSaf,
-          shape = ContinuousCapsule(),
-          color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+          corner = 999.dp,
+          containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
           modifier = Modifier.testTag("link_qq_wechat_dir"),
         ) {
           Row(
@@ -341,7 +347,7 @@ fun RecentFilesTabContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
       ) {
         LinearProgressIndicator(
-          modifier = Modifier.weight(1f).height(5.dp).clip(ContinuousCapsule()),
+          modifier = Modifier.weight(1f).height(5.dp).clip(themeShape(999.dp)),
         )
         Text(
           text = "扫描中",
@@ -495,10 +501,10 @@ fun DirectoryTreeTabContent(
             modifier = Modifier.size(16.dp),
           )
         }
-        Surface(
+        TactKitChip(
           onClick = { onNavigateToDir(target) },
-          shape = RoundedCornerShape(10.dp),
-          color =
+          corner = 10.dp,
+          containerColor =
             if (idx == breadcrumbs.lastIndex) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
@@ -647,10 +653,10 @@ fun DirectoryTreeTabContent(
 
         if (collapsedNoiseDirs.isNotEmpty()) {
           item(key = "noise_toggle_banner") {
-            Surface(
+            TactKitCard(
               onClick = { expandNoiseDirs = !expandNoiseDirs },
-              shape = RoundedCornerShape(14.dp),
-              color = MaterialTheme.colorScheme.surfaceContainer,
+              corner = 14.dp,
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
               modifier = Modifier.fillMaxWidth().testTag("collapsed_noise_banner"),
             ) {
               Row(
@@ -723,9 +729,9 @@ fun SpaceCleanupTabContent(
   val reclaimableBytes = checkedEntries.sumOf { it.sizeBytes }
 
   Column(modifier = Modifier.fillMaxSize()) {
-    Surface(
-      shape = RoundedCornerShape(20.dp),
-      color = MaterialTheme.colorScheme.surfaceContainerLow,
+    TactKitCard(
+      corner = 20.dp,
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
       modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
       Column(
@@ -787,7 +793,7 @@ fun SpaceCleanupTabContent(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
       ) {
         LinearProgressIndicator(
-          modifier = Modifier.weight(1f).height(5.dp).clip(ContinuousCapsule()),
+          modifier = Modifier.weight(1f).height(5.dp).clip(themeShape(999.dp)),
         )
         TextButton(
           onClick = onCancelScan,
@@ -809,10 +815,10 @@ fun SpaceCleanupTabContent(
         }
       }
       items(allVisibleEntries, key = { "clean_${it.id}" }) { entry ->
-        Surface(
+        TactKitCard(
           onClick = { onToggleChecked(entry) },
-          shape = RoundedCornerShape(16.dp),
-          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          corner = 16.dp,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
           modifier = Modifier.fillMaxWidth(),
         ) {
           Row(
@@ -906,14 +912,14 @@ fun ManagedFileRow(
       (entry.category == FileCategory.IMAGES || entry.category == FileCategory.AUDIO_VIDEO)
   val thumbSize = if (isMediaThumb) 68.dp else 48.dp
 
-  Surface(
-    shape = RoundedCornerShape(18.dp),
-    color =
+  TactKitCard(
+    corner = 18.dp,
+    containerColor =
       if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
       else MaterialTheme.colorScheme.surfaceContainerLow,
     modifier =
       Modifier.fillMaxWidth()
-        .clip(RoundedCornerShape(18.dp))
+        .clip(themeShape(18.dp))
         .combinedClickable(
           onClick = onClick,
           onLongClick = onLongClick,
@@ -978,9 +984,9 @@ fun ManagedFileRow(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          Surface(
-            shape = RoundedCornerShape(6.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+          TactKitChip(
+            corner = 6.dp,
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
           ) {
             Text(
               text = entry.sourceLabel,
@@ -1027,12 +1033,14 @@ private fun SquareMediaGridTile(
   onClick: () -> Unit,
   onLongClick: () -> Unit,
 ) {
+  val isMc = isMcPixelTheme()
   Box(
     modifier =
       Modifier.fillMaxWidth()
         .aspectRatio(1f)
-        .clip(RoundedCornerShape(14.dp))
+        .clip(themeShape(14.dp))
         .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        .then(if (isMc) Modifier.mcPixelBox() else Modifier)
         .combinedClickable(
           onClick = onClick,
           onLongClick = onLongClick,
@@ -1054,9 +1062,9 @@ private fun SquareMediaGridTile(
         modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(20.dp),
       )
     } else if (entry.extension.isNotBlank()) {
-      Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.52f),
+      TactKitChip(
+        corner = 6.dp,
+        containerColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.52f),
         modifier = Modifier.align(Alignment.BottomEnd).padding(5.dp),
       ) {
         Text(
@@ -1095,14 +1103,14 @@ private fun ManagedFileGridCard(
     return
   }
 
-  Surface(
-    shape = RoundedCornerShape(18.dp),
-    color =
+  TactKitCard(
+    corner = 18.dp,
+    containerColor =
       if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
       else MaterialTheme.colorScheme.surfaceContainerLow,
     modifier =
       Modifier.fillMaxWidth()
-        .clip(RoundedCornerShape(18.dp))
+        .clip(themeShape(18.dp))
         .combinedClickable(
           onClick = onClick,
           onLongClick = onLongClick,

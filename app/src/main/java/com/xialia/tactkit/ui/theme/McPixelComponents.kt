@@ -1,20 +1,39 @@
 package com.xialia.tactkit.ui.theme
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.xialia.tactkit.data.datastore.AppThemeStyle
 
 /**
  * Classic 3-layer Minecraft pixel bevel:
@@ -153,3 +172,178 @@ fun McGrassDirtTrim(modifier: Modifier = Modifier) {
     )
   }
 }
+
+@Composable
+fun isMcPixelTheme(): Boolean = LocalAppThemeStyle.current == AppThemeStyle.MINECRAFT_PIXEL
+
+@Composable
+fun themeShape(corner: Dp): Shape =
+  if (isMcPixelTheme()) RectangleShape else RoundedCornerShape(corner)
+
+@Composable
+fun TactKitCard(
+  modifier: Modifier = Modifier,
+  onClick: (() -> Unit)? = null,
+  interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+  corner: Dp = 18.dp,
+  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+  contentColor: Color = contentColorFor(containerColor),
+  border: BorderStroke? = null,
+  content: @Composable BoxScope.() -> Unit,
+) {
+  val style = LocalAppThemeStyle.current
+  val isMc = style == AppThemeStyle.MINECRAFT_PIXEL
+  val isDark = isSystemInDarkTheme()
+  if (isMc) {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val clickModifier =
+      if (onClick != null) {
+        Modifier.clickable(
+          interactionSource = interactionSource,
+          indication = null,
+          onClick = onClick,
+        )
+      } else {
+        Modifier
+      }
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
+      Box(
+        modifier =
+          modifier
+            .clip(RectangleShape)
+            .background(containerColor, RectangleShape)
+            .mcPixelBox(pressed = pressed && onClick != null, isDark = isDark)
+            .then(clickModifier),
+        content = content,
+      )
+    }
+  } else {
+    val resolvedBorder = border ?: themeCardBorder(style, isDark, MaterialTheme.colorScheme.outlineVariant)
+    if (onClick != null) {
+      Surface(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        shape = RoundedCornerShape(corner),
+        color = containerColor,
+        contentColor = contentColor,
+        border = resolvedBorder,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = modifier,
+      ) {
+        Box(content = content)
+      }
+    } else {
+      Surface(
+        shape = RoundedCornerShape(corner),
+        color = containerColor,
+        contentColor = contentColor,
+        border = resolvedBorder,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = modifier,
+      ) {
+        Box(content = content)
+      }
+    }
+  }
+}
+
+@Composable
+fun TactKitChip(
+  modifier: Modifier = Modifier,
+  onClick: (() -> Unit)? = null,
+  interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+  corner: Dp = 999.dp,
+  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+  contentColor: Color = contentColorFor(containerColor),
+  border: BorderStroke? = null,
+  content: @Composable BoxScope.() -> Unit,
+) {
+  val isMc = isMcPixelTheme()
+  val isDark = isSystemInDarkTheme()
+  if (isMc) {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val clickModifier =
+      if (onClick != null) {
+        Modifier.clickable(
+          interactionSource = interactionSource,
+          indication = null,
+          onClick = onClick,
+        )
+      } else {
+        Modifier
+      }
+    CompositionLocalProvider(LocalContentColor provides contentColor) {
+      Box(
+        modifier =
+          modifier
+            .clip(RectangleShape)
+            .background(containerColor, RectangleShape)
+            .mcPixelBox(pressed = pressed && onClick != null, isDark = isDark)
+            .then(clickModifier),
+        contentAlignment = Alignment.Center,
+        content = content,
+      )
+    }
+  } else {
+    if (onClick != null) {
+      Surface(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        shape = RoundedCornerShape(corner),
+        color = containerColor,
+        contentColor = contentColor,
+        border = border,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = modifier,
+      ) {
+        Box(contentAlignment = Alignment.Center, content = content)
+      }
+    } else {
+      Surface(
+        shape = RoundedCornerShape(corner),
+        color = containerColor,
+        contentColor = contentColor,
+        border = border,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier = modifier,
+      ) {
+        Box(contentAlignment = Alignment.Center, content = content)
+      }
+    }
+  }
+}
+
+@Composable
+fun TactKitThumbnailBox(
+  modifier: Modifier = Modifier,
+  corner: Dp = 14.dp,
+  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+  content: @Composable BoxScope.() -> Unit,
+) {
+  val isMc = isMcPixelTheme()
+  if (isMc) {
+    Box(
+      modifier =
+        modifier
+          .clip(RectangleShape)
+          .background(containerColor, RectangleShape)
+          .mcInventorySlotBox(),
+      contentAlignment = Alignment.Center,
+      content = content,
+    )
+  } else {
+    Box(
+      modifier =
+        modifier
+          .clip(RoundedCornerShape(corner))
+          .background(containerColor, RoundedCornerShape(corner)),
+      contentAlignment = Alignment.Center,
+      content = content,
+    )
+  }
+}
+

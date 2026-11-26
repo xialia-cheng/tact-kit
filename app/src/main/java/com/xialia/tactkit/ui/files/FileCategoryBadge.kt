@@ -35,7 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.ManagedFileEntry
+import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.isMcPixelTheme
+import com.xialia.tactkit.ui.theme.mcInventorySlotBox
+import com.xialia.tactkit.ui.theme.themeShape
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,7 +78,8 @@ fun FileEntryThumbnailOrBadge(
   size: Dp = 44.dp,
 ) {
   val context = LocalContext.current
-  val shape = RoundedCornerShape(14.dp)
+  val isMc = isMcPixelTheme()
+  val shape = themeShape(14.dp)
 
   if (entry.isDirectory) {
     val bg =
@@ -85,7 +90,12 @@ fun FileEntryThumbnailOrBadge(
       else MaterialTheme.colorScheme.onPrimaryContainer
     Box(
       contentAlignment = Alignment.Center,
-      modifier = modifier.size(size).clip(shape).background(bg),
+      modifier =
+        modifier
+          .size(size)
+          .clip(shape)
+          .background(bg)
+          .then(if (isMc) Modifier.mcInventorySlotBox() else Modifier),
     ) {
       Icon(
         imageVector = if (entry.isNoiseDirectory) Icons.Rounded.FolderOff else Icons.Rounded.Folder,
@@ -144,7 +154,7 @@ fun FileEntryThumbnailOrBadge(
       )
       if (isVideoFile) {
         Surface(
-          shape = RoundedCornerShape(999.dp),
+          shape = themeShape(999.dp),
           color = Color.Black.copy(alpha = 0.55f),
           modifier = Modifier.align(Alignment.Center).size(26.dp),
         ) {
@@ -162,7 +172,10 @@ fun FileEntryThumbnailOrBadge(
     val fallbackIconSize = if (size != Dp.Unspecified) size * 0.46f else 28.dp
     Box(
       contentAlignment = Alignment.Center,
-      modifier = sizedModifier.background(bg),
+      modifier =
+        sizedModifier
+          .background(bg)
+          .then(if (isMc) Modifier.mcInventorySlotBox() else Modifier),
     ) {
       Icon(
         imageVector = entry.category.icon,
@@ -180,9 +193,9 @@ fun FileExtensionPill(
   modifier: Modifier = Modifier,
 ) {
   if (extension.isBlank()) return
-  Surface(
-    shape = RoundedCornerShape(6.dp),
-    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+  TactKitChip(
+    corner = 6.dp,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     modifier = modifier,
   ) {
     Text(
