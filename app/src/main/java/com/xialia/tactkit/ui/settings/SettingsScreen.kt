@@ -468,13 +468,24 @@ fun SettingsScreen(
           }
 
           // 1.5 Help & Tips Entry Card
-          com.xialia.tactkit.ui.components.TactileCard(
-            onClick = onOpenHelpTips,
+          val helpInteraction = remember { MutableInteractionSource() }
+          TactKitCard(
+            onClick = {
+              haptics.tick()
+              onOpenHelpTips()
+            },
+            interactionSource = helpInteraction,
+            corner = 22.dp,
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            baseCorner = 22.dp,
-            pressedCorner = 26.dp,
-            modifier = Modifier.fillMaxWidth().testTag("settings_help_tips_entry"),
+            modifier =
+              Modifier.fillMaxWidth()
+                .tactilePress(
+                  interactionSource = helpInteraction,
+                  pressedScale = 0.98f,
+                  baseCorner = 22.dp,
+                  pressedCorner = 26.dp,
+                )
+                .testTag("settings_help_tips_entry"),
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,

@@ -1600,86 +1600,69 @@ private fun DocumentDashboardCard(
             color = MaterialTheme.colorScheme.onSurface,
           )
           Text(
-            text = "累计管理 ${stats.totalItemsCount} 项本地资料与记录",
+            text = "累计管理 ${stats.totalItemsCount} 项 · 本周 +${stats.thisWeekAddedCount}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          if (isMinecraft) {
-            OreUiButton(
-              onClick = onOpenFileManager,
-              tone = OreUiTone.GREEN,
-              modifier =
-                Modifier.onGloballyPositioned { coords ->
-                    onFileManagerButtonPositioned(coords.boundsInRoot())
-                  }
-                  .testTag("dashboard_open_file_manager"),
+        if (isMinecraft) {
+          OreUiButton(
+            onClick = onOpenFileManager,
+            tone = OreUiTone.GREEN,
+            modifier =
+              Modifier.onGloballyPositioned { coords ->
+                  onFileManagerButtonPositioned(coords.boundsInRoot())
+                }
+                .testTag("dashboard_open_file_manager"),
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Rounded.FolderOpen,
-                  contentDescription = null,
-                  tint = Color.White,
-                  modifier = Modifier.size(13.dp),
-                )
-                Text(
-                  text = "文件管理",
-                  style = MaterialTheme.typography.labelSmall,
-                  fontWeight = FontWeight.SemiBold,
-                  color = Color.White,
-                )
-              }
-            }
-          } else {
-            Surface(
-              onClick = onOpenFileManager,
-              shape = ContinuousCapsule(),
-              color = MaterialTheme.colorScheme.secondaryContainer,
-              modifier =
-                Modifier.onGloballyPositioned { coords ->
-                    onFileManagerButtonPositioned(coords.boundsInRoot())
-                  }
-                  .testTag("dashboard_open_file_manager"),
-            ) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Rounded.FolderOpen,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                  modifier = Modifier.size(13.dp),
-                )
-                Text(
-                  text = "文件管理",
-                  style = MaterialTheme.typography.labelSmall,
-                  fontWeight = FontWeight.SemiBold,
-                  color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-              }
+              Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(13.dp),
+              )
+              Text(
+                text = "文件管理",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+              )
             }
           }
+        } else {
           Surface(
-            shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
-            color = MaterialTheme.colorScheme.primaryContainer,
+            onClick = onOpenFileManager,
+            shape = ContinuousCapsule(),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier =
+              Modifier.onGloballyPositioned { coords ->
+                  onFileManagerButtonPositioned(coords.boundsInRoot())
+                }
+                .testTag("dashboard_open_file_manager"),
           ) {
-            Text(
-              text = "本周新增 +${stats.thisWeekAddedCount}",
-              style = MaterialTheme.typography.labelSmall,
-              fontWeight = FontWeight.SemiBold,
-              color = MaterialTheme.colorScheme.onPrimaryContainer,
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
               modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            )
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(13.dp),
+              )
+              Text(
+                text = "文件管理",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+              )
+            }
           }
         }
       }
