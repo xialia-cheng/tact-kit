@@ -1667,63 +1667,10 @@ private fun DocumentDashboardCard(
         }
       }
 
-      val totalCat = (stats.pdfCount + stats.docTextCount + stats.imageCount + stats.mediaArchiveCount).coerceAtLeast(1)
       val pdfColor = MaterialTheme.colorScheme.primary
       val docColor = MaterialTheme.colorScheme.secondary
       val imgColor = MaterialTheme.colorScheme.tertiary
       val mediaColor = MaterialTheme.colorScheme.outlineVariant
-
-      if (isMinecraft) {
-        val ratio = if (stats.totalItemsCount == 0) 0f else (stats.pdfCount + stats.docTextCount + stats.imageCount).toFloat() / totalCat.toFloat()
-        com.xialia.tactkit.ui.theme.McXpBar(progress = ratio)
-      } else {
-        Row(
-          horizontalArrangement = Arrangement.spacedBy(3.dp),
-          modifier = Modifier.fillMaxWidth().height(8.dp),
-        ) {
-          val barSegmentShape = themeShape(999.dp)
-          if (stats.totalItemsCount == 0) {
-            Box(
-              modifier =
-                Modifier.fillMaxSize()
-                  .background(MaterialTheme.colorScheme.surfaceContainerHigh, barSegmentShape),
-            )
-          } else {
-            if (stats.pdfCount > 0) {
-              Box(
-                modifier =
-                  Modifier.weight(stats.pdfCount.toFloat() / totalCat)
-                    .height(8.dp)
-                    .background(pdfColor, barSegmentShape),
-              )
-            }
-            if (stats.docTextCount > 0) {
-              Box(
-                modifier =
-                  Modifier.weight(stats.docTextCount.toFloat() / totalCat)
-                    .height(8.dp)
-                    .background(docColor, barSegmentShape),
-              )
-            }
-            if (stats.imageCount > 0) {
-              Box(
-                modifier =
-                  Modifier.weight(stats.imageCount.toFloat() / totalCat)
-                    .height(8.dp)
-                    .background(imgColor, barSegmentShape),
-              )
-            }
-            if (stats.mediaArchiveCount > 0) {
-              Box(
-                modifier =
-                  Modifier.weight(stats.mediaArchiveCount.toFloat() / totalCat)
-                    .height(8.dp)
-                    .background(mediaColor, barSegmentShape),
-              )
-            }
-          }
-        }
-      }
 
       Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1745,12 +1692,16 @@ private fun DocumentDashboardCard(
           stats.recentFiles.forEach { file ->
             Surface(
               onClick = { onOpenRecentFile(file) },
-              shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(14.dp),
+              shape = themeShape(14.dp),
               color = MaterialTheme.colorScheme.surfaceContainer,
-              modifier =
-                Modifier.fillMaxWidth()
-                  .let { if (isMinecraft) it.minecraftPixelBevel(isDark = isDark) else it }
-                  .testTag("dashboard_recent_${file.id}"),
+              border =
+                androidx.compose.foundation.BorderStroke(
+                  width = 1.dp,
+                  color =
+                    if (isMinecraft) (if (isDark) Color(0xFF3E4148) else Color(0xFFA0A2A6))
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                ),
+              modifier = Modifier.fillMaxWidth().testTag("dashboard_recent_${file.id}"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
