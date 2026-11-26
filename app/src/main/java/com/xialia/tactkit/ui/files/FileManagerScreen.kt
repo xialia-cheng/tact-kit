@@ -84,6 +84,7 @@ import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileModeChip
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -572,7 +573,7 @@ fun FileManagerWorkspace(
             }
           },
           singleLine = true,
-          shape = RoundedCornerShape(16.dp),
+          shape = themeShape(16.dp),
           modifier =
             Modifier.fillMaxWidth()
               .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -904,7 +905,7 @@ private fun BatchBarAction(
 ) {
   Surface(
     onClick = onClick,
-    shape = RoundedCornerShape(12.dp),
+    shape = themeShape(12.dp),
     color = MaterialTheme.colorScheme.surfaceContainerLow,
   ) {
     Row(

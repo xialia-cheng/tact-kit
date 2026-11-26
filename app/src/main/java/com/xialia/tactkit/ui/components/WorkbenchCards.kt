@@ -57,6 +57,7 @@ import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.text.SimpleDateFormat
@@ -228,7 +229,7 @@ fun WorkbenchCardView(
               onEditNote(card)
             },
             interactionSource = noteInteraction,
-            shape = RoundedCornerShape(16.dp),
+            shape = themeShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),
             modifier =
               Modifier.fillMaxWidth()
@@ -300,7 +301,7 @@ private fun VoiceMemoCardBody(
 
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Surface(
-      shape = RoundedCornerShape(16.dp),
+      shape = themeShape(16.dp),
       color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f),
       modifier = Modifier.fillMaxWidth(),
     ) {
@@ -422,7 +423,7 @@ private fun ChecklistCardBody(
           onValueChange = { newItemText = it },
           placeholder = { Text("输入新待办条目") },
           singleLine = true,
-          shape = RoundedCornerShape(14.dp),
+          shape = themeShape(14.dp),
           modifier = Modifier.weight(1f).testTag("checklist_add_input_${card.id}"),
         )
         TextButton(
@@ -467,7 +468,7 @@ private fun RecentFileCardBody(
     card.sha256?.takeIf { it.isNotBlank() }?.let { digest ->
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),
-        shape = RoundedCornerShape(12.dp),
+        shape = themeShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(
@@ -482,7 +483,7 @@ private fun RecentFileCardBody(
     if (card.previewExcerpt.isNotBlank()) {
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.75f),
-        shape = RoundedCornerShape(12.dp),
+        shape = themeShape(12.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(

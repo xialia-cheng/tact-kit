@@ -36,8 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.data.datastore.AppThemeStyle
 
 /**
- * Classic 3-layer Minecraft pixel bevel:
- * Outer 2.dp black/deep-charcoal border + inner 2.dp top-left highlight + inner 2.dp bottom-right shadow.
+ * Soft Minecraft pixel bevel:
+ * Outer 1.5.dp dark slate gray (#3A3D42) border + subtle inner highlight/shadow.
  * Inverts highlight/shadow when pressed = true for physical block-press feel.
  */
 fun Modifier.mcPixelBox(
@@ -45,9 +45,9 @@ fun Modifier.mcPixelBox(
   isDark: Boolean = false,
 ): Modifier =
   drawMcBevel(
-    outerColor = if (isDark) Color(0xFF121215) else Color(0xFF1E1E1E),
-    hiColor = if (isDark) Color(0xFF484852) else Color.White,
-    loColor = if (isDark) Color(0xFF19191D) else Color(0xFF555555),
+    outerColor = if (isDark) Color(0xFF454952) else Color(0xFF3A3D42),
+    hiColor = if (isDark) Color(0xFF3C4048) else Color(0xFFF8F9F8),
+    loColor = if (isDark) Color(0xFF1A1C20) else Color(0xFFC2C6C2),
     pressed = pressed,
   )
 
@@ -55,17 +55,17 @@ fun Modifier.mcGrassButtonBox(
   pressed: Boolean = false,
 ): Modifier =
   drawMcBevel(
-    outerColor = Color(0xFF1E1E1E),
-    hiColor = Color(0xFF7CE352),
-    loColor = Color(0xFF245217),
+    outerColor = Color(0xFF3A3D42),
+    hiColor = Color(0xFF6BA04F),
+    loColor = Color(0xFF345B22),
     pressed = pressed,
   )
 
 fun Modifier.mcInventorySlotBox(): Modifier =
   drawMcBevel(
     outerColor = Color.Transparent,
-    hiColor = Color(0xFF373737),
-    loColor = Color.White,
+    hiColor = Color(0xFF9EA39E),
+    loColor = Color(0xFFF4F5F4),
     pressed = false,
   )
 
@@ -76,7 +76,7 @@ private fun Modifier.drawMcBevel(
   pressed: Boolean,
 ): Modifier =
   this.drawBehind {
-    val borderPx = 2.dp.toPx()
+    val borderPx = 1.5.dp.toPx()
     val w = size.width
     val h = size.height
     if (w <= borderPx * 2f || h <= borderPx * 2f) return@drawBehind
@@ -136,7 +136,7 @@ fun McXpBar(
       modifier
         .fillMaxWidth()
         .height(10.dp)
-        .background(Color(0xFF1E1E1E), RectangleShape)
+        .background(Color(0xFF3A3D42), RectangleShape)
         .padding(1.5.dp),
   ) {
     for (i in 0 until segments) {
@@ -147,7 +147,7 @@ fun McXpBar(
             .height(7.dp)
             .padding(horizontal = 0.5.dp)
             .background(
-              if (filled) Color(0xFF80FF20) else Color(0xFF1B2418),
+              if (filled) Color(0xFF5EA83B) else Color(0xFF2B3328),
               RectangleShape,
             ),
       )
@@ -162,13 +162,13 @@ fun McGrassDirtTrim(modifier: Modifier = Modifier) {
       modifier =
         Modifier.fillMaxWidth()
           .height(2.dp)
-          .background(Color(0xFF5B8731), RectangleShape),
+          .background(Color(0xFF4A7C32), RectangleShape),
     )
     Box(
       modifier =
         Modifier.fillMaxWidth()
           .height(2.dp)
-          .background(Color(0xFF866043), RectangleShape),
+          .background(Color(0xFF7D5D43), RectangleShape),
     )
   }
 }

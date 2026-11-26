@@ -118,11 +118,13 @@ import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
+import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.ui.theme.mcGrassButtonBox
 import com.xialia.tactkit.ui.theme.mcPixelBox
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
@@ -372,7 +374,7 @@ fun HomeScreen(
                 }
               },
               singleLine = true,
-              shape = RoundedCornerShape(16.dp),
+              shape = themeShape(16.dp),
               modifier =
                 Modifier.fillMaxWidth()
                   .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1053,7 +1055,7 @@ private fun WorkbenchOverviewSection(
     } else {
       // Borderless tonal overview card (CLASSIC_DEFAULT and non-Bento themes)
       Surface(
-        shape = RoundedCornerShape(cardCorner),
+        shape = themeShape(cardCorner),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = cardBorder,
         tonalElevation = 0.dp,
@@ -1240,9 +1242,9 @@ private fun EmptyQuickActionsSection(
     modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("empty_workbench_card"),
   ) {
     if (hasSearchOrFilter) {
-      Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+      TactKitCard(
+        corner = 22.dp,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
       ) {
         Row(
@@ -1409,7 +1411,7 @@ private fun CreateChecklistDialog(
           label = { Text("清单标题") },
           placeholder = { Text("例如：发版前检查项") },
           singleLine = true,
-          shape = RoundedCornerShape(14.dp),
+          shape = themeShape(14.dp),
           modifier = Modifier.fillMaxWidth().testTag("dialog_checklist_title"),
         )
         OutlinedTextField(
@@ -1419,7 +1421,7 @@ private fun CreateChecklistDialog(
           placeholder = { Text("校验 SHA-256\n导出 release APK\n备份配置文件") },
           minLines = 4,
           maxLines = 8,
-          shape = RoundedCornerShape(14.dp),
+          shape = themeShape(14.dp),
           modifier = Modifier.fillMaxWidth().testTag("dialog_checklist_items"),
         )
       }
@@ -1463,7 +1465,7 @@ private fun NoteEditorDialog(
           label = { Text("便签标题") },
           placeholder = { Text("例如：Gradle 防冲突备忘") },
           singleLine = true,
-          shape = RoundedCornerShape(14.dp),
+          shape = themeShape(14.dp),
           modifier = Modifier.fillMaxWidth().testTag("dialog_note_title"),
         )
         OutlinedTextField(
@@ -1474,7 +1476,7 @@ private fun NoteEditorDialog(
           textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = TactKitMono),
           minLines = 6,
           maxLines = 12,
-          shape = RoundedCornerShape(14.dp),
+          shape = themeShape(14.dp),
           modifier = Modifier.fillMaxWidth().testTag("dialog_note_content"),
         )
       }
@@ -1621,11 +1623,12 @@ private fun DocumentDashboardCard(
           horizontalArrangement = Arrangement.spacedBy(3.dp),
           modifier = Modifier.fillMaxWidth().height(8.dp),
         ) {
+          val barSegmentShape = themeShape(999.dp)
           if (stats.totalItemsCount == 0) {
             Box(
               modifier =
                 Modifier.fillMaxSize()
-                  .background(MaterialTheme.colorScheme.surfaceContainerHigh, ContinuousCapsule()),
+                  .background(MaterialTheme.colorScheme.surfaceContainerHigh, barSegmentShape),
             )
           } else {
             if (stats.pdfCount > 0) {
@@ -1633,7 +1636,7 @@ private fun DocumentDashboardCard(
                 modifier =
                   Modifier.weight(stats.pdfCount.toFloat() / totalCat)
                     .height(8.dp)
-                    .background(pdfColor, ContinuousCapsule()),
+                    .background(pdfColor, barSegmentShape),
               )
             }
             if (stats.docTextCount > 0) {
@@ -1641,7 +1644,7 @@ private fun DocumentDashboardCard(
                 modifier =
                   Modifier.weight(stats.docTextCount.toFloat() / totalCat)
                     .height(8.dp)
-                    .background(docColor, ContinuousCapsule()),
+                    .background(docColor, barSegmentShape),
               )
             }
             if (stats.imageCount > 0) {
@@ -1649,7 +1652,7 @@ private fun DocumentDashboardCard(
                 modifier =
                   Modifier.weight(stats.imageCount.toFloat() / totalCat)
                     .height(8.dp)
-                    .background(imgColor, ContinuousCapsule()),
+                    .background(imgColor, barSegmentShape),
               )
             }
             if (stats.mediaArchiveCount > 0) {
@@ -1657,7 +1660,7 @@ private fun DocumentDashboardCard(
                 modifier =
                   Modifier.weight(stats.mediaArchiveCount.toFloat() / totalCat)
                     .height(8.dp)
-                    .background(mediaColor, ContinuousCapsule()),
+                    .background(mediaColor, barSegmentShape),
               )
             }
           }

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.AppHaptics
 import kotlin.math.roundToInt
 
@@ -248,7 +249,7 @@ fun SpotlightOnboardingOverlay(
         label = "onboarding_bubble",
       ) { step ->
         Surface(
-          shape = RoundedCornerShape(22.dp),
+          shape = themeShape(22.dp),
           color = MaterialTheme.colorScheme.surfaceContainerLowest,
           tonalElevation = 4.dp,
           shadowElevation = 8.dp,
@@ -264,7 +265,7 @@ fun SpotlightOnboardingOverlay(
               modifier = Modifier.fillMaxWidth(),
             ) {
               Surface(
-                shape = ContinuousCapsule(),
+                shape = themeShape(999.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
               ) {
                 Text(
