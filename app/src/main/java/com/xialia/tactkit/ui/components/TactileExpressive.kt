@@ -633,3 +633,52 @@ fun PetalIconBadge(
     }
   }
 }
+
+@Composable
+fun SimpleFlowRow(
+  modifier: Modifier = Modifier,
+  horizontalSpacing: Dp = 8.dp,
+  verticalSpacing: Dp = 8.dp,
+  content: @Composable () -> Unit,
+) {
+  androidx.compose.ui.layout.Layout(content = content, modifier = modifier) { measurables, constraints ->
+    val hGap = horizontalSpacing.roundToPx()
+    val vGap = verticalSpacing.roundToPx()
+    val maxW = constraints.maxWidth
+    val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+    val rows = mutableListOf<List<Pair<androidx.compose.ui.layout.Placeable, Int>>>()
+    var currentRow = mutableListOf<Pair<androidx.compose.ui.layout.Placeable, Int>>()
+    var x = 0
+    var rowHeight = 0
+    val rowHeights = mutableListOf<Int>()
+    for (measurable in measurables) {
+      val placeable = measurable.measure(childConstraints)
+      if (currentRow.isNotEmpty() && maxW != Int.MAX_VALUE && x + placeable.width > maxW) {
+        rows.add(currentRow)
+        rowHeights.add(rowHeight)
+        currentRow = mutableListOf()
+        x = 0
+        rowHeight = 0
+      }
+      currentRow.add(placeable to x)
+      x += placeable.width + hGap
+      rowHeight = maxOf(rowHeight, placeable.height)
+    }
+    if (currentRow.isNotEmpty()) {
+      rows.add(currentRow)
+      rowHeights.add(rowHeight)
+    }
+    val totalHeight =
+      (rowHeights.sum() + (rows.size - 1).coerceAtLeast(0) * vGap).coerceIn(constraints.minHeight, constraints.maxHeight)
+    val layoutWidth =
+      if (constraints.hasBoundedWidth) maxW
+      else (rows.maxOfOrNull { r -> r.lastOrNull()?.let { it.second + it.first.width } ?: 0 } ?: 0)
+    layout(layoutWidth.coerceIn(constraints.minWidth, maxW), totalHeight) {
+      var y = 0
+      rows.forEachIndexed { idx, row ->
+        row.forEach { (placeable, px) -> placeable.placeRelative(px, y) }
+        y += rowHeights[idx] + vGap
+      }
+    }
+  }
+}

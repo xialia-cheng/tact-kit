@@ -7,8 +7,6 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -63,7 +61,7 @@ import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DnsSslScreen(
   onNavigateBack: () -> Unit,
@@ -211,9 +209,9 @@ fun DnsSslScreen(
                   if (res.resolvedIps.isEmpty()) {
                     Text("未解析到 IP 地址", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                   } else {
-                    FlowRow(
-                      horizontalArrangement = Arrangement.spacedBy(8.dp),
-                      verticalArrangement = Arrangement.spacedBy(8.dp),
+                    com.xialia.tactkit.ui.components.SimpleFlowRow(
+                      horizontalSpacing = 8.dp,
+                      verticalSpacing = 8.dp,
                     ) {
                       res.resolvedIps.forEach { ip ->
                         Surface(
