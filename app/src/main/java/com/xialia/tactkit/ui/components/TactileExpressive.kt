@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -326,64 +327,113 @@ fun TactileModeChip(
     label = "chip_corner",
   )
 
-  Surface(
-    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
-    color =
-      when {
-        isMinecraft && selected -> Color(0xFF3C8527)
-        selected -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
-      },
-    contentColor =
-      when {
-        isMinecraft && selected -> Color.White
-        selected -> MaterialTheme.colorScheme.onPrimaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-      },
-    border = themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant),
-    modifier =
-      modifier
-        .graphicsLayer {
-          scaleX = scale
-          scaleY = scale
-        }
-        .let {
-          if (isMinecraft) {
-            it.let { m -> if (selected) m.mcGrassButtonBox(pressed = isPressed) else m.mcPixelBox(pressed = isPressed, isDark = isDark) }
-          } else {
-            it
+  val chipBgColor =
+    when {
+      isMinecraft && selected -> Color(0xFF4A7C32)
+      selected -> MaterialTheme.colorScheme.primaryContainer
+      else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+  val chipFgColor =
+    when {
+      isMinecraft && selected -> Color.White
+      selected -> MaterialTheme.colorScheme.onPrimaryContainer
+      else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+  if (isMinecraft) {
+    androidx.compose.foundation.layout.Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+        modifier
+          .heightIn(min = 34.dp)
+          .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
           }
-        }
-        .clickable(
-          interactionSource = interactionSource,
-          indication = ripple(),
-          role = Role.Tab,
-          onClick = {
-            view.playSoundEffect(SoundEffectConstants.CLICK)
-            AppHaptics.tick(view)
-            onClick()
-          },
-        ),
-  ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+          .background(chipBgColor, androidx.compose.ui.graphics.RectangleShape)
+          .let { m ->
+            if (selected) m.mcGrassButtonBox(pressed = isPressed)
+            else m.mcPixelBox(pressed = isPressed, isDark = isDark)
+          }
+          .clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            role = Role.Tab,
+            onClick = {
+              view.playSoundEffect(SoundEffectConstants.CLICK)
+              AppHaptics.tick(view)
+              onClick()
+            },
+          ),
     ) {
-      if (icon != null) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          modifier = Modifier.size(16.dp),
-        )
-        Spacer(modifier = Modifier.width(6.dp))
+      androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalContentColor provides chipFgColor,
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        ) {
+          if (icon != null) {
+            Icon(
+              imageVector = icon,
+              contentDescription = null,
+              modifier = Modifier.size(16.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+          }
+          Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+          )
+        }
       }
-      Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-        maxLines = 1,
-        softWrap = false,
-      )
+    }
+  } else {
+    Surface(
+      shape = RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+      color = chipBgColor,
+      contentColor = chipFgColor,
+      border = themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant),
+      modifier =
+        modifier
+          .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+          }
+          .clickable(
+            interactionSource = interactionSource,
+            indication = ripple(),
+            role = Role.Tab,
+            onClick = {
+              view.playSoundEffect(SoundEffectConstants.CLICK)
+              AppHaptics.tick(view)
+              onClick()
+            },
+          ),
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+      ) {
+        if (icon != null) {
+          Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+          )
+          Spacer(modifier = Modifier.width(6.dp))
+        }
+        Text(
+          text = label,
+          style = MaterialTheme.typography.labelLarge,
+          fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+          maxLines = 1,
+          softWrap = false,
+        )
+      }
     }
   }
 }
@@ -423,50 +473,79 @@ fun TactileActionButton(
     label = "btn_corner",
   )
 
-  Surface(
-    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
-    color =
-      when {
-        isMinecraft && enabled -> Color(0xFF3C8527)
-        isMinecraft && !enabled -> Color(0xFF8B8B8B)
-        enabled -> containerColor
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-      },
-    contentColor =
-      if (isMinecraft) Color.White
-      else if (enabled) contentColor
-      else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-    modifier =
-      modifier
-        .graphicsLayer {
-          scaleX = scale
-          scaleY = scale
-        }
-        .let {
-          if (isMinecraft) {
-            it.mcGrassButtonBox(pressed = isPressed && enabled)
-          } else {
-            it
+  val btnBgColor =
+    when {
+      isMinecraft && enabled -> Color(0xFF4A7C32)
+      isMinecraft && !enabled -> Color(0xFF8B8B8B)
+      enabled -> containerColor
+      else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+  val btnFgColor =
+    if (isMinecraft) Color.White
+    else if (enabled) contentColor
+    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+
+  if (isMinecraft) {
+    androidx.compose.runtime.CompositionLocalProvider(
+      androidx.compose.material3.LocalContentColor provides btnFgColor,
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        modifier =
+          modifier
+            .heightIn(min = 36.dp)
+            .graphicsLayer {
+              scaleX = scale
+              scaleY = scale
+            }
+            .background(btnBgColor, androidx.compose.ui.graphics.RectangleShape)
+            .mcGrassButtonBox(pressed = isPressed && enabled)
+            .clickable(
+              interactionSource = interactionSource,
+              indication = null,
+              enabled = enabled,
+              role = Role.Button,
+              onClick = {
+                view.playSoundEffect(SoundEffectConstants.CLICK)
+                AppHaptics.tick(view)
+                onClick()
+              },
+            )
+            .padding(contentPadding),
+        content = content,
+      )
+    }
+  } else {
+    Surface(
+      shape = RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+      color = btnBgColor,
+      contentColor = btnFgColor,
+      modifier =
+        modifier
+          .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
           }
-        }
-        .clickable(
-          interactionSource = interactionSource,
-          indication = ripple(),
-          enabled = enabled,
-          role = Role.Button,
-          onClick = {
-            view.playSoundEffect(SoundEffectConstants.CLICK)
-            AppHaptics.tick(view)
-            onClick()
-          },
-        ),
-  ) {
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-      modifier = Modifier.padding(contentPadding),
-      content = content,
-    )
+          .clickable(
+            interactionSource = interactionSource,
+            indication = ripple(),
+            enabled = enabled,
+            role = Role.Button,
+            onClick = {
+              view.playSoundEffect(SoundEffectConstants.CLICK)
+              AppHaptics.tick(view)
+              onClick()
+            },
+          ),
+    ) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        modifier = Modifier.padding(contentPadding),
+        content = content,
+      )
+    }
   }
 }
 

@@ -37,7 +37,7 @@ import com.xialia.tactkit.data.datastore.AppThemeStyle
 
 /**
  * Soft Minecraft pixel bevel:
- * Outer 1.5.dp dark slate gray (#3A3D42) border + subtle inner highlight/shadow.
+ * Outer 1.dp soft dark gray (#4E5259) border + 1.dp low-contrast inner highlight/shadow.
  * Inverts highlight/shadow when pressed = true for physical block-press feel.
  */
 fun Modifier.mcPixelBox(
@@ -45,9 +45,9 @@ fun Modifier.mcPixelBox(
   isDark: Boolean = false,
 ): Modifier =
   drawMcBevel(
-    outerColor = if (isDark) Color(0xFF454952) else Color(0xFF3A3D42),
-    hiColor = if (isDark) Color(0xFF3C4048) else Color(0xFFF8F9F8),
-    loColor = if (isDark) Color(0xFF1A1C20) else Color(0xFFC2C6C2),
+    outerColor = if (isDark) Color(0xFF565B64) else Color(0xFF4E5259),
+    hiColor = if (isDark) Color(0xFF3E424A) else Color(0xFFF6F7F6),
+    loColor = if (isDark) Color(0xFF1F2126) else Color(0xFFD0D3D0),
     pressed = pressed,
   )
 
@@ -55,16 +55,16 @@ fun Modifier.mcGrassButtonBox(
   pressed: Boolean = false,
 ): Modifier =
   drawMcBevel(
-    outerColor = Color(0xFF3A3D42),
+    outerColor = Color(0xFF4E5259),
     hiColor = Color(0xFF6BA04F),
-    loColor = Color(0xFF345B22),
+    loColor = Color(0xFF375F24),
     pressed = pressed,
   )
 
 fun Modifier.mcInventorySlotBox(): Modifier =
   drawMcBevel(
     outerColor = Color.Transparent,
-    hiColor = Color(0xFF9EA39E),
+    hiColor = Color(0xFFA8ADA8),
     loColor = Color(0xFFF4F5F4),
     pressed = false,
   )
@@ -76,7 +76,7 @@ private fun Modifier.drawMcBevel(
   pressed: Boolean,
 ): Modifier =
   this.drawBehind {
-    val borderPx = 1.5.dp.toPx()
+    val borderPx = 1.dp.toPx()
     val w = size.width
     val h = size.height
     if (w <= borderPx * 2f || h <= borderPx * 2f) return@drawBehind
@@ -135,9 +135,9 @@ fun McXpBar(
     modifier =
       modifier
         .fillMaxWidth()
-        .height(10.dp)
-        .background(Color(0xFF3A3D42), RectangleShape)
-        .padding(1.5.dp),
+        .height(9.dp)
+        .background(Color(0xFF4E5259), RectangleShape)
+        .padding(1.dp),
   ) {
     for (i in 0 until segments) {
       val filled = i < filledSegments || (clamped > 0f && i == 0 && filledSegments == 0)

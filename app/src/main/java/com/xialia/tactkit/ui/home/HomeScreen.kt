@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -1154,49 +1155,75 @@ private fun WorkbenchOverviewSection(
         val selected = uiState.activeFilter == filter
         val filterInteraction = remember { MutableInteractionSource() }
         val filterPressed by filterInteraction.collectIsPressedAsState()
-        Surface(
-          onClick = { onFilterChange(filter) },
-          interactionSource = filterInteraction,
-          shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(14.dp),
-          color =
-            when {
-              isMinecraft && selected -> Color(0xFF3C8527)
-              selected -> MaterialTheme.colorScheme.primaryContainer
-              else -> MaterialTheme.colorScheme.surfaceContainerLow
-            },
-          modifier =
-            Modifier.weight(1f)
-              .tactilePress(
-                interactionSource = filterInteraction,
-                baseCorner = if (isMinecraft) 0.dp else 14.dp,
-                pressedCorner = if (isMinecraft) 0.dp else 22.dp,
-                enableHapticOnPress = false,
-              )
-              .let {
-                if (isMinecraft) {
-                  it.let { m -> if (selected) m.mcGrassButtonBox(pressed = filterPressed) else m.mcPixelBox(pressed = filterPressed, isDark = isDark) }
-                } else {
-                  it
+        val bgColor =
+          when {
+            isMinecraft && selected -> Color(0xFF4A7C32)
+            selected -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+          }
+        val fgColor =
+          when {
+            isMinecraft && selected -> Color.White
+            selected -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+          }
+        if (isMinecraft) {
+          Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+              Modifier.weight(1f)
+                .height(36.dp)
+                .background(bgColor, androidx.compose.ui.graphics.RectangleShape)
+                .let { m ->
+                  if (selected) m.mcGrassButtonBox(pressed = filterPressed)
+                  else m.mcPixelBox(pressed = filterPressed, isDark = isDark)
                 }
-              }
-              .testTag("filter_chip_${filter.name}"),
-        ) {
-          Text(
-            text = filter.label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color =
-              when {
-                isMinecraft && selected -> Color.White
-                selected -> MaterialTheme.colorScheme.onPrimaryContainer
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
-              },
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(vertical = 10.dp),
-          )
+                .clickable(
+                  interactionSource = filterInteraction,
+                  indication = null,
+                  onClick = { onFilterChange(filter) },
+                )
+                .testTag("filter_chip_${filter.name}"),
+          ) {
+            Text(
+              text = filter.label,
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+              color = fgColor,
+              textAlign = TextAlign.Center,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
+        } else {
+          Surface(
+            onClick = { onFilterChange(filter) },
+            interactionSource = filterInteraction,
+            shape = RoundedCornerShape(14.dp),
+            color = bgColor,
+            modifier =
+              Modifier.weight(1f)
+                .tactilePress(
+                  interactionSource = filterInteraction,
+                  baseCorner = 14.dp,
+                  pressedCorner = 22.dp,
+                  enableHapticOnPress = false,
+                )
+                .testTag("filter_chip_${filter.name}"),
+          ) {
+            Text(
+              text = filter.label,
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+              color = fgColor,
+              textAlign = TextAlign.Center,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.padding(vertical = 10.dp),
+            )
+          }
         }
       }
     }
@@ -1558,40 +1585,62 @@ private fun DocumentDashboardCard(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          Surface(
-            onClick = onOpenFileManager,
-            shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule(),
-            color = if (isMinecraft) Color(0xFF3C8527) else MaterialTheme.colorScheme.secondaryContainer,
-            modifier =
-              Modifier.let {
-                  if (isMinecraft) {
-                    it.mcGrassButtonBox()
-                  } else {
-                    it
-                  }
-                }
-                .onGloballyPositioned { coords ->
-                  onFileManagerButtonPositioned(coords.boundsInRoot())
-                }
-                .testTag("dashboard_open_file_manager"),
-          ) {
+          if (isMinecraft) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(4.dp),
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+              modifier =
+                Modifier.background(Color(0xFF4A7C32), androidx.compose.ui.graphics.RectangleShape)
+                  .mcGrassButtonBox()
+                  .clickable(onClick = onOpenFileManager)
+                  .padding(horizontal = 10.dp, vertical = 6.dp)
+                  .onGloballyPositioned { coords ->
+                    onFileManagerButtonPositioned(coords.boundsInRoot())
+                  }
+                  .testTag("dashboard_open_file_manager"),
             ) {
               Icon(
                 imageVector = Icons.Rounded.FolderOpen,
                 contentDescription = null,
-                tint = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = Color.White,
                 modifier = Modifier.size(13.dp),
               )
               Text(
                 text = "文件管理",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onSecondaryContainer,
+                color = Color.White,
               )
+            }
+          } else {
+            Surface(
+              onClick = onOpenFileManager,
+              shape = ContinuousCapsule(),
+              color = MaterialTheme.colorScheme.secondaryContainer,
+              modifier =
+                Modifier.onGloballyPositioned { coords ->
+                    onFileManagerButtonPositioned(coords.boundsInRoot())
+                  }
+                  .testTag("dashboard_open_file_manager"),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.FolderOpen,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                  modifier = Modifier.size(13.dp),
+                )
+                Text(
+                  text = "文件管理",
+                  style = MaterialTheme.typography.labelSmall,
+                  fontWeight = FontWeight.SemiBold,
+                  color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+              }
             }
           }
           Surface(
