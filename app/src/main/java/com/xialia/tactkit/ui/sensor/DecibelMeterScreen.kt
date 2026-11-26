@@ -41,10 +41,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.FloatState
+import androidx.compose.runtime.IntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,6 +72,8 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+private const val DB_RING_CAP = 64
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DecibelMeterScreen(
@@ -88,13 +91,18 @@ fun DecibelMeterScreen(
     )
   }
   var isRunning by remember { mutableStateOf(false) }
-  var currentDb by remember { mutableFloatStateOf(0f) }
-  var minDb by remember { mutableFloatStateOf(999f) }
-  var maxDb by remember { mutableFloatStateOf(0f) }
-  var sumDb by remember { mutableFloatStateOf(0f) }
-  var sampleCount by remember { mutableIntStateOf(0) }
+  val currentDbState = remember { mutableFloatStateOf(0f) }
+  val minDbState = remember { mutableFloatStateOf(999f) }
+  val maxDbState = remember { mutableFloatStateOf(0f) }
+  val sumDbState = remember { mutableFloatStateOf(0f) }
+  val sampleCountState = remember { mutableIntStateOf(0) }
   var errorMsg by remember { mutableStateOf<String?>(null) }
-  val history = remember { mutableStateListOf<Float>() }
+
+  // Fixed pre-allocated ring buffer + Path
+  val ringBuffer = remember { FloatArray(DB_RING_CAP) }
+  val ringHeadState = remember { mutableIntStateOf(0) }
+  val ringCountState = remember { mutableIntStateOf(0) }
+  val wavePath = remember { Path() }
 
   fun startMonitoring() {
     errorMsg = null
@@ -103,14 +111,20 @@ fun DecibelMeterScreen(
       scope = scope,
       onSample = { db ->
         scope.launch(Dispatchers.Main) {
-          val smoothed = if (currentDb <= 0f) db else currentDb * 0.65f + db * 0.35f
-          currentDb = smoothed
-          if (smoothed < minDb) minDb = smoothed
-          if (smoothed > maxDb) maxDb = smoothed
-          sumDb += smoothed
-          sampleCount += 1
-          history.add(smoothed)
-          if (history.size > 64) history.removeAt(0)
+          val prev = currentDbState.floatValue
+          val smoothed = if (prev <= 0f) db else prev * 0.65f + db * 0.35f
+          currentDbState.floatValue = smoothed
+          if (smoothed < minDbState.floatValue) minDbState.floatValue = smoothed
+          if (smoothed > maxDbState.floatValue) maxDbState.floatValue = smoothed
+          sumDbState.floatValue += smoothed
+          sampleCountState.intValue += 1
+
+          val head = ringHeadState.intValue
+          ringBuffer[head] = smoothed
+          ringHeadState.intValue = (head + 1) % DB_RING_CAP
+          if (ringCountState.intValue < DB_RING_CAP) {
+            ringCountState.intValue += 1
+          }
         }
       },
       onError = { msg ->
@@ -138,17 +152,6 @@ fun DecibelMeterScreen(
       monitor.stop()
     }
   }
-
-  val avgDb = if (sampleCount > 0) sumDb / sampleCount else 0f
-  val envLabel =
-    when {
-      !isRunning && sampleCount == 0 -> "等待采样"
-      currentDb < 35f -> "极静环境（图书馆 / 深夜）"
-      currentDb < 50f -> "安静室内（住宅 / 轻声交谈）"
-      currentDb < 68f -> "日常办公（正常对话）"
-      currentDb < 82f -> "偏高嘈杂（街道 / 餐厅）"
-      else -> "高分贝噪音（建议注意听力防护）"
-    }
 
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -252,48 +255,14 @@ fun DecibelMeterScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.padding(20.dp),
               ) {
-                Row(
-                  verticalAlignment = Alignment.Bottom,
-                  horizontalArrangement = Arrangement.Center,
-                ) {
-                  com.xialia.tactkit.ui.components.RollingNumberText(
-                    text = if (sampleCount == 0) "--.-" else String.format(Locale.US, "%.1f", currentDb),
-                    fontFamily = TactKitMono,
-                    style = MaterialTheme.typography.displayMedium.copy(fontSize = 54.sp),
-                    fontWeight = FontWeight.Bold,
-                    color =
-                      if (currentDb >= 82f) MaterialTheme.colorScheme.error
-                      else MaterialTheme.colorScheme.primary,
-                  )
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                    text = "dB",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                  )
-                }
-
-                Surface(
-                  shape = RoundedCornerShape(14.dp),
-                  color = MaterialTheme.colorScheme.surfaceContainer,
-                ) {
-                  Text(
-                    text = envLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                  )
-                }
-
-                Row(
-                  horizontalArrangement = Arrangement.SpaceEvenly,
-                  modifier = Modifier.fillMaxWidth(),
-                ) {
-                  StatReadingTile("最小", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", minDb))
-                  StatReadingTile("平均", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", avgDb))
-                  StatReadingTile("峰值", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", maxDb))
-                }
+                DecibelReadoutSection(
+                  currentDbState = currentDbState,
+                  minDbState = minDbState,
+                  maxDbState = maxDbState,
+                  sumDbState = sumDbState,
+                  sampleCountState = sampleCountState,
+                  isRunning = isRunning,
+                )
 
                 val waveColor = MaterialTheme.colorScheme.primary
                 val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -302,17 +271,21 @@ fun DecibelMeterScreen(
                 ) {
                   val midY = size.height * 0.5f
                   drawLine(gridColor, Offset(0f, midY), Offset(size.width, midY), strokeWidth = 1.dp.toPx())
-                  if (history.size >= 2) {
-                    val path = Path()
-                    val stepX = size.width / (history.size - 1).coerceAtLeast(1)
-                    history.forEachIndexed { idx, value ->
+                  val count = ringCountState.intValue
+                  val head = ringHeadState.intValue
+                  if (count >= 2) {
+                    wavePath.reset()
+                    val stepX = size.width / (count - 1).coerceAtLeast(1)
+                    val startIdx = if (count == DB_RING_CAP) head else 0
+                    for (i in 0 until count) {
+                      val value = ringBuffer[(startIdx + i) % DB_RING_CAP]
                       val norm = ((value - 20f) / 100f).coerceIn(0f, 1f)
-                      val x = idx * stepX
+                      val x = i * stepX
                       val y = size.height - norm * (size.height - 16.dp.toPx()) - 8.dp.toPx()
-                      if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                      if (i == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
                     }
                     drawPath(
-                      path = path,
+                      path = wavePath,
                       color = waveColor,
                       style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
                     )
@@ -347,11 +320,12 @@ fun DecibelMeterScreen(
                   FilledTonalButton(
                     onClick = {
                       haptics.tick()
-                      minDb = 999f
-                      maxDb = 0f
-                      sumDb = 0f
-                      sampleCount = 0
-                      history.clear()
+                      minDbState.floatValue = 999f
+                      maxDbState.floatValue = 0f
+                      sumDbState.floatValue = 0f
+                      sampleCountState.intValue = 0
+                      ringHeadState.intValue = 0
+                      ringCountState.intValue = 0
                     },
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.height(48.dp).testTag("decibel_reset_button"),
@@ -396,12 +370,80 @@ fun DecibelMeterScreen(
 }
 
 @Composable
+private fun DecibelReadoutSection(
+  currentDbState: FloatState,
+  minDbState: FloatState,
+  maxDbState: FloatState,
+  sumDbState: FloatState,
+  sampleCountState: IntState,
+  isRunning: Boolean,
+) {
+  val currentDb = currentDbState.floatValue
+  val minDb = minDbState.floatValue
+  val maxDb = maxDbState.floatValue
+  val sampleCount = sampleCountState.intValue
+  val avgDb = if (sampleCount > 0) sumDbState.floatValue / sampleCount else 0f
+  val envLabel =
+    when {
+      !isRunning && sampleCount == 0 -> "等待采样"
+      currentDb < 35f -> "极静环境（图书馆 / 深夜）"
+      currentDb < 50f -> "安静室内（住宅 / 轻声交谈）"
+      currentDb < 68f -> "日常办公（正常对话）"
+      currentDb < 82f -> "偏高嘈杂（街道 / 餐厅）"
+      else -> "高分贝噪音（建议注意听力防护）"
+    }
+
+  Row(
+    verticalAlignment = Alignment.Bottom,
+    horizontalArrangement = Arrangement.Center,
+  ) {
+    Text(
+      text = if (sampleCount == 0) "--.-" else String.format(Locale.US, "%.1f", currentDb),
+      fontFamily = TactKitMono,
+      style = MaterialTheme.typography.displayMedium.copy(fontSize = 54.sp, fontFeatureSettings = "tnum"),
+      fontWeight = FontWeight.Bold,
+      color =
+        if (currentDb >= 82f) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.primary,
+    )
+    Spacer(modifier = Modifier.width(6.dp))
+    Text(
+      text = "dB",
+      style = MaterialTheme.typography.titleLarge,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(bottom = 10.dp),
+    )
+  }
+
+  Surface(
+    shape = RoundedCornerShape(14.dp),
+    color = MaterialTheme.colorScheme.surfaceContainer,
+  ) {
+    Text(
+      text = envLabel,
+      style = MaterialTheme.typography.labelLarge,
+      color = MaterialTheme.colorScheme.onSurface,
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+  }
+
+  Row(
+    horizontalArrangement = Arrangement.SpaceEvenly,
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    StatReadingTile("最小", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", minDb))
+    StatReadingTile("平均", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", avgDb))
+    StatReadingTile("峰值", if (sampleCount == 0) "--" else String.format(Locale.US, "%.1f", maxDb))
+  }
+}
+
+@Composable
 private fun StatReadingTile(label: String, value: String) {
   Column(horizontalAlignment = Alignment.CenterHorizontally) {
     Text(
       text = value,
       fontFamily = TactKitMono,
-      style = MaterialTheme.typography.titleMedium,
+      style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
       fontWeight = FontWeight.Bold,
     )
     Text(

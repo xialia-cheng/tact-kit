@@ -39,9 +39,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,6 +64,8 @@ import com.xialia.tactkit.util.rememberAppHaptics
 import java.util.Locale
 import kotlin.math.log10
 
+private const val LUX_RING_CAP = 60
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LightLuxScreen(
@@ -72,11 +75,16 @@ fun LightLuxScreen(
   val haptics = rememberAppHaptics()
 
   var hasLightSensor by remember { mutableStateOf(true) }
-  var currentLux by remember { mutableFloatStateOf(0f) }
-  var minLux by remember { mutableFloatStateOf(Float.MAX_VALUE) }
-  var maxLux by remember { mutableFloatStateOf(0f) }
-  var hasSample by remember { mutableStateOf(false) }
-  val history = remember { mutableStateListOf<Float>() }
+  val currentLuxState = remember { mutableFloatStateOf(0f) }
+  val minLuxState = remember { mutableFloatStateOf(Float.MAX_VALUE) }
+  val maxLuxState = remember { mutableFloatStateOf(0f) }
+  val hasSampleState = remember { mutableStateOf(false) }
+
+  // Fixed pre-allocated ring buffer + Path
+  val ringBuffer = remember { FloatArray(LUX_RING_CAP) }
+  val ringHeadState = remember { mutableIntStateOf(0) }
+  val ringCountState = remember { mutableIntStateOf(0) }
+  val wavePath = remember { Path() }
 
   DisposableEffect(context) {
     val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -86,31 +94,26 @@ fun LightLuxScreen(
       object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
           val lux = event.values.firstOrNull()?.coerceAtLeast(0f) ?: return
-          currentLux = lux
-          hasSample = true
-          if (lux < minLux) minLux = lux
-          if (lux > maxLux) maxLux = lux
-          history.add(lux)
-          if (history.size > 60) history.removeAt(0)
+          currentLuxState.floatValue = lux
+          hasSampleState.value = true
+          if (lux < minLuxState.floatValue) minLuxState.floatValue = lux
+          if (lux > maxLuxState.floatValue) maxLuxState.floatValue = lux
+
+          val head = ringHeadState.intValue
+          ringBuffer[head] = lux
+          ringHeadState.intValue = (head + 1) % LUX_RING_CAP
+          if (ringCountState.intValue < LUX_RING_CAP) {
+            ringCountState.intValue += 1
+          }
         }
 
         override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) = Unit
       }
     if (lightSensor != null) {
-      sm.registerListener(listener, lightSensor, SensorManager.SENSOR_DELAY_UI)
+      sm.registerListener(listener, lightSensor, SensorManager.SENSOR_DELAY_GAME)
     }
     onDispose { sm.unregisterListener(listener) }
   }
-
-  val sceneAdvice =
-    when {
-      !hasSample -> "等待光线传感器读数"
-      currentLux < 30f -> "昏暗环境（夜间休息或暗室）"
-      currentLux < 150f -> "柔和室内光（建议适当开灯阅读）"
-      currentLux < 500f -> "标准阅读 / 办公照度（舒适护眼）"
-      currentLux < 2500f -> "明亮窗边或高照度工作台"
-      else -> "强烈户外日照环境"
-    }
 
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -175,72 +178,33 @@ fun LightLuxScreen(
                 modifier = Modifier.padding(20.dp),
               ) {
                 PetalIconBadge(icon = Icons.Rounded.LightMode, size = 50.dp)
-                Row(verticalAlignment = Alignment.Bottom) {
-                  Text(
-                    text = if (!hasSample) "--" else String.format(Locale.US, "%.0f", currentLux),
-                    fontFamily = TactKitMono,
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                  )
-                  Spacer(modifier = Modifier.width(6.dp))
-                  Text(
-                    text = "lx",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 10.dp),
-                  )
-                }
-
-                Surface(
-                  shape = RoundedCornerShape(14.dp),
-                  color = MaterialTheme.colorScheme.surfaceContainer,
-                ) {
-                  Text(
-                    text = sceneAdvice,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                  )
-                }
-
-                Row(
-                  horizontalArrangement = Arrangement.SpaceEvenly,
-                  modifier = Modifier.fillMaxWidth(),
-                ) {
-                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                      text = if (!hasSample) "--" else String.format(Locale.US, "%.0f lx", minLux),
-                      fontFamily = TactKitMono,
-                      fontWeight = FontWeight.Bold,
-                    )
-                    Text("最低照度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                  }
-                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                      text = if (!hasSample) "--" else String.format(Locale.US, "%.0f lx", maxLux),
-                      fontFamily = TactKitMono,
-                      fontWeight = FontWeight.Bold,
-                    )
-                    Text("最高照度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                  }
-                }
+                LightLuxReadout(
+                  currentLuxState = currentLuxState,
+                  minLuxState = minLuxState,
+                  maxLuxState = maxLuxState,
+                  hasSample = hasSampleState.value,
+                )
 
                 val waveColor = MaterialTheme.colorScheme.primary
                 val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                 Canvas(modifier = Modifier.fillMaxWidth().height(110.dp)) {
                   drawLine(lineColor, Offset(0f, size.height * 0.5f), Offset(size.width, size.height * 0.5f))
-                  if (history.size >= 2) {
-                    val path = Path()
-                    val stepX = size.width / (history.size - 1).coerceAtLeast(1)
-                    history.forEachIndexed { idx, lux ->
+                  val count = ringCountState.intValue
+                  val head = ringHeadState.intValue
+                  if (count >= 2) {
+                    wavePath.reset()
+                    val stepX = size.width / (count - 1).coerceAtLeast(1)
+                    val startIdx = if (count == LUX_RING_CAP) head else 0
+                    for (i in 0 until count) {
+                      val lux = ringBuffer[(startIdx + i) % LUX_RING_CAP]
                       // Log scale maps 1 lx .. 20000 lx cleanly
                       val norm = (log10(lux + 1f) / 4.3f).coerceIn(0f, 1f)
-                      val x = idx * stepX
+                      val x = i * stepX
                       val y = size.height - norm * (size.height - 16.dp.toPx()) - 8.dp.toPx()
-                      if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                      if (i == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
                     }
                     drawPath(
-                      path = path,
+                      path = wavePath,
                       color = waveColor,
                       style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
                     )
@@ -250,9 +214,10 @@ fun LightLuxScreen(
                 FilledTonalButton(
                   onClick = {
                     haptics.tick()
-                    minLux = currentLux
-                    maxLux = currentLux
-                    history.clear()
+                    minLuxState.floatValue = currentLuxState.floatValue
+                    maxLuxState.floatValue = currentLuxState.floatValue
+                    ringHeadState.intValue = 0
+                    ringCountState.intValue = 0
                   },
                   shape = RoundedCornerShape(16.dp),
                 ) {
@@ -284,6 +249,79 @@ fun LightLuxScreen(
           }
         }
       }
+    }
+  }
+}
+
+@Composable
+private fun LightLuxReadout(
+  currentLuxState: FloatState,
+  minLuxState: FloatState,
+  maxLuxState: FloatState,
+  hasSample: Boolean,
+) {
+  val currentLux = currentLuxState.floatValue
+  val minLux = minLuxState.floatValue
+  val maxLux = maxLuxState.floatValue
+  val sceneAdvice =
+    when {
+      !hasSample -> "等待光线传感器读数"
+      currentLux < 30f -> "昏暗环境（夜间休息或暗室）"
+      currentLux < 150f -> "柔和室内光（建议适当开灯阅读）"
+      currentLux < 500f -> "标准阅读 / 办公照度（舒适护眼）"
+      currentLux < 2500f -> "明亮窗边或高照度工作台"
+      else -> "强烈户外日照环境"
+    }
+
+  Row(verticalAlignment = Alignment.Bottom) {
+    Text(
+      text = if (!hasSample) "--" else String.format(Locale.US, "%.0f", currentLux),
+      fontFamily = TactKitMono,
+      style = MaterialTheme.typography.displayMedium.copy(fontSize = 52.sp, fontFeatureSettings = "tnum"),
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.primary,
+    )
+    Spacer(modifier = Modifier.width(6.dp))
+    Text(
+      text = "lx",
+      style = MaterialTheme.typography.titleLarge,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.padding(bottom = 10.dp),
+    )
+  }
+
+  Surface(
+    shape = RoundedCornerShape(14.dp),
+    color = MaterialTheme.colorScheme.surfaceContainer,
+  ) {
+    Text(
+      text = sceneAdvice,
+      style = MaterialTheme.typography.labelLarge,
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+  }
+
+  Row(
+    horizontalArrangement = Arrangement.SpaceEvenly,
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Text(
+        text = if (!hasSample) "--" else String.format(Locale.US, "%.0f lx", minLux),
+        fontFamily = TactKitMono,
+        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+        fontWeight = FontWeight.Bold,
+      )
+      Text("最低照度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Text(
+        text = if (!hasSample) "--" else String.format(Locale.US, "%.0f lx", maxLux),
+        fontFamily = TactKitMono,
+        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+        fontWeight = FontWeight.Bold,
+      )
+      Text("最高照度", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
   }
 }

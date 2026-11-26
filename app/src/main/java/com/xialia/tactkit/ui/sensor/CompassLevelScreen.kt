@@ -7,17 +7,16 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -38,6 +37,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,10 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -79,66 +78,101 @@ fun CompassLevelScreen(
   val haptics = rememberAppHaptics()
 
   var activeTab by remember { mutableStateOf(CompassLevelTab.COMPASS) }
-  var azimuthDeg by remember { mutableFloatStateOf(0f) }
-  var pitchDeg by remember { mutableFloatStateOf(0f) }
-  var rollDeg by remember { mutableFloatStateOf(0f) }
-  var pitchOffset by remember { mutableFloatStateOf(0f) }
-  var rollOffset by remember { mutableFloatStateOf(0f) }
+  // Continuous unwrapped azimuth (can exceed 0..360) for smooth 359° <-> 0° crossing
+  val continuousAzimuthState = remember { mutableFloatStateOf(0f) }
+  val pitchState = remember { mutableFloatStateOf(0f) }
+  val rollState = remember { mutableFloatStateOf(0f) }
+  val pitchOffsetState = remember { mutableFloatStateOf(0f) }
+  val rollOffsetState = remember { mutableFloatStateOf(0f) }
   var hasSensors by remember { mutableStateOf(true) }
   var sensorAccuracyLabel by remember { mutableStateOf("标准") }
 
   DisposableEffect(context) {
     val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-    val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+    val rotationVector = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    val accel = if (rotationVector == null) sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) else null
     val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-    hasSensors = accel != null && mag != null
+    hasSensors = rotationVector != null || (accel != null && mag != null)
 
     val accelReading = FloatArray(3)
     val magReading = FloatArray(3)
     var hasAccel = false
     var hasMag = false
+    var hasInitialAzimuth = false
     val rotationMatrix = FloatArray(9)
     val orientation = FloatArray(3)
     var lastLevelSnap = false
+    val alpha = 0.22f
+
+    fun updateOrientation(rawAzDeg: Float, rawPitchDeg: Float, rawRollDeg: Float) {
+      if (!hasInitialAzimuth) {
+        continuousAzimuthState.floatValue = rawAzDeg
+        pitchState.floatValue = rawPitchDeg
+        rollState.floatValue = rawRollDeg
+        hasInitialAzimuth = true
+      } else {
+        // Shortest-angle delta in [-180, 180) prevents 359° <-> 0° wrap-around twitching
+        val currentWrapped = ((continuousAzimuthState.floatValue % 360f) + 360f) % 360f
+        val delta = ((rawAzDeg - currentWrapped + 540f) % 360f) - 180f
+        continuousAzimuthState.floatValue += alpha * delta
+        pitchState.floatValue += alpha * (rawPitchDeg - pitchState.floatValue)
+        rollState.floatValue += alpha * (rawRollDeg - rollState.floatValue)
+      }
+
+      val adjP = pitchState.floatValue - pitchOffsetState.floatValue
+      val adjR = rollState.floatValue - rollOffsetState.floatValue
+      val isLevelNow = abs(adjP) < 1.0f && abs(adjR) < 1.0f
+      if (isLevelNow && !lastLevelSnap) {
+        haptics.confirm()
+      }
+      lastLevelSnap = isLevelNow
+    }
 
     val listener =
       object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-          val alpha = 0.18f
           when (event.sensor.type) {
+            Sensor.TYPE_ROTATION_VECTOR -> {
+              SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+              SensorManager.getOrientation(rotationMatrix, orientation)
+              val az = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) + 360f) % 360f
+              val pt = Math.toDegrees(orientation[1].toDouble()).toFloat()
+              val rl = Math.toDegrees(orientation[2].toDouble()).toFloat()
+              updateOrientation(az, pt, rl)
+            }
             Sensor.TYPE_ACCELEROMETER -> {
               for (i in 0..2) {
                 accelReading[i] = accelReading[i] + alpha * (event.values[i] - accelReading[i])
               }
               hasAccel = true
+              if (hasMag && SensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading)) {
+                SensorManager.getOrientation(rotationMatrix, orientation)
+                val az = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) + 360f) % 360f
+                val pt = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                val rl = Math.toDegrees(orientation[2].toDouble()).toFloat()
+                updateOrientation(az, pt, rl)
+              }
             }
             Sensor.TYPE_MAGNETIC_FIELD -> {
               for (i in 0..2) {
                 magReading[i] = magReading[i] + alpha * (event.values[i] - magReading[i])
               }
               hasMag = true
+              if (rotationVector == null && hasAccel &&
+                SensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading)
+              ) {
+                SensorManager.getOrientation(rotationMatrix, orientation)
+                val az = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) + 360f) % 360f
+                val pt = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                val rl = Math.toDegrees(orientation[2].toDouble()).toFloat()
+                updateOrientation(az, pt, rl)
+              }
             }
-          }
-          if (hasAccel && hasMag && SensorManager.getRotationMatrix(rotationMatrix, null, accelReading, magReading)) {
-            SensorManager.getOrientation(rotationMatrix, orientation)
-            val az = ((Math.toDegrees(orientation[0].toDouble()).toFloat()) + 360f) % 360f
-            val pt = Math.toDegrees(orientation[1].toDouble()).toFloat()
-            val rl = Math.toDegrees(orientation[2].toDouble()).toFloat()
-            azimuthDeg = az
-            pitchDeg = pt
-            rollDeg = rl
-            val adjP = pt - pitchOffset
-            val adjR = rl - rollOffset
-            val isLevelNow = abs(adjP) < 1.0f && abs(adjR) < 1.0f
-            if (isLevelNow && !lastLevelSnap) {
-              haptics.confirm()
-            }
-            lastLevelSnap = isLevelNow
           }
         }
 
         override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-          if (sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
+          if (sensor.type == Sensor.TYPE_MAGNETIC_FIELD || sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
             sensorAccuracyLabel =
               when (accuracy) {
                 SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> "高精度"
@@ -149,8 +183,13 @@ fun CompassLevelScreen(
         }
       }
 
-    if (accel != null) sm.registerListener(listener, accel, SensorManager.SENSOR_DELAY_UI)
-    if (mag != null) sm.registerListener(listener, mag, SensorManager.SENSOR_DELAY_UI)
+    if (rotationVector != null) {
+      sm.registerListener(listener, rotationVector, SensorManager.SENSOR_DELAY_GAME)
+      if (mag != null) sm.registerListener(listener, mag, SensorManager.SENSOR_DELAY_UI)
+    } else {
+      if (accel != null) sm.registerListener(listener, accel, SensorManager.SENSOR_DELAY_GAME)
+      if (mag != null) sm.registerListener(listener, mag, SensorManager.SENSOR_DELAY_GAME)
+    }
 
     onDispose {
       sm.unregisterListener(listener)
@@ -209,7 +248,7 @@ fun CompassLevelScreen(
               modifier = Modifier.fillMaxWidth(),
             ) {
               Text(
-                text = "当前设备缺少加速度计或磁力计硬件传感器，无法读取真实方向与倾角。",
+                text = "当前设备缺少旋转矢量或加速度/磁力计硬件传感器，无法读取真实方向与倾角。",
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
@@ -242,13 +281,7 @@ fun CompassLevelScreen(
                 ) {
                   PetalIconBadge(icon = Icons.Rounded.Explore, size = 44.dp)
                   Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                      text = "${azimuthDeg.toInt()}° · ${cardinalDirection(azimuthDeg)}",
-                      style = MaterialTheme.typography.headlineSmall,
-                      fontWeight = FontWeight.Bold,
-                      fontFamily = TactKitMono,
-                      modifier = Modifier.testTag("compass_heading_text"),
-                    )
+                    CompassHeadingReadout(continuousAzimuthState = continuousAzimuthState)
                     Text(
                       text = "地磁状态：$sensorAccuracyLabel",
                       style = MaterialTheme.typography.bodySmall,
@@ -257,28 +290,40 @@ fun CompassLevelScreen(
                   }
                 }
 
-                Canvas(modifier = Modifier.fillMaxWidth().height(260.dp)) {
-                  val cx = size.width / 2f
-                  val cy = size.height / 2f
-                  val radius = minOf(size.width, size.height) * 0.42f
+                // Static outer ring + GPU-accelerated rotating dial via graphicsLayer
+                Box(modifier = Modifier.fillMaxWidth().height(260.dp)) {
+                  Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val radius = minOf(size.width, size.height) * 0.42f
 
-                  drawCircle(
-                    color = ringColor.copy(alpha = 0.5f),
-                    radius = radius,
-                    center = Offset(cx, cy),
-                    style = Stroke(width = 4f),
-                  )
+                    drawCircle(
+                      color = ringColor.copy(alpha = 0.5f),
+                      radius = radius,
+                      center = Offset(cx, cy),
+                      style = Stroke(width = 4f),
+                    )
+                    // Fixed top pointer
+                    drawLine(
+                      color = primaryColor,
+                      start = Offset(cx, cy - radius - 18f),
+                      end = Offset(cx, cy - radius + 8f),
+                      strokeWidth = 8f,
+                      cap = StrokeCap.Round,
+                    )
+                    drawCircle(color = primaryColor, radius = 12f, center = Offset(cx, cy))
+                  }
 
-                  // Fixed top pointer
-                  drawLine(
-                    color = primaryColor,
-                    start = Offset(cx, cy - radius - 18f),
-                    end = Offset(cx, cy - radius + 8f),
-                    strokeWidth = 8f,
-                    cap = StrokeCap.Round,
-                  )
+                  Canvas(
+                    modifier =
+                      Modifier.fillMaxSize().graphicsLayer {
+                        rotationZ = -continuousAzimuthState.floatValue
+                      },
+                  ) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val radius = minOf(size.width, size.height) * 0.42f
 
-                  rotate(degrees = -azimuthDeg, pivot = Offset(cx, cy)) {
                     for (deg in 0 until 360 step 15) {
                       val rad = Math.toRadians((deg - 90).toDouble())
                       val isMajor = deg % 90 == 0
@@ -309,18 +354,14 @@ fun CompassLevelScreen(
                       cap = StrokeCap.Round,
                     )
                   }
-                  drawCircle(color = primaryColor, radius = 12f, center = Offset(cx, cy))
                 }
               }
             }
           }
         } else {
           item(key = "bubble_level_card") {
-            val adjPitch = pitchDeg - pitchOffset
-            val adjRoll = rollDeg - rollOffset
-            val isLevel = abs(adjPitch) < 1.0f && abs(adjRoll) < 1.0f
-            val bubbleColor =
-              if (isLevel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+            val primaryColor = MaterialTheme.colorScheme.primary
+            val tertiaryColor = MaterialTheme.colorScheme.tertiary
             val ringColor = MaterialTheme.colorScheme.outlineVariant
 
             Surface(
@@ -339,79 +380,73 @@ fun CompassLevelScreen(
                   modifier = Modifier.fillMaxWidth(),
                 ) {
                   PetalIconBadge(icon = Icons.Rounded.Straighten, size = 44.dp)
-                  Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                      text = if (isLevel) "已处于水平状态" else "双轴倾角测量中",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                      text =
-                        String.format(
-                          Locale.US,
-                          "横滚 X: %+.1f°  ·  俯仰 Y: %+.1f°",
-                          adjRoll,
-                          adjPitch,
-                        ),
-                      style = MaterialTheme.typography.bodySmall,
-                      fontFamily = TactKitMono,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      modifier = Modifier.testTag("level_angles_text"),
-                    )
-                  }
+                  LevelAnglesReadout(
+                    pitchState = pitchState,
+                    rollState = rollState,
+                    pitchOffsetState = pitchOffsetState,
+                    rollOffsetState = rollOffsetState,
+                    modifier = Modifier.weight(1f),
+                  )
                 }
 
-                Canvas(modifier = Modifier.fillMaxWidth().height(240.dp)) {
-                  val cx = size.width / 2f
-                  val cy = size.height / 2f
-                  val outerR = minOf(size.width, size.height) * 0.42f
+                Box(modifier = Modifier.fillMaxWidth().height(240.dp)) {
+                  // Static target rings & crosshairs
+                  Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val outerR = minOf(size.width, size.height) * 0.42f
 
-                  drawCircle(
-                    color = ringColor.copy(alpha = 0.5f),
-                    radius = outerR,
-                    center = Offset(cx, cy),
-                    style = Stroke(width = 4f),
-                  )
-                  drawCircle(
-                    color = ringColor.copy(alpha = 0.6f),
-                    radius = outerR * 0.28f,
-                    center = Offset(cx, cy),
-                    style = Stroke(width = 3f),
-                  )
-                  drawLine(
-                    color = ringColor.copy(alpha = 0.4f),
-                    start = Offset(cx - outerR, cy),
-                    end = Offset(cx + outerR, cy),
-                    strokeWidth = 2f,
-                  )
-                  drawLine(
-                    color = ringColor.copy(alpha = 0.4f),
-                    start = Offset(cx, cy - outerR),
-                    end = Offset(cx, cy + outerR),
-                    strokeWidth = 2f,
-                  )
-
-                  val maxTilt = 35f
-                  val normX = (adjRoll / maxTilt).coerceIn(-1f, 1f)
-                  val normY = (adjPitch / maxTilt).coerceIn(-1f, 1f)
-                  val bubbleCenter =
-                    Offset(
-                      cx + normX * outerR * 0.72f,
-                      cy + normY * outerR * 0.72f,
+                    drawCircle(
+                      color = ringColor.copy(alpha = 0.5f),
+                      radius = outerR,
+                      center = Offset(cx, cy),
+                      style = Stroke(width = 4f),
                     )
-                  drawCircle(
-                    color = bubbleColor.copy(alpha = 0.85f),
-                    radius = outerR * 0.22f,
-                    center = bubbleCenter,
-                  )
+                    drawCircle(
+                      color = ringColor.copy(alpha = 0.6f),
+                      radius = outerR * 0.28f,
+                      center = Offset(cx, cy),
+                      style = Stroke(width = 3f),
+                    )
+                    drawLine(
+                      color = ringColor.copy(alpha = 0.4f),
+                      start = Offset(cx - outerR, cy),
+                      end = Offset(cx + outerR, cy),
+                      strokeWidth = 2f,
+                    )
+                    drawLine(
+                      color = ringColor.copy(alpha = 0.4f),
+                      start = Offset(cx, cy - outerR),
+                      end = Offset(cx, cy + outerR),
+                      strokeWidth = 2f,
+                    )
+                  }
+
+                  // Dynamic bubble drawn in draw phase only (zero recomposition)
+                  Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val outerR = minOf(size.width, size.height) * 0.42f
+                    val adjP = pitchState.floatValue - pitchOffsetState.floatValue
+                    val adjR = rollState.floatValue - rollOffsetState.floatValue
+                    val isLevel = abs(adjP) < 1.0f && abs(adjR) < 1.0f
+                    val maxTilt = 35f
+                    val normX = (adjR / maxTilt).coerceIn(-1f, 1f)
+                    val normY = (adjP / maxTilt).coerceIn(-1f, 1f)
+                    drawCircle(
+                      color = (if (isLevel) primaryColor else tertiaryColor).copy(alpha = 0.85f),
+                      radius = outerR * 0.22f,
+                      center = Offset(cx + normX * outerR * 0.72f, cy + normY * outerR * 0.72f),
+                    )
+                  }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                   TactileActionButton(
                     onClick = {
                       haptics.confirm()
-                      pitchOffset = pitchDeg
-                      rollOffset = rollDeg
+                      pitchOffsetState.floatValue = pitchState.floatValue
+                      rollOffsetState.floatValue = rollState.floatValue
                     },
                     modifier = Modifier.weight(1f).testTag("level_zero_btn"),
                   ) {
@@ -420,8 +455,8 @@ fun CompassLevelScreen(
                   TactileActionButton(
                     onClick = {
                       haptics.tick()
-                      pitchOffset = 0f
-                      rollOffset = 0f
+                      pitchOffsetState.floatValue = 0f
+                      rollOffsetState.floatValue = 0f
                     },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -436,6 +471,51 @@ fun CompassLevelScreen(
         }
       }
     }
+  }
+}
+
+@Composable
+private fun CompassHeadingReadout(continuousAzimuthState: FloatState) {
+  val wrapped = ((continuousAzimuthState.floatValue % 360f) + 360f) % 360f
+  Text(
+    text = "${wrapped.toInt()}° · ${cardinalDirection(wrapped)}",
+    style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+    fontWeight = FontWeight.Bold,
+    fontFamily = TactKitMono,
+    modifier = Modifier.testTag("compass_heading_text"),
+  )
+}
+
+@Composable
+private fun LevelAnglesReadout(
+  pitchState: FloatState,
+  rollState: FloatState,
+  pitchOffsetState: FloatState,
+  rollOffsetState: FloatState,
+  modifier: Modifier = Modifier,
+) {
+  val adjPitch = pitchState.floatValue - pitchOffsetState.floatValue
+  val adjRoll = rollState.floatValue - rollOffsetState.floatValue
+  val isLevel = abs(adjPitch) < 1.0f && abs(adjRoll) < 1.0f
+  Column(modifier = modifier) {
+    Text(
+      text = if (isLevel) "已处于水平状态" else "双轴倾角测量中",
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+    )
+    Text(
+      text =
+        String.format(
+          Locale.US,
+          "横滚 X: %+.1f°  ·  俯仰 Y: %+.1f°",
+          adjRoll,
+          adjPitch,
+        ),
+      style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+      fontFamily = TactKitMono,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.testTag("level_angles_text"),
+    )
   }
 }
 

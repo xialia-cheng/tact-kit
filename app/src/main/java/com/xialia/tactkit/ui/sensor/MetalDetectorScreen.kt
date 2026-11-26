@@ -37,9 +37,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.FloatState
+import androidx.compose.runtime.IntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,6 +64,8 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.sqrt
 
+private const val METAL_RING_CAP = 80
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MetalDetectorScreen(
@@ -71,17 +75,23 @@ fun MetalDetectorScreen(
   val haptics = rememberAppHaptics()
 
   var hasMagnetometer by remember { mutableStateOf(true) }
-  var magnitudeUt by remember { mutableFloatStateOf(0f) }
+  val magnitudeState = remember { mutableFloatStateOf(0f) }
   var baselineUt by remember { mutableFloatStateOf(48f) }
   var thresholdDelta by remember { mutableFloatStateOf(20f) }
   var hapticEnabled by remember { mutableStateOf(true) }
-  val history = remember { mutableStateListOf<Float>() }
+
+  // Fixed pre-allocated ring buffer + Path to eliminate per-frame allocations
+  val ringBuffer = remember { FloatArray(METAL_RING_CAP) }
+  val ringHeadState = remember { mutableIntStateOf(0) }
+  val ringCountState = remember { mutableIntStateOf(0) }
+  val wavePath = remember { Path() }
 
   DisposableEffect(context, hapticEnabled, thresholdDelta, baselineUt) {
     val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
     hasMagnetometer = mag != null
     var lastHapticMs = 0L
+    var hasFirstSample = false
 
     val listener =
       object : SensorEventListener {
@@ -90,13 +100,23 @@ fun MetalDetectorScreen(
           val y = event.values[1]
           val z = event.values[2]
           val total = sqrt(x * x + y * y + z * z)
-          magnitudeUt = total
-          history.add(total)
-          if (history.size > 80) {
-            history.removeAt(0)
+          val smoothed =
+            if (!hasFirstSample) {
+              hasFirstSample = true
+              total
+            } else {
+              magnitudeState.floatValue + 0.25f * (total - magnitudeState.floatValue)
+            }
+          magnitudeState.floatValue = smoothed
+
+          val head = ringHeadState.intValue
+          ringBuffer[head] = smoothed
+          ringHeadState.intValue = (head + 1) % METAL_RING_CAP
+          if (ringCountState.intValue < METAL_RING_CAP) {
+            ringCountState.intValue += 1
           }
 
-          val delta = abs(total - baselineUt)
+          val delta = abs(smoothed - baselineUt)
           if (hapticEnabled && delta >= thresholdDelta) {
             val now = System.currentTimeMillis()
             val intervalMs = (420L - (delta * 3f).toLong()).coerceIn(90L, 420L)
@@ -111,15 +131,12 @@ fun MetalDetectorScreen(
       }
 
     if (mag != null) {
-      sm.registerListener(listener, mag, SensorManager.SENSOR_DELAY_UI)
+      sm.registerListener(listener, mag, SensorManager.SENSOR_DELAY_GAME)
     }
     onDispose {
       sm.unregisterListener(listener)
     }
   }
-
-  val deltaUt = abs(magnitudeUt - baselineUt)
-  val isTriggered = deltaUt >= thresholdDelta
 
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -172,9 +189,7 @@ fun MetalDetectorScreen(
         item(key = "metal_readout_card") {
           Surface(
             shape = RoundedCornerShape(22.dp),
-            color =
-              if (isTriggered) MaterialTheme.colorScheme.primaryContainer
-              else MaterialTheme.colorScheme.surfaceContainerLow,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth(),
           ) {
             Column(
@@ -186,29 +201,16 @@ fun MetalDetectorScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
               ) {
                 PetalIconBadge(icon = Icons.Rounded.Sensors, size = 48.dp)
-                Column(modifier = Modifier.weight(1f)) {
-                  Text(
-                    text = String.format(Locale.US, "%.1f μT", magnitudeUt),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = TactKitMono,
-                    modifier = Modifier.testTag("metal_ut_readout"),
-                  )
-                  Text(
-                    text =
-                      if (isTriggered) {
-                        String.format(Locale.US, "检测到磁场异常 (+%.1f μT)", deltaUt)
-                      } else {
-                        String.format(Locale.US, "基准 %.1f μT · 偏差 %.1f μT", baselineUt, deltaUt)
-                      },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  )
-                }
+                MetalDetectorReadout(
+                  magnitudeState = magnitudeState,
+                  baselineUt = baselineUt,
+                  thresholdDelta = thresholdDelta,
+                  modifier = Modifier.weight(1f),
+                )
               }
 
-              val waveColor =
-                if (isTriggered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+              val primaryColor = MaterialTheme.colorScheme.primary
+              val secondaryColor = MaterialTheme.colorScheme.secondary
               val gridColor = MaterialTheme.colorScheme.outlineVariant
               Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
                 drawLine(
@@ -217,20 +219,25 @@ fun MetalDetectorScreen(
                   end = Offset(size.width, size.height / 2f),
                   strokeWidth = 2f,
                 )
-                if (history.size >= 2) {
-                  val path = Path()
+                val count = ringCountState.intValue
+                val head = ringHeadState.intValue
+                if (count >= 2) {
+                  wavePath.reset()
                   val minV = (baselineUt - 60f).coerceAtLeast(0f)
                   val maxV = (baselineUt + 120f).coerceAtLeast(minV + 60f)
-                  val stepX = size.width / (history.size - 1).coerceAtLeast(1)
-                  history.forEachIndexed { idx, v ->
+                  val stepX = size.width / (count - 1).coerceAtLeast(1)
+                  val startIdx = if (count == METAL_RING_CAP) head else 0
+                  for (i in 0 until count) {
+                    val v = ringBuffer[(startIdx + i) % METAL_RING_CAP]
                     val norm = ((v - minV) / (maxV - minV)).coerceIn(0f, 1f)
-                    val x = idx * stepX
+                    val x = i * stepX
                     val y = size.height * (1f - norm)
-                    if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    if (i == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
                   }
+                  val triggered = abs(magnitudeState.floatValue - baselineUt) >= thresholdDelta
                   drawPath(
-                    path = path,
-                    color = waveColor,
+                    path = wavePath,
+                    color = if (triggered) primaryColor else secondaryColor,
                     style = Stroke(width = 6f, cap = StrokeCap.Round),
                   )
                 }
@@ -239,7 +246,7 @@ fun MetalDetectorScreen(
               TactileActionButton(
                 onClick = {
                   haptics.confirm()
-                  if (magnitudeUt > 1f) baselineUt = magnitudeUt
+                  if (magnitudeState.floatValue > 1f) baselineUt = magnitudeState.floatValue
                 },
                 modifier = Modifier.fillMaxWidth().testTag("metal_calibrate_btn"),
               ) {
@@ -282,5 +289,37 @@ fun MetalDetectorScreen(
         }
       }
     }
+  }
+}
+
+@Composable
+private fun MetalDetectorReadout(
+  magnitudeState: FloatState,
+  baselineUt: Float,
+  thresholdDelta: Float,
+  modifier: Modifier = Modifier,
+) {
+  val magnitudeUt = magnitudeState.floatValue
+  val deltaUt = abs(magnitudeUt - baselineUt)
+  val isTriggered = deltaUt >= thresholdDelta
+  Column(modifier = modifier) {
+    Text(
+      text = String.format(Locale.US, "%.1f μT", magnitudeUt),
+      style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
+      fontWeight = FontWeight.Bold,
+      fontFamily = TactKitMono,
+      color = if (isTriggered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+      modifier = Modifier.testTag("metal_ut_readout"),
+    )
+    Text(
+      text =
+        if (isTriggered) {
+          String.format(Locale.US, "检测到磁场异常 (+%.1f μT)", deltaUt)
+        } else {
+          String.format(Locale.US, "基准 %.1f μT · 偏差 %.1f μT", baselineUt, deltaUt)
+        },
+      style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
