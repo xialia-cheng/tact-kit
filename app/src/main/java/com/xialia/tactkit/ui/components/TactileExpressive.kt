@@ -329,7 +329,7 @@ fun TactileModeChip(
 
   val chipBgColor =
     when {
-      isMinecraft && selected -> Color(0xFF4A7C32)
+      isMinecraft && selected -> Color(0xFF3C8527)
       selected -> MaterialTheme.colorScheme.primaryContainer
       else -> MaterialTheme.colorScheme.surfaceContainerLow
     }
@@ -475,7 +475,7 @@ fun TactileActionButton(
 
   val btnBgColor =
     when {
-      isMinecraft && enabled -> Color(0xFF4A7C32)
+      isMinecraft && enabled -> Color(0xFF3C8527)
       isMinecraft && !enabled -> Color(0xFF8B8B8B)
       enabled -> containerColor
       else -> MaterialTheme.colorScheme.surfaceContainerHigh
@@ -596,19 +596,22 @@ fun PetalIconBadge(
 ) {
   val themeStyle = LocalAppThemeStyle.current
   val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   if (isMinecraft) {
+    val badgeBg = if (isDark) Color(0xFF48494E) else Color(0xFFD0D1D4)
+    val badgeFg = if (isDark) Color.White else Color(0xFF1E1E1F)
     Box(
       contentAlignment = Alignment.Center,
       modifier =
         modifier
           .size(size)
-          .background(color = Color(0xFF8B8B8B), shape = androidx.compose.ui.graphics.RectangleShape)
+          .background(color = badgeBg, shape = androidx.compose.ui.graphics.RectangleShape)
           .mcInventorySlotBox(),
     ) {
       Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = Color.White,
+        tint = badgeFg,
         modifier = Modifier.size(iconSize),
       )
     }

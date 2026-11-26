@@ -86,6 +86,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -119,6 +120,9 @@ import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
+import com.xialia.tactkit.ui.theme.OreUiButton
+import com.xialia.tactkit.ui.theme.OreUiSegmentedTabRow
+import com.xialia.tactkit.ui.theme.OreUiTone
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
@@ -256,11 +260,13 @@ fun HomeScreen(
   }
 
   val bodySurfaceBg = MaterialTheme.colorScheme.surfaceContainerLowest
-  val topBarSurfaceBg = MaterialTheme.colorScheme.surfaceContainer
-  val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
   val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
   val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val topBarSurfaceBg =
+    if (isMinecraft) (if (isDark) Color(0xFF1C1D20) else Color(0xFFE6E8EB))
+    else MaterialTheme.colorScheme.surfaceContainer
+  val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
 
   Box(modifier = Modifier.fillMaxSize()) {
     Box(
@@ -305,11 +311,21 @@ fun HomeScreen(
                       modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                     )
                   }
-                  Text(
-                    text = "✨",
-                    fontSize = 15.sp,
-                    color = Color(0xFFD99B26),
-                  )
+                  if (isMinecraft) {
+                    Text(
+                      text = "Local-First!",
+                      fontSize = 11.sp,
+                      fontWeight = FontWeight.ExtraBold,
+                      color = Color(0xFFFFD83D),
+                      modifier = Modifier.graphicsLayer { rotationZ = -8f },
+                    )
+                  } else {
+                    Text(
+                      text = "✨",
+                      fontSize = 15.sp,
+                      color = Color(0xFFD99B26),
+                    )
+                  }
                 }
               },
             actions = {
@@ -824,42 +840,83 @@ private fun QuickActionStrip(
   ) {
     items(entries, key = { it.id }) { entry ->
       val interaction = remember { MutableInteractionSource() }
-      TactKitChip(
-        onClick = {
-          AppHaptics.click(view)
-          entry.onClick()
-        },
-        interactionSource = interaction,
-        corner = 18.dp,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier =
-          Modifier.tactilePress(
-              interactionSource = interaction,
-              baseCorner = 18.dp,
-              pressedCorner = 24.dp,
-              enableHapticOnPress = false,
-            )
-            .testTag(entry.id),
-      ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(7.dp),
-          modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+      val isMc = com.xialia.tactkit.ui.theme.isMcPixelTheme()
+      val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
+      if (isMc) {
+        val isAi = entry.id.contains("ai", ignoreCase = true) || entry.label.contains("AI", ignoreCase = true)
+        val tone =
+          when {
+            isAi -> OreUiTone.PURPLE
+            isDark -> OreUiTone.SLATE_DARK
+            else -> OreUiTone.SLATE_LIGHT
+          }
+        OreUiButton(
+          onClick = {
+            AppHaptics.click(view)
+            entry.onClick()
+          },
+          tone = tone,
+          interactionSource = interaction,
+          modifier = Modifier.testTag(entry.id),
         ) {
-          Icon(
-            imageVector = entry.icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-          )
-          Text(
-            text = entry.label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            softWrap = false,
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp),
+          ) {
+            Icon(
+              imageVector = entry.icon,
+              contentDescription = null,
+              tint = if (isAi) Color.White else MaterialTheme.colorScheme.primary,
+              modifier = Modifier.size(18.dp),
+            )
+            Text(
+              text = entry.label,
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.SemiBold,
+              maxLines = 1,
+              softWrap = false,
+            )
+          }
+        }
+      } else {
+        TactKitChip(
+          onClick = {
+            AppHaptics.click(view)
+            entry.onClick()
+          },
+          interactionSource = interaction,
+          corner = 18.dp,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+          modifier =
+            Modifier.tactilePress(
+                interactionSource = interaction,
+                baseCorner = 18.dp,
+                pressedCorner = 24.dp,
+                enableHapticOnPress = false,
+              )
+              .testTag(entry.id),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+          ) {
+            Icon(
+              imageVector = entry.icon,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+              modifier = Modifier.size(18.dp),
+            )
+            Text(
+              text = entry.label,
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.Medium,
+              color = MaterialTheme.colorScheme.onSurface,
+              maxLines = 1,
+              softWrap = false,
+            )
+          }
         }
       }
     }
@@ -1147,61 +1204,26 @@ private fun WorkbenchOverviewSection(
     }
 
     // Aligned borderless tonal filter tabs
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.fillMaxWidth(),
-    ) {
-      CardFilter.entries.forEach { filter ->
-        val selected = uiState.activeFilter == filter
-        val filterInteraction = remember { MutableInteractionSource() }
-        val filterPressed by filterInteraction.collectIsPressedAsState()
-        val bgColor =
-          when {
-            isMinecraft && selected -> Color(0xFF4A7C32)
-            selected -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
-          }
-        val fgColor =
-          when {
-            isMinecraft && selected -> Color.White
-            selected -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-          }
-        if (isMinecraft) {
-          Box(
-            contentAlignment = Alignment.Center,
-            modifier =
-              Modifier.weight(1f)
-                .height(36.dp)
-                .background(bgColor, androidx.compose.ui.graphics.RectangleShape)
-                .let { m ->
-                  if (selected) m.mcGrassButtonBox(pressed = filterPressed)
-                  else m.mcPixelBox(pressed = filterPressed, isDark = isDark)
-                }
-                .clickable(
-                  interactionSource = filterInteraction,
-                  indication = null,
-                  onClick = { onFilterChange(filter) },
-                )
-                .testTag("filter_chip_${filter.name}"),
-          ) {
-            Text(
-              text = filter.label,
-              style = MaterialTheme.typography.labelMedium,
-              fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-              color = fgColor,
-              textAlign = TextAlign.Center,
-              maxLines = 1,
-              softWrap = false,
-              overflow = TextOverflow.Ellipsis,
-            )
-          }
-        } else {
+    if (isMinecraft) {
+      OreUiSegmentedTabRow(
+        items = CardFilter.entries.map { it.label to (uiState.activeFilter == it) },
+        onSelect = { idx -> onFilterChange(CardFilter.entries[idx]) },
+      )
+    } else {
+      Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
+      ) {
+        CardFilter.entries.forEach { filter ->
+          val selected = uiState.activeFilter == filter
+          val filterInteraction = remember { MutableInteractionSource() }
           Surface(
             onClick = { onFilterChange(filter) },
             interactionSource = filterInteraction,
             shape = RoundedCornerShape(14.dp),
-            color = bgColor,
+            color =
+              if (selected) MaterialTheme.colorScheme.primaryContainer
+              else MaterialTheme.colorScheme.surfaceContainerLow,
             modifier =
               Modifier.weight(1f)
                 .tactilePress(
@@ -1216,7 +1238,9 @@ private fun WorkbenchOverviewSection(
               text = filter.label,
               style = MaterialTheme.typography.labelMedium,
               fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-              color = fgColor,
+              color =
+                if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
               textAlign = TextAlign.Center,
               maxLines = 1,
               softWrap = false,
@@ -1586,31 +1610,33 @@ private fun DocumentDashboardCard(
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
           if (isMinecraft) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(4.dp),
+            OreUiButton(
+              onClick = onOpenFileManager,
+              tone = OreUiTone.GREEN,
               modifier =
-                Modifier.background(Color(0xFF4A7C32), androidx.compose.ui.graphics.RectangleShape)
-                  .mcGrassButtonBox()
-                  .clickable(onClick = onOpenFileManager)
-                  .padding(horizontal = 10.dp, vertical = 6.dp)
-                  .onGloballyPositioned { coords ->
+                Modifier.onGloballyPositioned { coords ->
                     onFileManagerButtonPositioned(coords.boundsInRoot())
                   }
                   .testTag("dashboard_open_file_manager"),
             ) {
-              Icon(
-                imageVector = Icons.Rounded.FolderOpen,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(13.dp),
-              )
-              Text(
-                text = "文件管理",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White,
-              )
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.FolderOpen,
+                  contentDescription = null,
+                  tint = Color.White,
+                  modifier = Modifier.size(13.dp),
+                )
+                Text(
+                  text = "文件管理",
+                  style = MaterialTheme.typography.labelSmall,
+                  fontWeight = FontWeight.SemiBold,
+                  color = Color.White,
+                )
+              }
             }
           } else {
             Surface(

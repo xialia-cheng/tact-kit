@@ -35,93 +35,308 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.data.datastore.AppThemeStyle
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+
+enum class OreUiTone {
+  SLATE_LIGHT,
+  SLATE_DARK,
+  GREEN,
+  PURPLE,
+}
+
 /**
- * Soft Minecraft pixel bevel:
- * Outer 1.dp soft dark gray (#4E5259) border + 1.dp low-contrast inner highlight/shadow.
- * Inverts highlight/shadow when pressed = true for physical block-press feel.
+ * Standard Minecraft Bedrock OreUI 3D bevel:
+ * - Outer 1.dp thin outline (#1E1E1F or #141518 in dark mode)
+ * - Inner top 1.5.dp highlight
+ * - Inner bottom 3.dp thick bevel (narrows to 1.dp when pressed; no thick side shadows)
  */
+fun Modifier.oreUiBevel(
+  outerColor: Color = Color(0xFF1E1E1F),
+  topHighlight: Color = Color.White,
+  bottomShadow: Color = Color(0xFF8E9095),
+  pressed: Boolean = false,
+): Modifier =
+  this.drawBehind {
+    val outerPx = 1.dp.toPx()
+    val topPx = 1.5.dp.toPx()
+    val bottomPx = (if (pressed) 1.dp else 3.dp).toPx()
+    val w = size.width
+    val h = size.height
+    if (w <= outerPx * 2f || h <= outerPx * 2f) return@drawBehind
+
+    val inset = if (outerColor.alpha > 0f) outerPx else 0f
+    val innerW = (w - inset * 2f).coerceAtLeast(0f)
+
+    // Top inner highlight (1.5.dp)
+    if (topHighlight.alpha > 0f) {
+      drawRect(
+        color = topHighlight,
+        topLeft = Offset(inset, inset),
+        size = Size(innerW, topPx),
+      )
+    }
+
+    // Bottom inner thick bevel (3.dp -> 1.dp when pressed)
+    if (bottomShadow.alpha > 0f) {
+      drawRect(
+        color = bottomShadow,
+        topLeft = Offset(inset, (h - inset - bottomPx).coerceAtLeast(inset)),
+        size = Size(innerW, bottomPx),
+      )
+    }
+
+    // Outer 1.dp thin outline
+    if (outerColor.alpha > 0f) {
+      drawRect(outerColor, Offset(0f, 0f), Size(w, outerPx))
+      drawRect(outerColor, Offset(0f, h - outerPx), Size(w, outerPx))
+      drawRect(outerColor, Offset(0f, 0f), Size(outerPx, h))
+      drawRect(outerColor, Offset(w - outerPx, 0f), Size(outerPx, h))
+    }
+  }
+
 fun Modifier.mcPixelBox(
   pressed: Boolean = false,
   isDark: Boolean = false,
 ): Modifier =
-  drawMcBevel(
-    outerColor = if (isDark) Color(0xFF565B64) else Color(0xFF4E5259),
-    hiColor = if (isDark) Color(0xFF3E424A) else Color(0xFFF6F7F6),
-    loColor = if (isDark) Color(0xFF1F2126) else Color(0xFFD0D3D0),
+  oreUiBevel(
+    outerColor = if (isDark) Color(0xFF141518) else Color(0xFF1E1E1F),
+    topHighlight = if (isDark) Color(0xFF3E4148) else Color.White,
+    bottomShadow = if (isDark) Color(0xFF141518) else Color(0xFF8E9095),
     pressed = pressed,
   )
 
 fun Modifier.mcGrassButtonBox(
   pressed: Boolean = false,
 ): Modifier =
-  drawMcBevel(
-    outerColor = Color(0xFF4E5259),
-    hiColor = Color(0xFF6BA04F),
-    loColor = Color(0xFF375F24),
+  oreUiBevel(
+    outerColor = Color(0xFF1E1E1F),
+    topHighlight = Color(0xFF63C548),
+    bottomShadow = Color(0xFF255917),
     pressed = pressed,
   )
 
-fun Modifier.mcInventorySlotBox(): Modifier =
-  drawMcBevel(
-    outerColor = Color.Transparent,
-    hiColor = Color(0xFFA8ADA8),
-    loColor = Color(0xFFF4F5F4),
-    pressed = false,
+fun Modifier.mcPurpleButtonBox(
+  pressed: Boolean = false,
+): Modifier =
+  oreUiBevel(
+    outerColor = Color(0xFF1E1E1F),
+    topHighlight = Color(0xFF9F6BF5),
+    bottomShadow = Color(0xFF4D279B),
+    pressed = pressed,
   )
 
-private fun Modifier.drawMcBevel(
-  outerColor: Color,
-  hiColor: Color,
-  loColor: Color,
-  pressed: Boolean,
+fun Modifier.mcInventorySlotBox(
+  isDark: Boolean = false,
 ): Modifier =
-  this.drawBehind {
-    val borderPx = 1.dp.toPx()
-    val w = size.width
-    val h = size.height
-    if (w <= borderPx * 2f || h <= borderPx * 2f) return@drawBehind
-
-    val topLeftColor = if (pressed) loColor else hiColor
-    val bottomRightColor = if (pressed) hiColor else loColor
-
-    val inset = if (outerColor.alpha > 0f) borderPx else 0f
-    // Inner top highlight
-    drawRect(
-      color = topLeftColor,
-      topLeft = Offset(inset, inset),
-      size = Size((w - inset * 2f).coerceAtLeast(0f), borderPx),
-    )
-    // Inner left highlight
-    drawRect(
-      color = topLeftColor,
-      topLeft = Offset(inset, inset),
-      size = Size(borderPx, (h - inset * 2f).coerceAtLeast(0f)),
-    )
-    // Inner bottom shadow
-    drawRect(
-      color = bottomRightColor,
-      topLeft = Offset(inset, h - inset - borderPx),
-      size = Size((w - inset * 2f).coerceAtLeast(0f), borderPx),
-    )
-    // Inner right shadow
-    drawRect(
-      color = bottomRightColor,
-      topLeft = Offset(w - inset - borderPx, inset),
-      size = Size(borderPx, (h - inset * 2f).coerceAtLeast(0f)),
-    )
-
-    if (outerColor.alpha > 0f) {
-      drawRect(outerColor, Offset(0f, 0f), Size(w, borderPx))
-      drawRect(outerColor, Offset(0f, h - borderPx), Size(w, borderPx))
-      drawRect(outerColor, Offset(0f, 0f), Size(borderPx, h))
-      drawRect(outerColor, Offset(w - borderPx, 0f), Size(borderPx, h))
-    }
-  }
+  this.border(
+    width = 1.dp,
+    color = if (isDark) Color(0xFF141518) else Color(0xFF1E1E1F),
+    shape = RectangleShape,
+  )
 
 fun Modifier.minecraftPixelBevel(
   pressed: Boolean = false,
   isDark: Boolean = false,
 ): Modifier = mcPixelBox(pressed = pressed, isDark = isDark)
+
+@Composable
+fun OreUiSurface(
+  modifier: Modifier = Modifier,
+  tone: OreUiTone = if (isSystemInDarkTheme()) OreUiTone.SLATE_DARK else OreUiTone.SLATE_LIGHT,
+  onClick: (() -> Unit)? = null,
+  interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+  content: @Composable BoxScope.() -> Unit,
+) {
+  val pressed by interactionSource.collectIsPressedAsState()
+  val (bg, fg, outer, hi, lo) = oreUiPalette(tone)
+  val clickMod =
+    if (onClick != null) {
+      Modifier.clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        onClick = onClick,
+      )
+    } else {
+      Modifier
+    }
+  CompositionLocalProvider(LocalContentColor provides fg) {
+    Box(
+      modifier =
+        modifier
+          .graphicsLayer {
+            if (onClick != null && pressed) {
+              translationY = 2.dp.toPx()
+            }
+          }
+          .background(bg, RectangleShape)
+          .oreUiBevel(
+            outerColor = outer,
+            topHighlight = hi,
+            bottomShadow = lo,
+            pressed = onClick != null && pressed,
+          )
+          .then(clickMod),
+      content = content,
+    )
+  }
+}
+
+@Composable
+fun OreUiButton(
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  tone: OreUiTone = OreUiTone.GREEN,
+  enabled: Boolean = true,
+  interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+  content: @Composable BoxScope.() -> Unit,
+) {
+  val pressed by interactionSource.collectIsPressedAsState()
+  val (baseBg, baseFg, outer, hi, lo) = oreUiPalette(tone)
+  val bg = if (enabled) baseBg else Color(0xFF8E9095)
+  val fg = if (enabled) baseFg else Color(0xFFE6E8EB)
+  CompositionLocalProvider(LocalContentColor provides fg) {
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier =
+        modifier
+          .graphicsLayer {
+            if (enabled && pressed) {
+              translationY = 2.dp.toPx()
+            }
+          }
+          .background(bg, RectangleShape)
+          .oreUiBevel(
+            outerColor = outer,
+            topHighlight = if (enabled) hi else Color(0xFFB0B2B7),
+            bottomShadow = if (enabled) lo else Color(0xFF6A6C70),
+            pressed = enabled && pressed,
+          )
+          .clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            enabled = enabled,
+            onClick = onClick,
+          ),
+      content = content,
+    )
+  }
+}
+
+private data class OreUiPalette(
+  val bg: Color,
+  val fg: Color,
+  val outer: Color,
+  val topHighlight: Color,
+  val bottomShadow: Color,
+)
+
+private fun oreUiPalette(tone: OreUiTone): OreUiPalette =
+  when (tone) {
+    OreUiTone.SLATE_LIGHT ->
+      OreUiPalette(
+        bg = Color(0xFFD0D1D4),
+        fg = Color(0xFF1E1E1F),
+        outer = Color(0xFF1E1E1F),
+        topHighlight = Color.White,
+        bottomShadow = Color(0xFF8E9095),
+      )
+    OreUiTone.SLATE_DARK ->
+      OreUiPalette(
+        bg = Color(0xFF2B2D32),
+        fg = Color(0xFFECEEF0),
+        outer = Color(0xFF141518),
+        topHighlight = Color(0xFF3E4148),
+        bottomShadow = Color(0xFF141518),
+      )
+    OreUiTone.GREEN ->
+      OreUiPalette(
+        bg = Color(0xFF3C8527),
+        fg = Color.White,
+        outer = Color(0xFF1E1E1F),
+        topHighlight = Color(0xFF63C548),
+        bottomShadow = Color(0xFF255917),
+      )
+    OreUiTone.PURPLE ->
+      OreUiPalette(
+        bg = Color(0xFF7445D6),
+        fg = Color.White,
+        outer = Color(0xFF1E1E1F),
+        topHighlight = Color(0xFF9F6BF5),
+        bottomShadow = Color(0xFF4D279B),
+      )
+  }
+
+/**
+ * 7050.jpg style connected dark slate tab bar (#313236 / #48494E with 1.dp #1E1E1F dividers
+ * and centered 2.dp pure white bottom indicator bar on selected tab).
+ */
+@Composable
+fun OreUiSegmentedTabRow(
+  items: List<Pair<String, Boolean>>,
+  onSelect: (Int) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Row(
+    modifier =
+      modifier
+        .fillMaxWidth()
+        .height(38.dp)
+        .background(Color(0xFF313236), RectangleShape)
+        .border(1.dp, Color(0xFF1E1E1F), RectangleShape),
+  ) {
+    items.forEachIndexed { index, (label, selected) ->
+      if (index > 0) {
+        Box(
+          modifier =
+            Modifier.width(1.dp)
+              .fillMaxHeight()
+              .background(Color(0xFF1E1E1F), RectangleShape),
+        )
+      }
+      Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+          Modifier.weight(1f)
+            .fillMaxHeight()
+            .background(
+              if (selected) Color(0xFF48494E) else Color(0xFF313236),
+              RectangleShape,
+            )
+            .clickable { onSelect(index) },
+      ) {
+        Text(
+          text = label,
+          style = MaterialTheme.typography.labelMedium,
+          fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+          color = if (selected) Color.White else Color(0xFFD0D1D4),
+          maxLines = 1,
+          softWrap = false,
+          overflow = TextOverflow.Ellipsis,
+        )
+        if (selected) {
+          Box(
+            modifier =
+              Modifier.align(Alignment.BottomCenter)
+                .fillMaxWidth(0.56f)
+                .height(2.dp)
+                .background(Color.White, RectangleShape),
+          )
+        }
+      }
+    }
+  }
+}
 
 @Composable
 fun McXpBar(
@@ -136,7 +351,7 @@ fun McXpBar(
       modifier
         .fillMaxWidth()
         .height(9.dp)
-        .background(Color(0xFF4E5259), RectangleShape)
+        .background(Color(0xFF1E1E1F), RectangleShape)
         .padding(1.dp),
   ) {
     for (i in 0 until segments) {
@@ -147,7 +362,7 @@ fun McXpBar(
             .height(7.dp)
             .padding(horizontal = 0.5.dp)
             .background(
-              if (filled) Color(0xFF5EA83B) else Color(0xFF2B3328),
+              if (filled) Color(0xFF63C548) else Color(0xFF253022),
               RectangleShape,
             ),
       )
@@ -157,20 +372,14 @@ fun McXpBar(
 
 @Composable
 fun McGrassDirtTrim(modifier: Modifier = Modifier) {
-  Column(modifier = modifier.fillMaxWidth()) {
-    Box(
-      modifier =
-        Modifier.fillMaxWidth()
-          .height(2.dp)
-          .background(Color(0xFF4A7C32), RectangleShape),
-    )
-    Box(
-      modifier =
-        Modifier.fillMaxWidth()
-          .height(2.dp)
-          .background(Color(0xFF7D5D43), RectangleShape),
-    )
-  }
+  val isDark = isSystemInDarkTheme()
+  Box(
+    modifier =
+      modifier
+        .fillMaxWidth()
+        .height(1.dp)
+        .background(if (isDark) Color(0xFF141518) else Color(0xFFA0A2A6), RectangleShape),
+  )
 }
 
 @Composable

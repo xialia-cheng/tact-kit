@@ -84,6 +84,8 @@ import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileModeChip
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
+import com.xialia.tactkit.ui.theme.OreUiSegmentedTabRow
+import com.xialia.tactkit.ui.theme.isMcPixelTheme
 import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
@@ -629,28 +631,39 @@ fun FileManagerWorkspace(
         val visibleModes =
           if (isPickerMode) listOf(FileManagerMode.RECENT, FileManagerMode.TREE)
           else FileManagerMode.entries
-        LazyRow(
-          contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          modifier = Modifier.fillMaxWidth(),
-        ) {
-          items(visibleModes, key = { it.name }) { m ->
-            val icon =
-              when (m) {
-                FileManagerMode.RECENT -> Icons.Rounded.History
-                FileManagerMode.TREE -> Icons.Rounded.FolderCopy
-                FileManagerMode.CLEANUP -> Icons.Rounded.CleaningServices
-              }
-            TactileModeChip(
-              selected = mode == m,
-              label = m.label,
-              icon = icon,
-              onClick = {
-                mode = m
-                selectedIds = emptySet()
-              },
-              modifier = Modifier.testTag("file_mode_${m.name}"),
-            )
+        if (isMcPixelTheme()) {
+          OreUiSegmentedTabRow(
+            items = visibleModes.map { it.label to (mode == it) },
+            onSelect = { idx ->
+              mode = visibleModes[idx]
+              selectedIds = emptySet()
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+          )
+        } else {
+          LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            items(visibleModes, key = { it.name }) { m ->
+              val icon =
+                when (m) {
+                  FileManagerMode.RECENT -> Icons.Rounded.History
+                  FileManagerMode.TREE -> Icons.Rounded.FolderCopy
+                  FileManagerMode.CLEANUP -> Icons.Rounded.CleaningServices
+                }
+              TactileModeChip(
+                selected = mode == m,
+                label = m.label,
+                icon = icon,
+                onClick = {
+                  mode = m
+                  selectedIds = emptySet()
+                },
+                modifier = Modifier.testTag("file_mode_${m.name}"),
+              )
+            }
           }
         }
 

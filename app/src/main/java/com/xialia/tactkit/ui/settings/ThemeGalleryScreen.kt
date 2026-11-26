@@ -488,8 +488,8 @@ private fun previewPaletteFor(style: AppThemeStyle, isDark: Boolean): ThemePrevi
       }
     AppThemeStyle.MINECRAFT_PIXEL ->
       if (isDark) {
-        ThemePreviewPalette(Color(0xFF222428), Color(0xFF2D3036), Color(0xFF5EA83B), Color(0xFF9C7B60), Color(0xFFECEEF0), 0.dp)
+        ThemePreviewPalette(Color(0xFF1C1D20), Color(0xFF2B2D32), Color(0xFF3C8527), Color(0xFF7445D6), Color(0xFFECEEF0), 0.dp)
       } else {
-        ThemePreviewPalette(Color(0xFFE6E8E6), Color(0xFFF2F3F2), Color(0xFF4A7C32), Color(0xFF7D5D43), Color(0xFF232629), 0.dp)
+        ThemePreviewPalette(Color(0xFFE6E8EB), Color(0xFFD0D1D4), Color(0xFF3C8527), Color(0xFF7445D6), Color(0xFF1E1E1F), 0.dp)
       }
   }
