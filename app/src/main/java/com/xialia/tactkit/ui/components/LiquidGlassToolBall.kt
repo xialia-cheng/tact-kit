@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +77,7 @@ import com.xialia.tactkit.R
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
@@ -351,18 +353,28 @@ fun LiquidGlassToolBallOverlay(
           .navigationBarsPadding()
           .padding(end = 16.dp, bottom = 16.dp),
     ) {
-      val orbShape = RoundedCornerShape(16.dp)
+      val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
+      val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+      val orbCorner = if (isMinecraft) 0.dp else 16.dp
+      val orbShape = RoundedCornerShape(orbCorner)
       val ballTint =
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
+        when (themeStyle) {
+          com.xialia.tactkit.data.datastore.AppThemeStyle.GLACIER_BENTO ->
+            Color(0xFF38BDF8).copy(alpha = if (isDark) 0.28f else 0.26f)
+          else ->
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
+        }
       val fallbackBallTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
       val highlightBorder =
-        if (isDark) {
-          Color.White.copy(alpha = 0.24f)
-        } else {
-          Color.White.copy(alpha = 0.72f)
+        when (themeStyle) {
+          com.xialia.tactkit.data.datastore.AppThemeStyle.GLACIER_BENTO ->
+            Color(0xFFBAE6FD).copy(alpha = if (isDark) 0.45f else 0.92f)
+          else ->
+            if (isDark) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.72f)
         }
 
       val orbInteraction = remember { MutableInteractionSource() }
+      val orbPressed by orbInteraction.collectIsPressedAsState()
       Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -371,18 +383,28 @@ fun LiquidGlassToolBallOverlay(
             .tactilePress(
               interactionSource = orbInteraction,
               pressedScale = 0.90f,
-              baseCorner = 16.dp,
-              pressedCorner = 24.dp,
+              baseCorner = orbCorner,
+              pressedCorner = if (isMinecraft) 0.dp else 24.dp,
               enableHapticOnPress = false,
             )
             .glassSurfaceModifier(
-              useLiquidShader = useLiquidShader,
+              useLiquidShader = useLiquidShader && !isMinecraft,
               backdrop = backdrop,
               shape = orbShape,
               glassTint = ballTint,
               fallbackTint = fallbackBallTint,
               borderColor = highlightBorder,
             )
+            .let {
+              if (isMinecraft) {
+                it.minecraftPixelBevel(
+                  pressed = orbPressed,
+                  isDark = isDark,
+                )
+              } else {
+                it
+              }
+            }
             .clickable(
               interactionSource = orbInteraction,
               indication = null,

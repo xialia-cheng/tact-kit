@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -66,6 +67,10 @@ import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.star
 import androidx.graphics.shapes.toPath
+import com.xialia.tactkit.data.datastore.AppThemeStyle
+import com.xialia.tactkit.ui.theme.LocalAppThemeStyle
+import com.xialia.tactkit.ui.theme.minecraftPixelBevel
+import com.xialia.tactkit.ui.theme.themeCardBorder
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
@@ -212,6 +217,24 @@ fun TactileCard(
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val view = LocalView.current
+  val themeStyle = LocalAppThemeStyle.current
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+
+  val resolvedBaseCorner =
+    when (themeStyle) {
+      AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
+      AppThemeStyle.PRECISION_LAB -> minOf(baseCorner, 16.dp)
+      else -> baseCorner
+    }
+  val resolvedPressedCorner =
+    when (themeStyle) {
+      AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
+      AppThemeStyle.PRECISION_LAB -> minOf(pressedCorner, 20.dp)
+      else -> pressedCorner
+    }
+  val resolvedBorder =
+    border ?: themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant)
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed && enabled) pressedScale else 1f,
@@ -220,7 +243,7 @@ fun TactileCard(
   )
 
   val corner by animateDpAsState(
-    targetValue = if (isPressed && enabled) pressedCorner else baseCorner,
+    targetValue = if (isPressed && enabled) resolvedPressedCorner else resolvedBaseCorner,
     animationSpec = TactilePressSpringDp,
     label = "tactile_card_corner",
   )
@@ -229,7 +252,7 @@ fun TactileCard(
     shape = RoundedCornerShape(corner),
     color = containerColor,
     contentColor = contentColor,
-    border = border,
+    border = resolvedBorder,
     tonalElevation = 0.dp,
     shadowElevation = 0.dp,
     modifier =
@@ -237,6 +260,10 @@ fun TactileCard(
         .graphicsLayer {
           scaleX = scale
           scaleY = scale
+        }
+        .let {
+          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed && enabled, isDark = isDark)
+          else it
         }
         .clickable(
           interactionSource = interactionSource,
@@ -268,6 +295,9 @@ fun TactileModeChip(
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val view = LocalView.current
+  val themeStyle = LocalAppThemeStyle.current
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed) 0.95f else 1f,
@@ -276,7 +306,11 @@ fun TactileModeChip(
   )
 
   val corner by animateDpAsState(
-    targetValue = if (isPressed) 22.dp else if (selected) 16.dp else 14.dp,
+    targetValue =
+      if (isMinecraft) 0.dp
+      else if (isPressed) 22.dp
+      else if (selected) 16.dp
+      else 14.dp,
     animationSpec = TactilePressSpringDp,
     label = "chip_corner",
   )
@@ -295,11 +329,16 @@ fun TactileModeChip(
       } else {
         MaterialTheme.colorScheme.onSurfaceVariant
       },
+    border = themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant),
     modifier =
       modifier
         .graphicsLayer {
           scaleX = scale
           scaleY = scale
+        }
+        .let {
+          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed || selected, isDark = isDark)
+          else it
         }
         .clickable(
           interactionSource = interactionSource,
@@ -351,6 +390,9 @@ fun TactileActionButton(
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val view = LocalView.current
+  val themeStyle = LocalAppThemeStyle.current
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed && enabled) 0.95f else 1f,
@@ -359,7 +401,10 @@ fun TactileActionButton(
   )
 
   val corner by animateDpAsState(
-    targetValue = if (isPressed && enabled) 26.dp else 16.dp,
+    targetValue =
+      if (isMinecraft) 0.dp
+      else if (isPressed && enabled) 26.dp
+      else 16.dp,
     animationSpec = TactilePressSpringDp,
     label = "btn_corner",
   )
@@ -373,6 +418,10 @@ fun TactileActionButton(
         .graphicsLayer {
           scaleX = scale
           scaleY = scale
+        }
+        .let {
+          if (isMinecraft) it.minecraftPixelBevel(pressed = isPressed && enabled, isDark = isDark)
+          else it
         }
         .clickable(
           interactionSource = interactionSource,

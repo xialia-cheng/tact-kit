@@ -51,11 +51,14 @@ import com.xialia.tactkit.ui.sensor.MorseTorchScreen
 import com.xialia.tactkit.ui.sensor.PhysicalRulerScreen
 import com.xialia.tactkit.ui.settings.HelpTipsScreen
 import com.xialia.tactkit.ui.settings.SettingsScreen
+import com.xialia.tactkit.ui.settings.ThemeGalleryScreen
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
 
 @Serializable data object SettingsRoute
+
+@Serializable data object ThemeGalleryRoute
 
 @Serializable data object HelpTipsRoute
 
@@ -272,6 +275,17 @@ fun TactKitNavHost(
         onClearAiApiKey = viewModel::clearAiApiKey,
         onGetDecryptedAiApiKey = viewModel::getDecryptedAiApiKey,
         onOpenHelpTips = { navController.navigate(HelpTipsRoute) },
+        onOpenThemeGallery = { navController.navigate(ThemeGalleryRoute) },
+        onNavigateBack = { navController.popBackStack() },
+      )
+    }
+
+    composable<ThemeGalleryRoute> {
+      ThemeGalleryScreen(
+        preferences = uiState.preferences,
+        onThemeModeChange = viewModel::setThemeMode,
+        onDynamicColorChange = viewModel::setDynamicColor,
+        onAppThemeStyleChange = viewModel::setAppThemeStyle,
         onNavigateBack = { navController.popBackStack() },
       )
     }

@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
       TactKitTheme(
         themeMode = uiState.preferences.themeMode,
         dynamicColor = uiState.preferences.dynamicColor,
+        appThemeStyle = uiState.preferences.appThemeStyle,
       ) {
         TactKitNavHost(
           uiState = uiState,

@@ -192,6 +192,7 @@ fun SettingsScreen(
   onClearAiApiKey: () -> Unit,
   onGetDecryptedAiApiKey: suspend () -> String,
   onOpenHelpTips: () -> Unit = {},
+  onOpenThemeGallery: () -> Unit = {},
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -510,9 +511,11 @@ fun SettingsScreen(
           // 2. Appearance Card (Expandable, default collapsed)
           val appearanceSummary =
             buildString {
+              append(preferences.appThemeStyle.label)
+              append(" · ")
               append(preferences.themeMode.label)
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                append(if (preferences.dynamicColor) " · 动态取色已开启" else " · 动态取色已关闭")
+                append(if (preferences.dynamicColor) " · 动态取色" else "")
               }
             }
           ExpandableSettingsCard(
@@ -523,6 +526,45 @@ fun SettingsScreen(
             onToggle = { appearanceExpanded = !appearanceExpanded },
             testTag = "settings_appearance_card",
           ) {
+            com.xialia.tactkit.ui.components.TactileCard(
+              onClick = onOpenThemeGallery,
+              containerColor = MaterialTheme.colorScheme.surfaceContainer,
+              baseCorner = 16.dp,
+              pressedCorner = 22.dp,
+              modifier = Modifier.fillMaxWidth().testTag("settings_theme_gallery_entry"),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.Palette,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(20.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(
+                    text = "主题风格画廊",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                  )
+                  Text(
+                    text = "当前：${preferences.appThemeStyle.label}（点击切换 5 套风格）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+                Icon(
+                  imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
+                  contentDescription = "进入主题风格画廊",
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.size(18.dp),
+                )
+              }
+            }
+
             Text(
               text = "主题模式",
               style = MaterialTheme.typography.titleSmall,

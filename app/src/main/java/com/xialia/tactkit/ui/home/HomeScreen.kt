@@ -118,6 +118,7 @@ import com.xialia.tactkit.ui.components.WorkbenchCardView
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
@@ -529,6 +530,10 @@ fun HomeScreen(
                       AppHaptics.click(view)
                       onOpenFileManager()
                     },
+                    onOpenDocScanner = onOpenDocScanner,
+                    onOpenLanShare = onOpenLanShare,
+                    onOpenAiHub = { onOpenAiHub("VISION") },
+                    onQuickNote = openNoteCreator,
                     onDashboardPositioned = { rect ->
                       targetBoundsMap[OnboardingStep.DASHBOARD] = rect
                     },
@@ -608,6 +613,10 @@ fun HomeScreen(
                       AppHaptics.click(view)
                       onOpenFileManager()
                     },
+                    onOpenDocScanner = onOpenDocScanner,
+                    onOpenLanShare = onOpenLanShare,
+                    onOpenAiHub = { onOpenAiHub("VISION") },
+                    onQuickNote = openNoteCreator,
                     onDashboardPositioned = { rect ->
                       targetBoundsMap[OnboardingStep.DASHBOARD] = rect
                     },
@@ -848,95 +857,279 @@ private fun WorkbenchOverviewSection(
   onFilterChange: (CardFilter) -> Unit,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
   onOpenFileManager: () -> Unit,
+  onOpenDocScanner: () -> Unit = {},
+  onOpenLanShare: () -> Unit = {},
+  onOpenAiHub: () -> Unit = {},
+  onQuickNote: () -> Unit = {},
   onDashboardPositioned: (Rect) -> Unit = {},
   onFileManagerButtonPositioned: (Rect) -> Unit = {},
 ) {
+  val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
+  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+  val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val cardCorner =
+    when (themeStyle) {
+      com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
+      com.xialia.tactkit.data.datastore.AppThemeStyle.PRECISION_LAB -> 16.dp
+      else -> 22.dp
+    }
+  val cardBorder =
+    com.xialia.tactkit.ui.theme.themeCardBorder(
+      themeStyle,
+      isDark,
+      MaterialTheme.colorScheme.outlineVariant,
+    )
+
   Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-    // Borderless tonal overview card (no inner boxes around stat numbers)
-    Surface(
-      shape = RoundedCornerShape(22.dp),
-      color = MaterialTheme.colorScheme.surfaceContainerLow,
-      tonalElevation = 0.dp,
-      shadowElevation = 0.dp,
-      modifier =
-        Modifier.fillMaxWidth()
-          .onGloballyPositioned { coords -> onDashboardPositioned(coords.boundsInRoot()) }
-          .testTag("workbench_overview_card"),
-    ) {
+    if (themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.GLACIER_BENTO) {
+      // 2-column asymmetric Bento dashboard (left tall FileManager, right stacked PDF/Scanner + LAN Share, bottom AI + QuickNote)
       Column(
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier =
+          Modifier.fillMaxWidth()
+            .onGloballyPositioned { coords -> onDashboardPositioned(coords.boundsInRoot()) }
+            .testTag("workbench_overview_card"),
       ) {
         Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween,
-          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
+          modifier = Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         ) {
-          Text(
-            text = "我的工作台",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-          )
-          Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = ContinuousCapsule(),
+          TactileCard(
+            onClick = onOpenFileManager,
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            baseCorner = 22.dp,
+            pressedCorner = 26.dp,
+            modifier =
+              Modifier.weight(1f)
+                .fillMaxSize()
+                .onGloballyPositioned { coords -> onFileManagerButtonPositioned(coords.boundsInRoot()) },
           ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(4.dp),
-              modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+            Column(
+              verticalArrangement = Arrangement.SpaceBetween,
+              modifier = Modifier.fillMaxSize().padding(16.dp),
             ) {
               Icon(
-                imageVector = Icons.Rounded.Shield,
+                imageVector = Icons.Rounded.FolderOpen,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(30.dp),
               )
-              Text(
-                text = stringResource(R.string.local_first_badge),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
+              Spacer(modifier = Modifier.height(16.dp))
+              Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                  text = "文件管理",
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Bold,
+                )
+                Text(
+                  text = "共 ${uiState.dashboardStats.totalItemsCount} 项文档 · 全盘直览",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                )
+              }
+            }
+          }
+
+          Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f),
+          ) {
+            TactileCard(
+              onClick = onOpenDocScanner,
+              containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+              baseCorner = 20.dp,
+              pressedCorner = 24.dp,
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(14.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.DocumentScanner,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                )
+                Column {
+                  Text("PDF 与扫描", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                  Text("透视拉直 · 多页", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+              }
+            }
+
+            TactileCard(
+              onClick = onOpenLanShare,
+              containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+              baseCorner = 20.dp,
+              pressedCorner = 24.dp,
+              modifier = Modifier.fillMaxWidth(),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(14.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.WifiTethering,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                )
+                Column {
+                  Text("局域网快传", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                  Text("同网扫码互传", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+              }
             }
           }
         }
 
-        // Flat unboxed stats row
         Row(
-          horizontalArrangement = Arrangement.SpaceEvenly,
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
-          OverviewStatTile(
-            count = uiState.totalChecklists,
-            label = "清单",
+          TactileCard(
+            onClick = onOpenAiHub,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            baseCorner = 20.dp,
+            pressedCorner = 24.dp,
             modifier = Modifier.weight(1f),
-          )
-          OverviewStatTile(
-            count = uiState.totalNotes,
-            label = "便签",
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(10.dp),
+              modifier = Modifier.padding(14.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+              )
+              Column {
+                Text("AI 中枢", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("识图 · 摘要", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+            }
+          }
+
+          TactileCard(
+            onClick = onQuickNote,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            baseCorner = 20.dp,
+            pressedCorner = 24.dp,
             modifier = Modifier.weight(1f),
-          )
-          OverviewStatTile(
-            count = uiState.totalVoiceMemos,
-            label = "语音",
-            modifier = Modifier.weight(1f),
-          )
-          OverviewStatTile(
-            count = uiState.totalFiles,
-            label = "文件",
-            modifier = Modifier.weight(1f),
-          )
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(10.dp),
+              modifier = Modifier.padding(14.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.EditNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+              )
+              Column {
+                Text("随手记", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("${uiState.totalNotes} 便签 · ${uiState.totalChecklists} 清单", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+            }
+          }
         }
       }
-    }
+    } else {
+      // Borderless tonal overview card (CLASSIC_DEFAULT and non-Bento themes)
+      Surface(
+        shape = RoundedCornerShape(cardCorner),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = cardBorder,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        modifier =
+          Modifier.fillMaxWidth()
+            .let {
+              if (isMinecraft) it.minecraftPixelBevel(isDark = isDark)
+              else it
+            }
+            .onGloballyPositioned { coords -> onDashboardPositioned(coords.boundsInRoot()) }
+            .testTag("workbench_overview_card"),
+      ) {
+        Column(
+          verticalArrangement = Arrangement.spacedBy(14.dp),
+          modifier = Modifier.padding(16.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text(
+              text = "我的工作台",
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.Bold,
+              color = MaterialTheme.colorScheme.onSurface,
+            )
+            Surface(
+              color = MaterialTheme.colorScheme.surfaceContainer,
+              shape = if (isMinecraft) RoundedCornerShape(0.dp) else ContinuousCapsule(),
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.Shield,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(12.dp),
+                )
+                Text(
+                  text = stringResource(R.string.local_first_badge),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+          }
 
-    DocumentDashboardCard(
-      stats = uiState.dashboardStats,
-      onOpenRecentFile = onOpenRecentFile,
-      onOpenFileManager = onOpenFileManager,
-      onFileManagerButtonPositioned = onFileManagerButtonPositioned,
-    )
+          // Flat unboxed stats row
+          Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            OverviewStatTile(
+              count = uiState.totalChecklists,
+              label = "清单",
+              modifier = Modifier.weight(1f),
+            )
+            OverviewStatTile(
+              count = uiState.totalNotes,
+              label = "便签",
+              modifier = Modifier.weight(1f),
+            )
+            OverviewStatTile(
+              count = uiState.totalVoiceMemos,
+              label = "语音",
+              modifier = Modifier.weight(1f),
+            )
+            OverviewStatTile(
+              count = uiState.totalFiles,
+              label = "文件",
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
+      }
+
+      DocumentDashboardCard(
+        stats = uiState.dashboardStats,
+        onOpenRecentFile = onOpenRecentFile,
+        onOpenFileManager = onOpenFileManager,
+        onFileManagerButtonPositioned = onFileManagerButtonPositioned,
+      )
+    }
 
     // Aligned borderless tonal filter tabs
     Row(

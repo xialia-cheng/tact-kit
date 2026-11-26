@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xialia.tactkit.BuildConfig
 import com.xialia.tactkit.data.TactKitDatabase
+import com.xialia.tactkit.data.datastore.AppThemeStyle
 import com.xialia.tactkit.data.datastore.SettingsRepository
 import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
@@ -335,6 +336,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
   fun setThemeMode(mode: ThemeMode) {
     viewModelScope.launch { settingsRepository.setThemeMode(mode) }
+  }
+
+  fun setAppThemeStyle(style: AppThemeStyle) {
+    viewModelScope.launch { settingsRepository.setAppThemeStyle(style) }
   }
 
   fun setDynamicColor(enabled: Boolean) {

@@ -26,8 +26,17 @@ enum class ThemeMode(val label: String) {
   DARK("深色模式"),
 }
 
+enum class AppThemeStyle(val label: String, val tagline: String) {
+  CLASSIC_DEFAULT("默认经典", "温润靛蓝 · Material 3 Expressive"),
+  GLACIER_BENTO("冰川琉璃", "冷雪曜石 · 镜面高光 Bento 便当格"),
+  SWISS_CRAFT("瑞士精密", "米白炭黑 · 钴蓝信号橙刻度线框"),
+  PRECISION_LAB("理工实验室", "雾白深板 · 松石青绿 16dp 仪表盘"),
+  MINECRAFT_PIXEL("MC 像素工坊", "石板黑曜 · 零圆角 3D 像素凹凸框"),
+}
+
 data class UserPreferences(
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
+  val appThemeStyle: AppThemeStyle = AppThemeStyle.CLASSIC_DEFAULT,
   val dynamicColor: Boolean = true,
   val liquidGlassPowerSave: Boolean = false,
   val autoCheckUpdates: Boolean = true,
@@ -58,6 +67,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
   private object Keys {
     val THEME_MODE = stringPreferencesKey("theme_mode")
+    val APP_THEME_STYLE = stringPreferencesKey("app_theme_style")
     val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
     val LIQUID_GLASS_POWER_SAVE = booleanPreferencesKey("liquid_glass_power_save")
     val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_updates")
@@ -86,6 +96,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val themeName = prefs[Keys.THEME_MODE] ?: ThemeMode.SYSTEM.name
         val themeMode =
           ThemeMode.entries.firstOrNull { it.name == themeName } ?: ThemeMode.SYSTEM
+        val styleName = prefs[Keys.APP_THEME_STYLE] ?: AppThemeStyle.CLASSIC_DEFAULT.name
+        val appThemeStyle =
+          AppThemeStyle.entries.firstOrNull { it.name == styleName } ?: AppThemeStyle.CLASSIC_DEFAULT
         val dynamicColor = prefs[Keys.DYNAMIC_COLOR] ?: true
         val powerSave = prefs[Keys.LIQUID_GLASS_POWER_SAVE] ?: false
         val rawPinned = prefs[Keys.PINNED_TOOL_IDS]
@@ -119,6 +132,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
         UserPreferences(
           themeMode = themeMode,
+          appThemeStyle = appThemeStyle,
           dynamicColor = dynamicColor,
           liquidGlassPowerSave = powerSave,
           autoCheckUpdates = prefs[Keys.AUTO_CHECK_UPDATES] ?: true,
@@ -154,6 +168,10 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
   suspend fun setThemeMode(mode: ThemeMode) {
     dataStore.edit { it[Keys.THEME_MODE] = mode.name }
+  }
+
+  suspend fun setAppThemeStyle(style: AppThemeStyle) {
+    dataStore.edit { it[Keys.APP_THEME_STYLE] = style.name }
   }
 
   suspend fun setDynamicColor(enabled: Boolean) {
