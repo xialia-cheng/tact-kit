@@ -65,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -703,14 +704,17 @@ private fun Modifier.glassSurfaceModifier(
   fallbackTint: Color,
   borderColor: Color,
 ): Modifier {
-  return if (useLiquidShader) {
+  val supportsLensSdf = shape is androidx.compose.foundation.shape.CornerBasedShape
+  return if (useLiquidShader && supportsLensSdf) {
     this.drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
           vibrancy()
           blur(14.dp.toPx())
-          lens(16.dp.toPx(), 28.dp.toPx())
+          if (size.isSpecified && size.width > 0f && size.height > 0f) {
+            lens(16.dp.toPx(), 28.dp.toPx())
+          }
         },
         onDrawSurface = { drawRect(glassTint) },
       )

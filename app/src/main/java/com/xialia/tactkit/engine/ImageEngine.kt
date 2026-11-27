@@ -111,17 +111,17 @@ object ImageEngine {
     rightNorm: Float,
     bottomNorm: Float,
   ): Bitmap {
-    val l = (leftNorm.coerceIn(0f, 0.95f) * source.width).toInt()
-    val t = (topNorm.coerceIn(0f, 0.95f) * source.height).toInt()
-    val r = (rightNorm.coerceIn(leftNorm + 0.05f, 1f) * source.width).toInt()
-    val b = (bottomNorm.coerceIn(topNorm + 0.05f, 1f) * source.height).toInt()
-    return Bitmap.createBitmap(
-      source,
-      l,
-      t,
-      (r - l).coerceAtLeast(16),
-      (b - t).coerceAtLeast(16),
-    )
+    val safeL = leftNorm.coerceIn(0f, 0.94f)
+    val safeT = topNorm.coerceIn(0f, 0.94f)
+    val safeR = rightNorm.coerceIn(safeL + 0.05f, 1f)
+    val safeB = bottomNorm.coerceIn(safeT + 0.05f, 1f)
+    val l = (safeL * source.width).toInt().coerceIn(0, (source.width - 1).coerceAtLeast(0))
+    val t = (safeT * source.height).toInt().coerceIn(0, (source.height - 1).coerceAtLeast(0))
+    val maxW = (source.width - l).coerceAtLeast(1)
+    val maxH = (source.height - t).coerceAtLeast(1)
+    val w = ((safeR * source.width).toInt() - l).coerceIn(minOf(16, maxW), maxW)
+    val h = ((safeB * source.height).toInt() - t).coerceIn(minOf(16, maxH), maxH)
+    return Bitmap.createBitmap(source, l, t, w, h)
   }
 
   fun applyMosaic(

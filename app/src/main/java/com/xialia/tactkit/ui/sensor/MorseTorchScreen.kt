@@ -203,13 +203,22 @@ fun MorseTorchScreen(
                         isSosLoop = true
                         blinkJob =
                           scope.launch {
-                            MorseTorchEngine.transmitMorsePattern(
-                              context = context,
-                              morseCode = "... --- ...",
-                              unitMs = unitMs.toLong(),
-                              repeatLoop = true,
-                              onStep = { lit -> isTorchLit = lit },
-                            )
+                            try {
+                              MorseTorchEngine.transmitMorsePattern(
+                                context = context,
+                                morseCode = "... --- ...",
+                                unitMs = unitMs.toLong(),
+                                repeatLoop = true,
+                                onStep = { lit -> isTorchLit = lit },
+                              )
+                            } catch (_: kotlinx.coroutines.CancellationException) {
+                              // normal stop
+                            } catch (_: Exception) {
+                              // ignore torch hardware failure
+                            } finally {
+                              isSosLoop = false
+                              isTorchLit = false
+                            }
                           }
                       }
                     },

@@ -88,7 +88,11 @@ fun MetalDetectorScreen(
   val wavePath = remember { Path() }
 
   DisposableEffect(context, hapticEnabled, thresholdDelta, baselineUt) {
-    val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    if (sm == null) {
+      hasMagnetometer = false
+      return@DisposableEffect onDispose {}
+    }
     val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
     hasMagnetometer = mag != null
     var lastHapticMs = 0L

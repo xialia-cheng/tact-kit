@@ -304,10 +304,19 @@ fun LanShareScreen(
                       selectedIp = ipList.first()
                     }
                     scope.launch {
-                      val startedPort = withContext(Dispatchers.IO) { server.start(8765) }
-                      serverPort = startedPort
-                      isRunning = true
-                      haptics.confirm()
+                      runCatching { withContext(Dispatchers.IO) { server.start(8765) } }
+                        .onSuccess { startedPort ->
+                          serverPort = startedPort
+                          isRunning = true
+                          haptics.confirm()
+                        }
+                        .onFailure { err ->
+                          Toast.makeText(
+                            context,
+                            "启动局域网服务失败：${err.message ?: "端口不可用"}",
+                            Toast.LENGTH_SHORT,
+                          ).show()
+                        }
                     }
                   } else {
                     server.stop()

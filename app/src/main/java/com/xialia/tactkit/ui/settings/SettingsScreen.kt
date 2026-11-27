@@ -1349,7 +1349,7 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
 
 private fun checkAllFilesGranted(context: Context): Boolean {
   return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-    Environment.isExternalStorageManager()
+    runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
   } else {
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
       PackageManager.PERMISSION_GRANTED

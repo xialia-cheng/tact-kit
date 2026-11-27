@@ -51,15 +51,21 @@ class VoiceMemoManager(private val context: Context) {
         @Suppress("DEPRECATION")
         MediaRecorder()
       }
-    rec.apply {
-      setAudioSource(MediaRecorder.AudioSource.MIC)
-      setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-      setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-      setAudioEncodingBitRate(128_000)
-      setAudioSamplingRate(44_100)
-      setOutputFile(outFile.absolutePath)
-      prepare()
-      start()
+    try {
+      rec.apply {
+        setAudioSource(MediaRecorder.AudioSource.MIC)
+        setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+        setAudioEncodingBitRate(128_000)
+        setAudioSamplingRate(44_100)
+        setOutputFile(outFile.absolutePath)
+        prepare()
+        start()
+      }
+    } catch (e: Exception) {
+      runCatching { rec.release() }
+      runCatching { outFile.delete() }
+      throw e
     }
     recorder = rec
     activeRecordingFile = outFile

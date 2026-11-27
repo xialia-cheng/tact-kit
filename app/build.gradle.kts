@@ -92,7 +92,7 @@ android {
 }
 
 dependencies {
-  implementation(platform(libs.androidx.compose.bom))
+  implementation(enforcedPlatform(libs.androidx.compose.bom))
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
@@ -135,6 +135,7 @@ dependencies {
 
   "ksp"(libs.androidx.room.compiler)
 
+  testImplementation(enforcedPlatform(libs.androidx.compose.bom))
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
@@ -142,7 +143,7 @@ dependencies {
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
 
-  androidTestImplementation(platform(libs.androidx.compose.bom))
+  androidTestImplementation(enforcedPlatform(libs.androidx.compose.bom))
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   androidTestImplementation(libs.androidx.espresso.core)
   androidTestImplementation(libs.androidx.junit)

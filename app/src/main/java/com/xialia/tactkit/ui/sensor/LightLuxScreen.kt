@@ -87,7 +87,11 @@ fun LightLuxScreen(
   val wavePath = remember { Path() }
 
   DisposableEffect(context) {
-    val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    if (sm == null) {
+      hasLightSensor = false
+      return@DisposableEffect onDispose {}
+    }
     val lightSensor = sm.getDefaultSensor(Sensor.TYPE_LIGHT)
     hasLightSensor = lightSensor != null
     val listener =

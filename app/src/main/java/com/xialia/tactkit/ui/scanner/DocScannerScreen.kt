@@ -165,30 +165,42 @@ fun DocScannerScreen(
       if (uris.isNotEmpty()) {
         scope.launch {
           isBusy = true
+          var loadedAny = false
+          var failedCount = 0
           uris.forEach { uri ->
-            val bmp = ImageEngine.loadOrientedBitmap(context, uri, maxDimension = 1800)
-            if (bmp != null) {
-              val quad = NormalizedQuad()
-              val enhanced =
-                withContext(Dispatchers.Default) {
-                  DocScannerEngine.warpPerspectiveAndFilter(bmp, quad, ScanFilter.ENHANCED)
-                }
-              pages.add(
-                ScannedPage(
-                  id = "${System.nanoTime()}",
-                  originalBitmap = bmp,
-                  processedBitmap = enhanced,
-                  quad = quad,
-                  filter = ScanFilter.ENHANCED,
+            runCatching {
+              val bmp = ImageEngine.loadOrientedBitmap(context, uri, maxDimension = 1800)
+              if (bmp != null) {
+                val quad = NormalizedQuad()
+                val enhanced =
+                  withContext(Dispatchers.Default) {
+                    DocScannerEngine.warpPerspectiveAndFilter(bmp, quad, ScanFilter.ENHANCED)
+                  }
+                pages.add(
+                  ScannedPage(
+                    id = "${System.nanoTime()}",
+                    originalBitmap = bmp,
+                    processedBitmap = enhanced,
+                    quad = quad,
+                    filter = ScanFilter.ENHANCED,
+                  )
                 )
-              )
+                loadedAny = true
+              } else {
+                failedCount++
+              }
+            }.onFailure {
+              failedCount++
             }
           }
-          if (pages.isNotEmpty()) {
+          if (loadedAny && pages.isNotEmpty()) {
             selectedPageIndex = pages.lastIndex
             isCameraMode = false
+            haptics.confirm()
           }
-          haptics.confirm()
+          if (failedCount > 0) {
+            Toast.makeText(context, "有 $failedCount 张图片无法读取或格式不支持", Toast.LENGTH_SHORT).show()
+          }
           isBusy = false
         }
       }
@@ -223,26 +235,30 @@ fun DocScannerScreen(
       object : ImageCapture.OnImageSavedCallback {
         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
           scope.launch {
-            val bmp = ImageEngine.loadOrientedBitmap(context, Uri.fromFile(tempPhoto), 1800)
-            tempPhoto.delete()
-            if (bmp != null) {
-              val quad = NormalizedQuad()
-              val processed =
-                withContext(Dispatchers.Default) {
-                  DocScannerEngine.warpPerspectiveAndFilter(bmp, quad, ScanFilter.ENHANCED)
-                }
-              pages.add(
-                ScannedPage(
-                  id = "${System.nanoTime()}",
-                  originalBitmap = bmp,
-                  processedBitmap = processed,
-                  quad = quad,
-                  filter = ScanFilter.ENHANCED,
+            runCatching {
+              val bmp = ImageEngine.loadOrientedBitmap(context, Uri.fromFile(tempPhoto), 1800)
+              if (bmp != null) {
+                val quad = NormalizedQuad()
+                val processed =
+                  withContext(Dispatchers.Default) {
+                    DocScannerEngine.warpPerspectiveAndFilter(bmp, quad, ScanFilter.ENHANCED)
+                  }
+                pages.add(
+                  ScannedPage(
+                    id = "${System.nanoTime()}",
+                    originalBitmap = bmp,
+                    processedBitmap = processed,
+                    quad = quad,
+                    filter = ScanFilter.ENHANCED,
+                  )
                 )
-              )
-              selectedPageIndex = pages.lastIndex
-              haptics.confirm()
+                selectedPageIndex = pages.lastIndex
+                haptics.confirm()
+              }
+            }.onFailure { err ->
+              Toast.makeText(context, "读取拍摄图片失败：${err.message}", Toast.LENGTH_SHORT).show()
             }
+            tempPhoto.delete()
             isBusy = false
           }
         }

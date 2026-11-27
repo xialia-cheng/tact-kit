@@ -195,9 +195,19 @@ fun VoiceMemoDialog(
                     haptics.confirm()
                   } else {
                     recordedResult = null
-                    voiceMemoManager.startRecording()
-                    isRecording = true
-                    haptics.tick()
+                    runCatching { voiceMemoManager.startRecording() }
+                      .onSuccess {
+                        isRecording = true
+                        haptics.tick()
+                      }
+                      .onFailure { err ->
+                        isRecording = false
+                        android.widget.Toast.makeText(
+                          context,
+                          "无法启动录音：${err.message ?: "麦克风被占用或设备不支持"}",
+                          android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                      }
                   }
                 },
                 modifier = Modifier.testTag("voice_memo_record_toggle"),

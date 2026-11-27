@@ -89,7 +89,11 @@ fun CompassLevelScreen(
   var sensorAccuracyLabel by remember { mutableStateOf("标准") }
 
   DisposableEffect(context) {
-    val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    val sm = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    if (sm == null) {
+      hasSensors = false
+      return@DisposableEffect onDispose {}
+    }
     val rotationVector = sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     val accel = if (rotationVector == null) sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) else null
     val mag = sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
