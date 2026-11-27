@@ -79,6 +79,7 @@ import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.util.concurrent.Executors
@@ -178,7 +179,13 @@ fun QrStudioScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("二维码工坊", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "二维码工坊",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("qr_studio"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {

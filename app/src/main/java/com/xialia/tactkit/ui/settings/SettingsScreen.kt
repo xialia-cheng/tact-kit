@@ -56,19 +56,18 @@ import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -104,7 +103,11 @@ import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.repository.AiHubRepository
 import com.xialia.tactkit.data.repository.AppUpdateRepository
 import com.xialia.tactkit.data.repository.ReleaseInfo
+import com.xialia.tactkit.ui.components.GeminiSparkleLoader
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
+import com.xialia.tactkit.ui.components.TactileSwitch
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
@@ -253,7 +256,13 @@ fun SettingsScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("我的与设置", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              text = "我的与设置",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("settings"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -615,7 +624,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                   )
                 }
-                Switch(
+                TactileSwitch(
                   checked = preferences.dynamicColor,
                   onCheckedChange = {
                     haptics.tick()
@@ -665,7 +674,7 @@ fun SettingsScreen(
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
               }
-              Switch(
+              TactileSwitch(
                 checked = preferences.liquidGlassPowerSave,
                 onCheckedChange = {
                   haptics.confirm()
@@ -833,6 +842,10 @@ fun SettingsScreen(
                 shape = themeShape(14.dp),
                 modifier = Modifier.weight(1f).testTag("ai_test_conn_btn"),
               ) {
+                if (isTestingAi) {
+                  GeminiSparkleLoader(size = 18.dp)
+                  Spacer(modifier = Modifier.width(6.dp))
+                }
                 Text(if (isTestingAi) "测试中..." else "测试连通性")
               }
             }
@@ -992,7 +1005,7 @@ fun SettingsScreen(
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
               }
-              Switch(
+              TactileSwitch(
                 checked = preferences.autoCheckUpdates,
                 onCheckedChange = {
                   haptics.tick()
@@ -1068,9 +1081,9 @@ fun SettingsScreen(
               modifier = Modifier.fillMaxWidth().testTag("settings_check_update_btn"),
             ) {
               if (isCheckingUpdate) {
-                CircularProgressIndicator(
-                  strokeWidth = 2.dp,
-                  modifier = Modifier.size(16.dp),
+                TactKitMorphLoadingIndicator(
+                  size = 18.dp,
+                  color = LocalContentColor.current,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("正在双路竞速查询 Releases...")

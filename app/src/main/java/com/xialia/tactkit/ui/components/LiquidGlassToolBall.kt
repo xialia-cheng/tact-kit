@@ -2,15 +2,18 @@ package com.xialia.tactkit.ui.components
 
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,19 +22,23 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -41,7 +48,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Icon
@@ -58,7 +64,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalView
@@ -74,21 +82,22 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.capsule.ContinuousCapsule
 import com.xialia.tactkit.R
+import com.xialia.tactkit.data.datastore.AppThemeStyle
 import com.xialia.tactkit.domain.ToolCatalog
 import com.xialia.tactkit.domain.ToolCategory
 import com.xialia.tactkit.domain.ToolItem
+import com.xialia.tactkit.ui.theme.LocalAppThemeStyle
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitThumbnailBox
 import com.xialia.tactkit.ui.theme.mcGrassButtonBox
-import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.ui.theme.mcPixelBox
-import com.xialia.tactkit.ui.theme.minecraftPixelBevel
+import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
 /**
- * Compact 56.dp rounded-square (16.dp) Liquid Glass Tool Ball & 28.dp top-corner Bottom Sheet Drawer.
+ * Compact 56.dp rounded-square (16.dp) Liquid Glass Tool Ball & Container-Transformed 28.dp Drawer.
  */
 @Composable
 fun LiquidGlassToolBallOverlay(
@@ -121,7 +130,17 @@ fun LiquidGlassToolBallOverlay(
     }
   }
 
-  Box(modifier = modifier.fillMaxSize()) {
+  BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    // Persistent invisible anchor for Onboarding spotlight target coordinates
+    Box(
+      modifier =
+        ballModifier
+          .align(Alignment.BottomEnd)
+          .navigationBarsPadding()
+          .padding(end = 16.dp, bottom = 16.dp)
+          .size(56.dp),
+    )
+
     AnimatedVisibility(
       visible = isExpanded,
       enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
@@ -141,312 +160,368 @@ fun LiquidGlassToolBallOverlay(
       )
     }
 
-    AnimatedVisibility(
-      visible = isExpanded,
-      enter =
-        fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-          slideInVertically(initialOffsetY = { it / 3 }),
-      exit =
-        fadeOut(spring(stiffness = Spring.StiffnessMedium)) +
-          slideOutVertically(targetOffsetY = { it / 3 }),
-      modifier = Modifier.align(Alignment.BottomCenter),
-    ) {
-      val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
-      val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
-      val sheetShape =
-        if (isMinecraft) androidx.compose.ui.graphics.RectangleShape
-        else RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-      val glassTint =
-        MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = if (isDark) 0.84f else 0.82f)
-      val fallbackTint = MaterialTheme.colorScheme.surfaceContainerLowest
-      val highlightBorder =
-        if (isDark) {
-          Color.White.copy(alpha = 0.14f)
-        } else {
-          Color.White.copy(alpha = 0.72f)
-        }
+    val themeStyle = LocalAppThemeStyle.current
+    val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val expandedWidth = minOf(maxWidth, 600.dp)
+    val expandedHeight = minOf(maxHeight * 0.78f, 640.dp)
+    val expandedEndMargin = ((maxWidth - expandedWidth) / 2f).coerceAtLeast(0.dp)
 
-      val sheetModifier =
-        Modifier.widthIn(max = 600.dp)
-          .fillMaxWidth()
-          .heightIn(max = 640.dp)
-          .let { base ->
-            if (isMinecraft) {
-              base
-                .background(fallbackTint, androidx.compose.ui.graphics.RectangleShape)
-                .mcPixelBox(isDark = isDark,
-                  )
-            } else {
-              base.glassSurfaceModifier(
-                useLiquidShader = useLiquidShader,
-                backdrop = backdrop,
-                shape = sheetShape,
-                glassTint = glassTint,
-                fallbackTint = fallbackTint,
-                borderColor = highlightBorder,
-              )
-            }
-          }
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-          ) { /* Consume taps inside sheet */ }
-          .navigationBarsPadding()
-          .padding(horizontal = 16.dp, vertical = 14.dp)
-          .testTag("tool_drawer_panel")
+    val transformTransition =
+      updateTransition(targetState = isExpanded, label = "tool_ball_container_transform")
 
-      Column(modifier = sheetModifier) {
-        Box(
-          modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-          contentAlignment = Alignment.Center,
-        ) {
-          Box(
-            modifier =
-              Modifier.width(36.dp)
-                .height(4.dp)
-                .clip(if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else ContinuousCapsule())
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
-          )
-        }
+    val containerWidth by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_width",
+      ) { expanded -> if (expanded) expandedWidth else 56.dp }
 
-        // Clean Header: only title "全部工具" + close button (zero technical jargon subtitle)
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-          Text(
-            text = "全部工具",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-          )
-          IconButton(
-            onClick = {
-              haptics.tick()
-              isExpanded = false
-            },
-            modifier = Modifier.testTag("close_tool_drawer_button"),
-          ) {
-            Icon(
-              imageVector = Icons.Rounded.Close,
-              contentDescription = stringResource(R.string.cd_close),
-            )
-          }
-        }
+    val containerHeight by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_height",
+      ) { expanded -> if (expanded) expandedHeight else 56.dp }
 
-        Spacer(modifier = Modifier.height(8.dp))
+    val endMargin by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_end_margin",
+      ) { expanded -> if (expanded) expandedEndMargin else 16.dp }
 
-        // Compact 50.dp single-line search bar
-        Surface(
-          shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(16.dp),
-          color = MaterialTheme.colorScheme.surfaceContainerLow,
-          modifier =
-            Modifier.fillMaxWidth()
-              .height(50.dp)
-              .let {
-                if (isMinecraft) {
-                  it.mcPixelBox(isDark = isDark,
-                    )
-                } else {
-                  it
-                }
-              },
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-          ) {
-            Icon(
-              imageVector = Icons.Rounded.Search,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.size(20.dp),
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Box(
-              contentAlignment = Alignment.CenterStart,
-              modifier = Modifier.weight(1f),
-            ) {
-              if (searchQuery.isEmpty()) {
-                Text(
-                  text = "搜索工具...",
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  maxLines = 1,
-                )
-              }
-              BasicTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                singleLine = true,
-                textStyle =
-                  MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface
-                  ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier.fillMaxWidth().testTag("tool_drawer_search_input"),
-              )
-            }
-            if (searchQuery.isNotEmpty()) {
-              IconButton(
-                onClick = { searchQuery = "" },
-                modifier = Modifier.size(32.dp),
-              ) {
-                Icon(
-                  Icons.Rounded.Close,
-                  contentDescription = stringResource(R.string.cd_close),
-                  modifier = Modifier.size(18.dp),
-                )
-              }
-            }
-          }
-        }
+    val bottomMargin by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_bottom_margin",
+      ) { expanded -> if (expanded) 0.dp else (16.dp + navBottom) }
 
-        val pinnedTools =
-          remember(pinnedToolIds) { pinnedToolIds.mapNotNull { ToolCatalog.findById(it) } }
-
-        // Only show pinned tools strip when user actually pinned >= 1 tool (no empty placeholder, no cap)
-        if (pinnedTools.isNotEmpty()) {
-          Spacer(modifier = Modifier.height(10.dp))
-          LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(end = 4.dp),
-            modifier = Modifier.fillMaxWidth().testTag("pinned_tools_row"),
-          ) {
-            items(pinnedTools, key = { "pinned_${it.id}" }) { tool ->
-              PinnedToolSlotChip(
-                tool = tool,
-                onClick = {
-                  haptics.tick()
-                  isExpanded = false
-                  onLaunchTool(tool)
-                },
-              )
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val normalizedQuery = searchQuery.trim().lowercase()
-        LazyColumn(
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-          modifier = Modifier.weight(1f, fill = false),
-        ) {
-          ToolCategory.entries.forEach { category ->
-            val toolsInCategory =
-              ToolCatalog.allTools.filter { tool ->
-                tool.category == category &&
-                  (normalizedQuery.isEmpty() ||
-                    tool.name.lowercase().contains(normalizedQuery) ||
-                    tool.subtitle.lowercase().contains(normalizedQuery) ||
-                    category.title.lowercase().contains(normalizedQuery))
-              }
-            if (toolsInCategory.isNotEmpty()) {
-              item(key = category.name) {
-                val isCatExpanded =
-                  if (normalizedQuery.isNotEmpty()) true else (expandedCategories[category] ?: true)
-                CategoryToolCard(
-                  category = category,
-                  tools = toolsInCategory,
-                  expanded = isCatExpanded,
-                  pinnedIds = pinnedToolIds,
-                  onToggleExpand = {
-                    haptics.tick()
-                    expandedCategories[category] = !isCatExpanded
-                  },
-                  onToolClick = { tool ->
-                    haptics.tick()
-                    isExpanded = false
-                    onLaunchTool(tool)
-                  },
-                  onTogglePin = { toolId ->
-                    haptics.confirm()
-                    onTogglePinTool(toolId)
-                  },
-                )
-              }
-            }
-          }
-        }
+    val topCorner by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_top_corner",
+      ) { expanded ->
+        if (isMinecraft) 0.dp else if (expanded) 28.dp else 16.dp
       }
-    }
 
-    AnimatedVisibility(
-      visible = !isExpanded,
-      enter = fadeIn() + scaleIn(initialScale = 0.85f),
-      exit = fadeOut() + scaleOut(targetScale = 0.85f),
-      modifier =
-        Modifier.align(Alignment.BottomEnd)
-          .navigationBarsPadding()
-          .padding(end = 16.dp, bottom = 16.dp),
-    ) {
-      val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
-      val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
-      val orbCorner = if (isMinecraft) 0.dp else 16.dp
-      val orbShape = RoundedCornerShape(orbCorner)
-      val ballTint =
-        when (themeStyle) {
-          com.xialia.tactkit.data.datastore.AppThemeStyle.GLACIER_BENTO ->
-            Color(0xFF38BDF8).copy(alpha = if (isDark) 0.28f else 0.26f)
-          else ->
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
-        }
-      val fallbackBallTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
-      val highlightBorder =
-        when (themeStyle) {
-          com.xialia.tactkit.data.datastore.AppThemeStyle.GLACIER_BENTO ->
-            Color(0xFFBAE6FD).copy(alpha = if (isDark) 0.45f else 0.92f)
-          else ->
-            if (isDark) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.72f)
-        }
+    val bottomCorner by
+      transformTransition.animateDp(
+        transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
+        label = "container_bottom_corner",
+      ) { expanded ->
+        if (isMinecraft) 0.dp else if (expanded) 1.dp else 16.dp
+      }
 
-      val orbInteraction = remember { MutableInteractionSource() }
-      val orbPressed by orbInteraction.collectIsPressedAsState()
-      Box(
-        contentAlignment = Alignment.Center,
-        modifier =
-          ballModifier
-            .size(56.dp)
-            .tactilePress(
+    val ballTint =
+      when (themeStyle) {
+        AppThemeStyle.GLACIER_BENTO ->
+          Color(0xFF38BDF8).copy(alpha = if (isDark) 0.28f else 0.26f)
+        else ->
+          MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
+      }
+    val sheetGlassTint =
+      MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = if (isDark) 0.84f else 0.82f)
+    val fallbackBallTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
+    val fallbackSheetTint = MaterialTheme.colorScheme.surfaceContainerLowest
+
+    val animatedGlassTint by
+      transformTransition.animateColor(
+        transitionSpec = { tween(220) },
+        label = "container_glass_tint",
+      ) { expanded -> if (expanded) sheetGlassTint else ballTint }
+
+    val animatedFallbackTint by
+      transformTransition.animateColor(
+        transitionSpec = { tween(220) },
+        label = "container_fallback_tint",
+      ) { expanded -> if (expanded) fallbackSheetTint else fallbackBallTint }
+
+    val ballBorder =
+      when (themeStyle) {
+        AppThemeStyle.GLACIER_BENTO ->
+          Color(0xFFBAE6FD).copy(alpha = if (isDark) 0.45f else 0.92f)
+        else ->
+          if (isDark) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.72f)
+      }
+    val sheetBorder =
+      if (isDark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.72f)
+    val animatedBorderColor by
+      transformTransition.animateColor(
+        transitionSpec = { tween(220) },
+        label = "container_border",
+      ) { expanded -> if (expanded) sheetBorder else ballBorder }
+
+    val orbInteraction = remember { MutableInteractionSource() }
+    val orbPressed by orbInteraction.collectIsPressedAsState()
+
+    val containerShape: Shape =
+      if (isMinecraft) {
+        RectangleShape
+      } else {
+        RoundedCornerShape(
+          topStart = topCorner.coerceAtLeast(1.dp),
+          topEnd = topCorner.coerceAtLeast(1.dp),
+          bottomStart = bottomCorner.coerceAtLeast(1.dp),
+          bottomEnd = bottomCorner.coerceAtLeast(1.dp),
+        )
+      }
+
+    val containerSurfaceModifier =
+      Modifier.align(Alignment.BottomEnd)
+        .padding(end = endMargin.coerceAtLeast(0.dp), bottom = bottomMargin.coerceAtLeast(0.dp))
+        .size(width = containerWidth, height = containerHeight)
+        .let { base ->
+          if (!isExpanded && !transformTransition.isRunning) {
+            base.tactilePress(
               interactionSource = orbInteraction,
               pressedScale = 0.90f,
-              baseCorner = orbCorner,
+              baseCorner = if (isMinecraft) 0.dp else 16.dp,
               pressedCorner = if (isMinecraft) 0.dp else 24.dp,
               enableHapticOnPress = false,
             )
-            .let { base ->
-              if (isMinecraft) {
-                base
-                  .background(Color(0xFF3C8527), androidx.compose.ui.graphics.RectangleShape)
-                  .mcGrassButtonBox(pressed = orbPressed)
-              } else {
-                base.glassSurfaceModifier(
-                  useLiquidShader = useLiquidShader,
-                  backdrop = backdrop,
-                  shape = orbShape,
-                  glassTint = ballTint,
-                  fallbackTint = fallbackBallTint,
-                  borderColor = highlightBorder,
+          } else {
+            base
+          }
+        }
+        .let { base ->
+          if (isMinecraft) {
+            if (isExpanded) {
+              base
+                .background(fallbackSheetTint, RectangleShape)
+                .mcPixelBox(isDark = isDark)
+            } else {
+              base
+                .background(Color(0xFF3C8527), RectangleShape)
+                .mcGrassButtonBox(pressed = orbPressed)
+            }
+          } else {
+            base.glassSurfaceModifier(
+              useLiquidShader = useLiquidShader,
+              backdrop = backdrop,
+              shape = containerShape,
+              glassTint = animatedGlassTint,
+              fallbackTint = animatedFallbackTint,
+              borderColor = animatedBorderColor,
+            )
+          }
+        }
+        .clipToBounds()
+
+    Box(modifier = containerSurfaceModifier) {
+      AnimatedContent(
+        targetState = isExpanded,
+        transitionSpec = {
+          (fadeIn(animationSpec = tween(220, delayMillis = 50)) +
+            scaleIn(
+              initialScale = 0.94f,
+              animationSpec = spring(dampingRatio = 0.78f, stiffness = 360f),
+            )) togetherWith fadeOut(animationSpec = tween(100))
+        },
+        label = "tool_ball_drawer_content",
+      ) { expanded ->
+        if (!expanded) {
+          Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+              Modifier.fillMaxSize()
+                .clickable(
+                  interactionSource = orbInteraction,
+                  indication = null,
+                ) {
+                  AppHaptics.click(view)
+                  isExpanded = true
+                }
+                .testTag("liquid_glass_tool_ball"),
+          ) {
+            Icon(
+              imageVector = Icons.Rounded.Widgets,
+              contentDescription = stringResource(R.string.cd_tool_ball),
+              tint =
+                if (isMinecraft) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+              modifier = Modifier.size(24.dp),
+            )
+          }
+        } else {
+          Column(
+            modifier =
+              Modifier.requiredWidth(expandedWidth)
+                .requiredHeight(expandedHeight)
+                .clickable(
+                  interactionSource = remember { MutableInteractionSource() },
+                  indication = null,
+                ) { /* Consume taps inside drawer */ }
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(bottom = navBottom)
+                .testTag("tool_drawer_panel"),
+          ) {
+            Box(
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+              contentAlignment = Alignment.Center,
+            ) {
+              Box(
+                modifier =
+                  Modifier.width(36.dp)
+                    .height(4.dp)
+                    .clip(if (isMinecraft) RectangleShape else ContinuousCapsule())
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+              )
+            }
+
+            // Clean Header: only title "全部工具" + close button
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Text(
+                text = "全部工具",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+              )
+              IconButton(
+                onClick = {
+                  haptics.tick()
+                  isExpanded = false
+                },
+                modifier = Modifier.testTag("close_tool_drawer_button"),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.Close,
+                  contentDescription = stringResource(R.string.cd_close),
                 )
               }
             }
-            .clickable(
-              interactionSource = orbInteraction,
-              indication = null,
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Compact 50.dp single-line search bar
+            Surface(
+              shape = if (isMinecraft) RectangleShape else RoundedCornerShape(16.dp),
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
+              modifier =
+                Modifier.fillMaxWidth()
+                  .height(50.dp)
+                  .let {
+                    if (isMinecraft) it.mcPixelBox(isDark = isDark) else it
+                  },
             ) {
-              AppHaptics.click(view)
-              isExpanded = true
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Rounded.Search,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Box(
+                  contentAlignment = Alignment.CenterStart,
+                  modifier = Modifier.weight(1f),
+                ) {
+                  if (searchQuery.isEmpty()) {
+                    Text(
+                      text = "搜索工具...",
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      maxLines = 1,
+                    )
+                  }
+                  BasicTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    textStyle =
+                      MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                      ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth().testTag("tool_drawer_search_input"),
+                  )
+                }
+                if (searchQuery.isNotEmpty()) {
+                  IconButton(
+                    onClick = { searchQuery = "" },
+                    modifier = Modifier.size(32.dp),
+                  ) {
+                    Icon(
+                      Icons.Rounded.Close,
+                      contentDescription = stringResource(R.string.cd_close),
+                      modifier = Modifier.size(18.dp),
+                    )
+                  }
+                }
+              }
             }
-            .testTag("liquid_glass_tool_ball"),
-      ) {
-        Icon(
-          imageVector = Icons.Rounded.Widgets,
-          contentDescription = stringResource(R.string.cd_tool_ball),
-          tint = if (isMinecraft) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
-          modifier = Modifier.size(24.dp),
-        )
+
+            val pinnedTools =
+              remember(pinnedToolIds) { pinnedToolIds.mapNotNull { ToolCatalog.findById(it) } }
+
+            if (pinnedTools.isNotEmpty()) {
+              Spacer(modifier = Modifier.height(10.dp))
+              LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(end = 4.dp),
+                modifier = Modifier.fillMaxWidth().testTag("pinned_tools_row"),
+              ) {
+                items(pinnedTools, key = { "pinned_${it.id}" }) { tool ->
+                  PinnedToolSlotChip(
+                    tool = tool,
+                    onClick = {
+                      haptics.tick()
+                      isExpanded = false
+                      onLaunchTool(tool)
+                    },
+                  )
+                }
+              }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val normalizedQuery = searchQuery.trim().lowercase()
+            LazyColumn(
+              verticalArrangement = Arrangement.spacedBy(10.dp),
+              modifier = Modifier.weight(1f, fill = false),
+            ) {
+              ToolCategory.entries.forEach { category ->
+                val toolsInCategory =
+                  ToolCatalog.allTools.filter { tool ->
+                    tool.category == category &&
+                      (normalizedQuery.isEmpty() ||
+                        tool.name.lowercase().contains(normalizedQuery) ||
+                        tool.subtitle.lowercase().contains(normalizedQuery) ||
+                        category.title.lowercase().contains(normalizedQuery))
+                  }
+                if (toolsInCategory.isNotEmpty()) {
+                  item(key = category.name) {
+                    val isCatExpanded =
+                      if (normalizedQuery.isNotEmpty()) true
+                      else (expandedCategories[category] ?: true)
+                    CategoryToolCard(
+                      category = category,
+                      tools = toolsInCategory,
+                      expanded = isCatExpanded,
+                      pinnedIds = pinnedToolIds,
+                      onToggleExpand = {
+                        haptics.tick()
+                        expandedCategories[category] = !isCatExpanded
+                      },
+                      onToolClick = { tool ->
+                        haptics.tick()
+                        isExpanded = false
+                        onLaunchTool(tool)
+                      },
+                      onTogglePin = { toolId ->
+                        onTogglePinTool(toolId)
+                      },
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -605,22 +680,12 @@ private fun CategoryToolCard(
                     overflow = TextOverflow.Ellipsis,
                   )
                 }
-                IconButton(
-                  onClick = { onTogglePin(tool.id) },
+                TactilePinIconButton(
+                  pinned = isPinned,
+                  onToggle = { onTogglePin(tool.id) },
+                  contentDescription = stringResource(R.string.cd_pin),
                   modifier = Modifier.testTag("pin_tool_${tool.id}"),
-                ) {
-                  Icon(
-                    imageVector = Icons.Rounded.PushPin,
-                    contentDescription = stringResource(R.string.cd_pin),
-                    tint =
-                      if (isPinned) {
-                        MaterialTheme.colorScheme.primary
-                      } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-                      },
-                    modifier = Modifier.size(18.dp),
-                  )
-                }
+                )
               }
             }
           }

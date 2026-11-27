@@ -36,7 +36,6 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -62,8 +61,10 @@ import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.engine.HashAndCryptoEngine
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -159,7 +160,13 @@ fun CryptoVaultScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("AES-256 加密锁", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "AES-256 加密锁",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("crypto_vault"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -178,7 +185,12 @@ fun CryptoVaultScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize().padding(innerPadding),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) {
+          TactKitBusyStatusBar(
+            message = "正在执行 AES-256 加密/解密处理...",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+          )
+        }
 
         LazyColumn(
           contentPadding = PaddingValues(16.dp),

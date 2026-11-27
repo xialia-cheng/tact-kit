@@ -57,6 +57,7 @@ import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.util.Locale
@@ -207,7 +208,13 @@ fun CompassLevelScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("指南针与水平仪", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "指南针与水平仪",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("compass_level"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {

@@ -279,7 +279,7 @@ private fun oreUiPalette(tone: OreUiTone): OreUiPalette =
 
 /**
  * 7050.jpg style connected dark slate tab bar (#313236 / #48494E with 1.dp #1E1E1F dividers
- * and centered 2.dp pure white bottom indicator bar on selected tab).
+ * and smooth spring-sliding centered 2.dp pure white bottom indicator bar).
  */
 @Composable
 fun OreUiSegmentedTabRow(
@@ -287,7 +287,9 @@ fun OreUiSegmentedTabRow(
   onSelect: (Int) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  Row(
+  val selectedIndex = items.indexOfFirst { it.second }.coerceAtLeast(0)
+  val itemCount = items.size.coerceAtLeast(1)
+  androidx.compose.foundation.layout.BoxWithConstraints(
     modifier =
       modifier
         .fillMaxWidth()
@@ -295,46 +297,76 @@ fun OreUiSegmentedTabRow(
         .background(Color(0xFF313236), RectangleShape)
         .border(1.dp, Color(0xFF1E1E1F), RectangleShape),
   ) {
-    items.forEachIndexed { index, (label, selected) ->
-      if (index > 0) {
-        Box(
-          modifier =
-            Modifier.width(1.dp)
-              .fillMaxHeight()
-              .background(Color(0xFF1E1E1F), RectangleShape),
-        )
-      }
-      Box(
-        contentAlignment = Alignment.Center,
-        modifier =
-          Modifier.weight(1f)
-            .fillMaxHeight()
-            .background(
-              if (selected) Color(0xFF48494E) else Color(0xFF313236),
-              RectangleShape,
-            )
-            .clickable { onSelect(index) },
-      ) {
-        Text(
-          text = label,
-          style = MaterialTheme.typography.labelMedium,
-          fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-          color = if (selected) Color.White else Color(0xFFD0D1D4),
-          maxLines = 1,
-          softWrap = false,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (selected) {
+    val tabWidth = maxWidth / itemCount
+    val indicatorWidth = tabWidth * 0.56f
+    val targetIndicatorX = tabWidth * selectedIndex + (tabWidth - indicatorWidth) / 2f
+    val animatedIndicatorX by
+      androidx.compose.animation.core.animateDpAsState(
+        targetValue = targetIndicatorX,
+        animationSpec =
+          androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+          ),
+        label = "oreui_tab_indicator_x",
+      )
+
+    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+      items.forEachIndexed { index, (label, selected) ->
+        if (index > 0) {
           Box(
             modifier =
-              Modifier.align(Alignment.BottomCenter)
-                .fillMaxWidth(0.56f)
-                .height(2.dp)
-                .background(Color.White, RectangleShape),
+              Modifier.width(1.dp)
+                .fillMaxHeight()
+                .background(Color(0xFF1E1E1F), RectangleShape),
+          )
+        }
+        val bgColor by
+          androidx.compose.animation.animateColorAsState(
+            targetValue = if (selected) Color(0xFF48494E) else Color(0xFF313236),
+            animationSpec = androidx.compose.animation.core.tween(180),
+            label = "oreui_tab_bg",
+          )
+        val textScale by
+          androidx.compose.animation.core.animateFloatAsState(
+            targetValue = if (selected) 1.04f else 1f,
+            animationSpec =
+              androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
+              ),
+            label = "oreui_tab_scale",
+          )
+        Box(
+          contentAlignment = Alignment.Center,
+          modifier =
+            Modifier.weight(1f)
+              .fillMaxHeight()
+              .background(bgColor, RectangleShape)
+              .clickable { onSelect(index) },
+        ) {
+          Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) Color.White else Color(0xFFD0D1D4),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.graphicsLayer { scaleX = textScale; scaleY = textScale },
           )
         }
       }
     }
+
+    Box(
+      modifier =
+        Modifier.align(Alignment.BottomStart)
+          .padding(start = animatedIndicatorX.coerceAtLeast(0.dp))
+          .width(indicatorWidth)
+          .height(2.dp)
+          .background(Color.White, RectangleShape),
+    )
   }
 }
 

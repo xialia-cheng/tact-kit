@@ -31,7 +31,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -61,7 +60,9 @@ import com.xialia.tactkit.engine.NetworkDiagEngine
 import com.xialia.tactkit.engine.PortProbeResult
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.Job
@@ -102,7 +103,13 @@ fun NetDiagnosticsScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("局域网体检与 Ping", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "局域网体检与 Ping",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("net_diagnostics"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -343,7 +350,7 @@ fun NetDiagnosticsScreen(
                 ) {
                   Text("常用端口状态", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                   if (isScanningPorts) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    TactKitBusyStatusBar(message = "正在并发探测常用服务端口...")
                   }
                   com.xialia.tactkit.ui.components.SimpleFlowRow(
                     horizontalSpacing = 8.dp,

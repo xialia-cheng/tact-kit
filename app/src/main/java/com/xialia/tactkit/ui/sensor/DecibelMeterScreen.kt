@@ -66,6 +66,7 @@ import com.xialia.tactkit.engine.DecibelMonitor
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.util.Locale
@@ -164,7 +165,13 @@ fun DecibelMeterScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("分贝噪音计", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "分贝噪音计",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("decibel_meter"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {

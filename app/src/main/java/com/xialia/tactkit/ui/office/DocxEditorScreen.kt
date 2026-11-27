@@ -35,7 +35,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +62,8 @@ import com.xialia.tactkit.engine.DocxEngine
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.MarkdownRenderer
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
 
@@ -172,6 +173,7 @@ fun DocxEditorScreen(
         editableParagraphs.add("在这里开始编写正文内容...")
         viewMode = DocxViewMode.EDIT
       },
+      heroTargetRoute = "docx_editor",
     )
     return
   }
@@ -192,6 +194,7 @@ fun DocxEditorScreen(
               text = docData?.title ?: "Docx 文档工坊",
               fontWeight = FontWeight.Bold,
               maxLines = 1,
+              modifier = Modifier.tactKitToolHeroTarget("docx_editor"),
             )
           },
           navigationIcon = {
@@ -222,7 +225,12 @@ fun DocxEditorScreen(
       Column(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) {
+          TactKitBusyStatusBar(
+            message = "正在解析与导出 .docx 文档...",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+          )
+        }
 
         LazyColumn(
           contentPadding = PaddingValues(16.dp),

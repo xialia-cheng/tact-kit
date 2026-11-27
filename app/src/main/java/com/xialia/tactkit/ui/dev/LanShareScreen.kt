@@ -74,6 +74,7 @@ import com.xialia.tactkit.engine.QrCodeEngine
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.FileInspectionHelper
@@ -227,7 +228,13 @@ fun LanShareScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("局域网 HTTP 快传", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "局域网 HTTP 快传",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("lan_share"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {

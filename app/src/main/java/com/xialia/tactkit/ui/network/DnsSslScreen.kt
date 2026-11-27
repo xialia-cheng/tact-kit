@@ -32,7 +32,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -56,7 +55,9 @@ import com.xialia.tactkit.engine.DnsSslReport
 import com.xialia.tactkit.engine.NetworkDiagEngine
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
@@ -97,7 +98,13 @@ fun DnsSslScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("DNS 与 SSL 证书检查", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "DNS 与 SSL 证书检查",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("dns_ssl"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -176,7 +183,7 @@ fun DnsSslScreen(
                 }
 
                 if (isInspecting) {
-                  LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                  TactKitBusyStatusBar(message = "正在解析 DNS 记录与 TLS 握手证书链...")
                 }
               }
             }

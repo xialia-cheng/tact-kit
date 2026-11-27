@@ -40,12 +40,10 @@ import androidx.compose.material.icons.rounded.MergeType
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -81,6 +79,9 @@ import com.xialia.tactkit.engine.PdfEngine
 import com.xialia.tactkit.engine.PdfPrepareResult
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
 import kotlin.math.roundToInt
@@ -277,6 +278,7 @@ fun PdfToolkitScreen(
       },
       onNavigateBack = onNavigateBack,
       fabText = "选择 PDF",
+      heroTargetRoute = "pdf_toolkit",
     )
     return
   }
@@ -292,7 +294,13 @@ fun PdfToolkitScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("PDF 核心工具箱", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              text = "PDF 核心工具箱",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("pdf_toolkit"),
+            )
+          },
           navigationIcon = {
             IconButton(onClick = onNavigateBack) {
               Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
@@ -318,7 +326,7 @@ fun PdfToolkitScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         if (isBusy) {
-          LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+          TactKitBusyStatusBar(message = "正在处理与渲染 PDF 页面...")
         }
 
         // Multi-page Pinch-to-Zoom Preview Surface
@@ -363,7 +371,7 @@ fun PdfToolkitScreen(
                     },
                 )
               } else if (isBusy) {
-                CircularProgressIndicator()
+                TactKitMorphLoadingIndicator(size = 46.dp)
               } else {
                 Text("双指捏合可放大预览页面", style = MaterialTheme.typography.bodySmall)
               }

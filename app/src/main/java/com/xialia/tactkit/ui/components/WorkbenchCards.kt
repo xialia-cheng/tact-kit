@@ -1,5 +1,8 @@
 package com.xialia.tactkit.ui.components
 
+import android.graphics.Bitmap
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +30,6 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -41,10 +43,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -54,9 +61,12 @@ import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.R
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.engine.AudioPlaybackState
+import com.xialia.tactkit.engine.ImageEngine
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitMono
+import com.xialia.tactkit.ui.theme.isMcPixelTheme
+import com.xialia.tactkit.ui.theme.mcInventorySlotBox
 import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -73,6 +83,7 @@ fun WorkbenchCardView(
   onDeleteChecklistItem: (Long, String) -> Unit,
   onEditNote: (WorkbenchCard.Note) -> Unit,
   onOpenRecentFile: (WorkbenchCard.RecentFile) -> Unit,
+  onPreviewImage: ((uriString: String, title: String, sharedKey: String) -> Unit)? = null,
   onToggleVoiceMemoPlay: (WorkbenchCard.VoiceMemo) -> Unit,
   onSeekVoiceMemo: (Long, Long) -> Unit,
   onTogglePin: (Long) -> Unit,
@@ -164,25 +175,15 @@ fun WorkbenchCardView(
           )
         }
 
-        IconButton(
-          onClick = {
+        TactilePinIconButton(
+          pinned = card.pinned,
+          onToggle = {
             haptics.tick()
             onTogglePin(card.id)
           },
+          contentDescription = stringResource(R.string.cd_pin),
           modifier = Modifier.size(40.dp).testTag("card_pin_${card.id}"),
-        ) {
-          Icon(
-            imageVector = Icons.Rounded.PushPin,
-            contentDescription = stringResource(R.string.cd_pin),
-            tint =
-              if (card.pinned) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-              },
-            modifier = Modifier.size(18.dp),
-          )
-        }
+        )
 
         IconButton(
           onClick = {
@@ -272,6 +273,7 @@ fun WorkbenchCardView(
               haptics.tick()
               onOpenRecentFile(card)
             },
+            onPreviewImage = onPreviewImage,
           )
         }
       }
@@ -456,7 +458,23 @@ private fun ChecklistCardBody(
 private fun RecentFileCardBody(
   card: WorkbenchCard.RecentFile,
   onOpenFile: () -> Unit,
+  onPreviewImage: ((uriString: String, title: String, sharedKey: String) -> Unit)? = null,
 ) {
+  val context = LocalContext.current
+  val isMc = isMcPixelTheme()
+  val sharedKey = "shared_img_home_${card.id}"
+  val isImageFile = card.mimeType.startsWith("image/") && card.fileUri != null
+  val previewBitmap by
+    produceState<Bitmap?>(initialValue = TactKitImageThumbCache.get(sharedKey), key1 = card.fileUri) {
+      if (!isImageFile) return@produceState
+      val parsedUri = runCatching { Uri.parse(card.fileUri) }.getOrNull() ?: return@produceState
+      val loaded = runCatching { ImageEngine.loadOrientedBitmap(context, parsedUri, maxDimension = 720) }.getOrNull()
+      if (loaded != null) {
+        TactKitImageThumbCache.put(sharedKey, loaded)
+        value = loaded
+      }
+    }
+
   val actionLabel =
     when {
       card.mimeType == "application/pdf" -> "在内置 PDF 查看器中打开"
@@ -465,6 +483,32 @@ private fun RecentFileCardBody(
     }
 
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val thumb = previewBitmap
+    val rawUri = card.fileUri
+    if (thumb != null && rawUri != null && card.mimeType.startsWith("image/")) {
+      val shape = themeShape(14.dp)
+      Box(
+        modifier =
+          Modifier.fillMaxWidth()
+            .height(156.dp)
+            .tactKitSharedElement(sharedKey)
+            .clip(shape)
+            .then(if (isMc) Modifier.mcInventorySlotBox() else Modifier)
+            .clickable {
+              if (onPreviewImage != null) onPreviewImage(rawUri, card.title, sharedKey)
+              else onOpenFile()
+            }
+            .testTag("recent_image_thumb_${card.id}"),
+      ) {
+        Image(
+          bitmap = thumb.asImageBitmap(),
+          contentDescription = card.title,
+          contentScale = ContentScale.Crop,
+          modifier = Modifier.fillMaxWidth().height(156.dp),
+        )
+      }
+    }
+
     card.sha256?.takeIf { it.isNotBlank() }?.let { digest ->
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.8f),

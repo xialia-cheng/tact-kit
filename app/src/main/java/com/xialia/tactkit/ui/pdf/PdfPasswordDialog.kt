@@ -16,7 +16,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -121,7 +121,10 @@ fun PdfPasswordUnlockDialog(
       ) {
         if (isVerifying) {
           Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+            TactKitMorphLoadingIndicator(
+              size = 18.dp,
+              color = MaterialTheme.colorScheme.onPrimary,
+            )
             Spacer(modifier = Modifier.width(8.dp))
             Text("解密中...")
           }

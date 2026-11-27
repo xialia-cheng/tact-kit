@@ -5,6 +5,10 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -64,7 +68,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -109,15 +112,18 @@ import com.xialia.tactkit.domain.ToolItem
 import com.xialia.tactkit.engine.AudioPlaybackState
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.components.LiquidGlassToolBallOverlay
+import com.xialia.tactkit.ui.components.LocalHeroTransitionState
 import com.xialia.tactkit.ui.components.NewVersionUpdateDialog
 import com.xialia.tactkit.ui.components.OnboardingStep
 import com.xialia.tactkit.ui.components.OnboardingWelcomeDialog
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.RollingNumberText
 import com.xialia.tactkit.ui.components.SpotlightOnboardingOverlay
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileCard
 import com.xialia.tactkit.ui.components.VoiceMemoDialog
 import com.xialia.tactkit.ui.components.WorkbenchCardView
+import com.xialia.tactkit.ui.components.tactKitSharedBounds
 import com.xialia.tactkit.ui.components.tactilePress
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.OreUiButton
@@ -137,6 +143,7 @@ private data class QuickStripEntry(
   val id: String,
   val label: String,
   val icon: ImageVector,
+  val targetRoute: String? = null,
   val onClick: () -> Unit,
 )
 
@@ -171,6 +178,7 @@ fun HomeScreen(
   onOpenPdfToolkit: (String?) -> Unit,
   onOpenPdfAnnotate: (String?) -> Unit,
   onOpenImageToolkit: (String?) -> Unit,
+  onPreviewImage: ((uriString: String, title: String, sharedKey: String) -> Unit)? = null,
   onOpenMediaWorkshop: (String?) -> Unit,
   onOpenAiHub: (String) -> Unit,
   onOpenDocxEditor: (String?) -> Unit,
@@ -203,6 +211,7 @@ fun HomeScreen(
   val context = LocalContext.current
   val view = LocalView.current
   val haptics = rememberAppHaptics()
+  val heroState = LocalHeroTransitionState.current
   val snackbarHostState = remember { SnackbarHostState() }
 
   var isSearchBarVisible by remember { mutableStateOf(false) }
@@ -346,10 +355,12 @@ fun HomeScreen(
               IconButton(
                 onClick = {
                   AppHaptics.click(view)
+                  heroState?.activate("hero_settings_gear", "settings")
                   onNavigateToSettings()
                 },
                 modifier =
-                  Modifier.onGloballyPositioned { coords ->
+                  Modifier.tactKitSharedBounds("hero_settings_gear")
+                    .onGloballyPositioned { coords ->
                       targetBoundsMap[OnboardingStep.SETTINGS_ENTRY] = coords.boundsInRoot()
                     }
                     .testTag("settings_button"),
@@ -371,7 +382,10 @@ fun HomeScreen(
           modifier = Modifier.fillMaxSize().padding(innerPadding),
         ) {
           if (uiState.isImportingFile) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            TactKitBusyStatusBar(
+              message = "正在导入并索引本地文件...",
+              modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
           }
 
           AnimatedVisibility(visible = isSearchBarVisible) {
@@ -453,77 +467,77 @@ fun HomeScreen(
           val quickStripEntries =
             remember {
               listOf(
-                QuickStripEntry("strip_files", "文件管理", Icons.Rounded.FolderOpen) {
+                QuickStripEntry("strip_files", "文件管理", Icons.Rounded.FolderOpen, "file_manager") {
                   haptics.tick()
                   onOpenFileManager()
                 },
-                QuickStripEntry("strip_scan", "文档扫描", Icons.Rounded.DocumentScanner) {
+                QuickStripEntry("strip_scan", "文档扫描", Icons.Rounded.DocumentScanner, "doc_scanner") {
                   haptics.tick()
                   onOpenDocScanner()
                 },
-                QuickStripEntry("strip_pdf", "PDF 工具", Icons.Rounded.PictureAsPdf) {
+                QuickStripEntry("strip_pdf", "PDF 工具", Icons.Rounded.PictureAsPdf, "pdf_toolkit") {
                   haptics.tick()
                   onOpenPdfToolkit(null)
                 },
-                QuickStripEntry("strip_img", "图片隐私", Icons.Rounded.HideImage) {
+                QuickStripEntry("strip_img", "图片隐私", Icons.Rounded.HideImage, "image_toolkit") {
                   haptics.tick()
                   onOpenImageToolkit(null)
                 },
-                QuickStripEntry("strip_qr", "二维码", Icons.Rounded.QrCode2) {
+                QuickStripEntry("strip_qr", "二维码", Icons.Rounded.QrCode2, "qr_studio") {
                   haptics.tick()
                   onOpenQrStudio()
                 },
-                QuickStripEntry("strip_lan", "局域网快传", Icons.Rounded.WifiTethering) {
+                QuickStripEntry("strip_lan", "局域网快传", Icons.Rounded.WifiTethering, "lan_share") {
                   haptics.tick()
                   onOpenLanShare()
                 },
-                QuickStripEntry("strip_net", "网络体检", Icons.Rounded.Lan) {
+                QuickStripEntry("strip_net", "网络体检", Icons.Rounded.Lan, "net_diagnostics") {
                   haptics.tick()
                   onOpenNetDiagnostics()
                 },
-                QuickStripEntry("strip_db", "分贝计", Icons.Rounded.GraphicEq) {
+                QuickStripEntry("strip_db", "分贝计", Icons.Rounded.GraphicEq, "decibel_meter") {
                   haptics.tick()
                   onOpenDecibelMeter()
                 },
-                QuickStripEntry("strip_hw", "电池硬件", Icons.Rounded.BatteryChargingFull) {
+                QuickStripEntry("strip_hw", "电池硬件", Icons.Rounded.BatteryChargingFull, "battery_hardware") {
                   haptics.tick()
                   onOpenBatteryHardware()
                 },
-                QuickStripEntry("strip_hash", "哈希校验", Icons.Rounded.Fingerprint) {
+                QuickStripEntry("strip_hash", "哈希校验", Icons.Rounded.Fingerprint, "hash_workshop") {
                   haptics.tick()
                   onOpenHashWorkshop()
                 },
-                QuickStripEntry("strip_daily", "日常工具", Icons.Rounded.Calculate) {
+                QuickStripEntry("strip_daily", "日常工具", Icons.Rounded.Calculate, "daily_tools") {
                   haptics.tick()
                   onOpenDailyTools(null)
                 },
-                QuickStripEntry("strip_compass", "指南针", Icons.Rounded.Explore) {
+                QuickStripEntry("strip_compass", "指南针", Icons.Rounded.Explore, "compass_level") {
                   haptics.tick()
                   onOpenCompassLevel()
                 },
-                QuickStripEntry("strip_docx", "Docx 文档", Icons.Rounded.Description) {
+                QuickStripEntry("strip_docx", "Docx 文档", Icons.Rounded.Description, "docx_editor") {
                   haptics.tick()
                   onOpenDocxEditor(null)
                 },
-                QuickStripEntry("strip_data", "数据工坊", Icons.Rounded.TableChart) {
+                QuickStripEntry("strip_data", "数据工坊", Icons.Rounded.TableChart, "data_workshop") {
                   haptics.tick()
                   onOpenDataWorkshop()
                 },
-                QuickStripEntry("strip_archive", "压缩包", Icons.Rounded.Archive) {
+                QuickStripEntry("strip_archive", "压缩包", Icons.Rounded.Archive, "archive_workshop") {
                   haptics.tick()
                   onOpenArchiveWorkshop(null)
                 },
-                QuickStripEntry("strip_ai", "AI 提取", Icons.Rounded.AutoAwesome) {
+                QuickStripEntry("strip_ai", "AI 提取", Icons.Rounded.AutoAwesome, "ai_hub") {
                   haptics.tick()
                   onOpenAiHub("VISION")
                 },
-                QuickStripEntry("strip_note", "新建便签", Icons.Rounded.EditNote) {
+                QuickStripEntry("strip_note", "新建便签", Icons.Rounded.EditNote, null) {
                   openNoteCreator()
                 },
-                QuickStripEntry("strip_voice", "语音备忘", Icons.Rounded.Mic) {
+                QuickStripEntry("strip_voice", "语音备忘", Icons.Rounded.Mic, null) {
                   openVoiceMemoCreator()
                 },
-                QuickStripEntry("strip_media", "音视频", Icons.Rounded.AudioFile) {
+                QuickStripEntry("strip_media", "音视频", Icons.Rounded.AudioFile, "media_workshop") {
                   haptics.tick()
                   onOpenMediaWorkshop(null)
                 },
@@ -602,6 +616,7 @@ fun HomeScreen(
                       onDeleteChecklistItem = onDeleteChecklistItem,
                       onEditNote = { editingNote = it },
                       onOpenRecentFile = openRecentFile,
+                      onPreviewImage = onPreviewImage,
                       onToggleVoiceMemoPlay = onToggleVoiceMemoPlay,
                       onSeekVoiceMemo = onSeekVoiceMemo,
                       onTogglePin = onTogglePinCard,
@@ -685,6 +700,7 @@ fun HomeScreen(
                       onDeleteChecklistItem = onDeleteChecklistItem,
                       onEditNote = { editingNote = it },
                       onOpenRecentFile = openRecentFile,
+                      onPreviewImage = onPreviewImage,
                       onToggleVoiceMemoPlay = onToggleVoiceMemoPlay,
                       onSeekVoiceMemo = onSeekVoiceMemo,
                       onTogglePin = onTogglePinCard,
@@ -717,6 +733,7 @@ fun HomeScreen(
           targetBoundsMap[OnboardingStep.TOOL_BALL] = coords.boundsInRoot()
         },
       onLaunchTool = { tool: ToolItem ->
+        heroState?.clear()
         when (tool.id) {
           "quick_note" -> showCreateNoteDialog = true
           "quick_checklist" -> showCreateChecklistDialog = true
@@ -834,6 +851,7 @@ private fun QuickActionStrip(
   modifier: Modifier = Modifier,
 ) {
   val view = LocalView.current
+  val heroState = LocalHeroTransitionState.current
   LazyRow(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     modifier = modifier.fillMaxWidth().testTag("quick_action_strip"),
@@ -842,6 +860,15 @@ private fun QuickActionStrip(
       val interaction = remember { MutableInteractionSource() }
       val isMc = com.xialia.tactkit.ui.theme.isMcPixelTheme()
       val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
+      val heroKey = "hero_strip_${entry.id}"
+      val heroMod =
+        if (entry.targetRoute != null) Modifier.tactKitSharedBounds(heroKey)
+        else Modifier
+      val onStripClick = {
+        AppHaptics.click(view)
+        entry.targetRoute?.let { routeKey -> heroState?.activate(heroKey, routeKey) }
+        entry.onClick()
+      }
       if (isMc) {
         val isAi = entry.id.contains("ai", ignoreCase = true) || entry.label.contains("AI", ignoreCase = true)
         val tone =
@@ -851,13 +878,10 @@ private fun QuickActionStrip(
             else -> OreUiTone.SLATE_LIGHT
           }
         OreUiButton(
-          onClick = {
-            AppHaptics.click(view)
-            entry.onClick()
-          },
+          onClick = onStripClick,
           tone = tone,
           interactionSource = interaction,
-          modifier = Modifier.testTag(entry.id),
+          modifier = heroMod.testTag(entry.id),
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -881,15 +905,13 @@ private fun QuickActionStrip(
         }
       } else {
         TactKitChip(
-          onClick = {
-            AppHaptics.click(view)
-            entry.onClick()
-          },
+          onClick = onStripClick,
           interactionSource = interaction,
           corner = 18.dp,
           containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
           modifier =
-            Modifier.tactilePress(
+            heroMod
+              .tactilePress(
                 interactionSource = interaction,
                 baseCorner = 18.dp,
                 pressedCorner = 24.dp,
@@ -939,6 +961,7 @@ private fun WorkbenchOverviewSection(
   val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
   val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val heroState = LocalHeroTransitionState.current
   val cardCorner =
     when (themeStyle) {
       com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
@@ -967,7 +990,10 @@ private fun WorkbenchOverviewSection(
           modifier = Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min),
         ) {
           TactileCard(
-            onClick = onOpenFileManager,
+            onClick = {
+              heroState?.activate("hero_bento_file_manager", "file_manager")
+              onOpenFileManager()
+            },
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             baseCorner = 22.dp,
@@ -975,6 +1001,7 @@ private fun WorkbenchOverviewSection(
             modifier =
               Modifier.weight(1f)
                 .fillMaxSize()
+                .tactKitSharedBounds("hero_bento_file_manager")
                 .onGloballyPositioned { coords -> onFileManagerButtonPositioned(coords.boundsInRoot()) },
           ) {
             Column(
@@ -1008,11 +1035,14 @@ private fun WorkbenchOverviewSection(
             modifier = Modifier.weight(1f),
           ) {
             TactileCard(
-              onClick = onOpenDocScanner,
+              onClick = {
+                heroState?.activate("hero_bento_doc_scanner", "doc_scanner")
+                onOpenDocScanner()
+              },
               containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
               baseCorner = 20.dp,
               pressedCorner = 24.dp,
-              modifier = Modifier.fillMaxWidth(),
+              modifier = Modifier.fillMaxWidth().tactKitSharedBounds("hero_bento_doc_scanner"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1032,11 +1062,14 @@ private fun WorkbenchOverviewSection(
             }
 
             TactileCard(
-              onClick = onOpenLanShare,
+              onClick = {
+                heroState?.activate("hero_bento_lan_share", "lan_share")
+                onOpenLanShare()
+              },
               containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
               baseCorner = 20.dp,
               pressedCorner = 24.dp,
-              modifier = Modifier.fillMaxWidth(),
+              modifier = Modifier.fillMaxWidth().tactKitSharedBounds("hero_bento_lan_share"),
             ) {
               Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1062,11 +1095,14 @@ private fun WorkbenchOverviewSection(
           modifier = Modifier.fillMaxWidth(),
         ) {
           TactileCard(
-            onClick = onOpenAiHub,
+            onClick = {
+              heroState?.activate("hero_bento_ai_hub", "ai_hub")
+              onOpenAiHub()
+            },
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             baseCorner = 20.dp,
             pressedCorner = 24.dp,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).tactKitSharedBounds("hero_bento_ai_hub"),
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
@@ -1217,15 +1253,35 @@ private fun WorkbenchOverviewSection(
         CardFilter.entries.forEach { filter ->
           val selected = uiState.activeFilter == filter
           val filterInteraction = remember { MutableInteractionSource() }
+          val tabScale by
+            animateFloatAsState(
+              targetValue = if (selected) 1.03f else 1f,
+              animationSpec =
+                spring(
+                  dampingRatio = Spring.DampingRatioMediumBouncy,
+                  stiffness = Spring.StiffnessMediumLow,
+                ),
+              label = "card_filter_scale",
+            )
+          val containerBg by
+            animateColorAsState(
+              targetValue =
+                if (selected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerLow,
+              animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+              label = "card_filter_bg",
+            )
           Surface(
             onClick = { onFilterChange(filter) },
             interactionSource = filterInteraction,
             shape = RoundedCornerShape(14.dp),
-            color =
-              if (selected) MaterialTheme.colorScheme.primaryContainer
-              else MaterialTheme.colorScheme.surfaceContainerLow,
+            color = containerBg,
             modifier =
               Modifier.weight(1f)
+                .graphicsLayer {
+                  scaleX = tabScale
+                  scaleY = tabScale
+                }
                 .tactilePress(
                   interactionSource = filterInteraction,
                   baseCorner = 14.dp,
@@ -1556,6 +1612,7 @@ private fun DocumentDashboardCard(
   val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
   val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val heroState = LocalHeroTransitionState.current
   val cardCorner =
     when (themeStyle) {
       com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
@@ -1607,10 +1664,14 @@ private fun DocumentDashboardCard(
         }
         if (isMinecraft) {
           OreUiButton(
-            onClick = onOpenFileManager,
+            onClick = {
+              heroState?.activate("hero_dash_file_manager", "file_manager")
+              onOpenFileManager()
+            },
             tone = OreUiTone.GREEN,
             modifier =
-              Modifier.onGloballyPositioned { coords ->
+              Modifier.tactKitSharedBounds("hero_dash_file_manager")
+                .onGloballyPositioned { coords ->
                   onFileManagerButtonPositioned(coords.boundsInRoot())
                 }
                 .testTag("dashboard_open_file_manager"),
@@ -1636,11 +1697,15 @@ private fun DocumentDashboardCard(
           }
         } else {
           Surface(
-            onClick = onOpenFileManager,
+            onClick = {
+              heroState?.activate("hero_dash_file_manager", "file_manager")
+              onOpenFileManager()
+            },
             shape = ContinuousCapsule(),
             color = MaterialTheme.colorScheme.secondaryContainer,
             modifier =
-              Modifier.onGloballyPositioned { coords ->
+              Modifier.tactKitSharedBounds("hero_dash_file_manager")
+                .onGloballyPositioned { coords ->
                   onFileManagerButtonPositioned(coords.boundsInRoot())
                 }
                 .testTag("dashboard_open_file_manager"),

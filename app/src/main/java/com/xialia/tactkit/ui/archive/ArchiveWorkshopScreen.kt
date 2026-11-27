@@ -43,7 +43,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -72,6 +71,8 @@ import com.xialia.tactkit.engine.ArchiveEntryNode
 import com.xialia.tactkit.engine.ArchiveInspection
 import com.xialia.tactkit.engine.PackArchiveFormat
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
@@ -245,7 +246,13 @@ fun ArchiveWorkshopScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("压缩包工坊", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              text = "压缩包工坊",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("archive_workshop"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -263,7 +270,12 @@ fun ArchiveWorkshopScreen(
       Column(
         modifier = Modifier.fillMaxSize().padding(innerPadding),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) {
+          TactKitBusyStatusBar(
+            message = "正在解析与解压压缩包内容...",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+          )
+        }
 
         LazyColumn(
           contentPadding = PaddingValues(16.dp),

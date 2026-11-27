@@ -36,7 +36,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -66,8 +65,11 @@ import com.xialia.tactkit.data.repository.AiHubRepository
 import com.xialia.tactkit.data.repository.ChecklistDraft
 import com.xialia.tactkit.engine.ImageEngine
 import com.xialia.tactkit.engine.PdfEngine
+import com.xialia.tactkit.ui.components.GeminiSparkleLoader
 import com.xialia.tactkit.ui.components.MarkdownRenderer
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitAiBusyBanner
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.launch
 
@@ -196,7 +198,13 @@ fun AiHubScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("多模态 ✨ AI 中枢", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              text = "多模态 ✨ AI 中枢",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("ai_hub"),
+            )
+          },
           navigationIcon = {
             IconButton(onClick = onNavigateBack) {
               Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
@@ -218,7 +226,16 @@ fun AiHubScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) {
+          TactKitAiBusyBanner(
+            message =
+              when (mode) {
+                AiHubMode.VISION -> "正在识别图像文字、公式与表格并转为 Markdown..."
+                AiHubMode.PDF_QA -> "正在深度语义检索与提炼 PDF 结构化内容..."
+                AiHubMode.CHECKLIST -> "正在归纳关键待办动作并生成清单..."
+              },
+          )
+        }
 
         if (!preferences.hasAiApiKey) {
           Surface(
@@ -352,9 +369,13 @@ fun AiHubScreen(
                   shape = RoundedCornerShape(14.dp),
                   modifier = Modifier.fillMaxWidth().testTag("ai_vision_run_btn"),
                 ) {
-                  Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                  if (isBusy) {
+                    GeminiSparkleLoader(size = 18.dp)
+                  } else {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                  }
                   Spacer(modifier = Modifier.width(6.dp))
-                  Text("识图转 Markdown")
+                  Text(if (isBusy) "AI 识图解析中..." else "识图转 Markdown")
                 }
               }
             }
@@ -420,9 +441,17 @@ fun AiHubScreen(
                   shape = RoundedCornerShape(14.dp),
                   modifier = Modifier.fillMaxWidth().testTag("ai_pdf_run_btn"),
                 ) {
-                  Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                  if (isBusy) {
+                    GeminiSparkleLoader(size = 18.dp)
+                  } else {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                  }
                   Spacer(modifier = Modifier.width(6.dp))
-                  Text(if (pdfQuestion.isBlank()) "生成 PDF 结构化摘要" else "提问该 PDF")
+                  Text(
+                    if (isBusy) "AI 分析中..."
+                    else if (pdfQuestion.isBlank()) "生成 PDF 结构化摘要"
+                    else "提问该 PDF",
+                  )
                 }
               }
             }
@@ -479,9 +508,13 @@ fun AiHubScreen(
                   shape = RoundedCornerShape(14.dp),
                   modifier = Modifier.fillMaxWidth().testTag("ai_checklist_run_btn"),
                 ) {
-                  Icon(Icons.Rounded.Checklist, contentDescription = null)
+                  if (isBusy) {
+                    GeminiSparkleLoader(size = 18.dp)
+                  } else {
+                    Icon(Icons.Rounded.Checklist, contentDescription = null)
+                  }
                   Spacer(modifier = Modifier.width(6.dp))
-                  Text("智能整理为可勾选清单")
+                  Text(if (isBusy) "正在梳理待办..." else "智能整理为可勾选清单")
                 }
               }
             }

@@ -2,6 +2,7 @@ package com.xialia.tactkit.ui.files
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +46,6 @@ import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -78,6 +78,8 @@ import com.xialia.tactkit.engine.MessengerDirHint
 import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.engine.StorageOverview
 import com.xialia.tactkit.ui.components.PetalIconBadge
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
@@ -306,6 +308,7 @@ fun RecentFilesTabContent(
   onEntryClick: (ManagedFileEntry) -> Unit,
   onEntryLongClick: (ManagedFileEntry) -> Unit,
   onLocateDirectory: (ManagedFileEntry) -> Unit,
+  onImagePreviewClick: ((ManagedFileEntry) -> Unit)? = null,
 ) {
   val countsByCategory =
     remember(allRecentFiles) {
@@ -343,16 +346,12 @@ fun RecentFilesTabContent(
     if (isScanning) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
       ) {
-        LinearProgressIndicator(
-          modifier = Modifier.weight(1f).height(5.dp).clip(themeShape(999.dp)),
-        )
-        Text(
-          text = "扫描中",
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        TactKitBusyStatusBar(
+          message = "正在扫描索引本地文件...",
+          modifier = Modifier.weight(1f),
         )
         TextButton(
           onClick = onCancelScan,
@@ -366,8 +365,8 @@ fun RecentFilesTabContent(
     if (isScanning && allRecentFiles.isEmpty()) {
       Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-          CircularProgressIndicator()
-          Spacer(modifier = Modifier.height(10.dp))
+          TactKitMorphLoadingIndicator(size = 48.dp)
+          Spacer(modifier = Modifier.height(12.dp))
           Text("正在深度遍历存储文件...", style = MaterialTheme.typography.bodyMedium)
         }
       }
@@ -408,11 +407,18 @@ fun RecentFilesTabContent(
           }
         }
         items(filteredFiles, key = { it.id }) { entry ->
+          val previewHandler =
+            if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
+              onImagePreviewClick
+            } else {
+              null
+            }
           SquareMediaGridTile(
             entry = entry,
             isSelected = entry.id in selectedIds,
             selectionMode = selectedIds.isNotEmpty(),
-            onClick = { onEntryClick(entry) },
+            sharedElementKey = if (entry.category == FileCategory.IMAGES) "shared_img_fm_${entry.id}" else null,
+            onClick = { if (previewHandler != null) previewHandler(entry) else onEntryClick(entry) },
             onLongClick = { onEntryLongClick(entry) },
           )
         }
@@ -429,12 +435,20 @@ fun RecentFilesTabContent(
           }
         }
         items(filteredFiles, key = { it.id }) { entry ->
+          val previewHandler =
+            if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
+              onImagePreviewClick
+            } else {
+              null
+            }
           ManagedFileRow(
             entry = entry,
             isSelected = entry.id in selectedIds,
             selectionMode = selectedIds.isNotEmpty(),
             showLocateButton = !isPickerMode && !entry.isSafBacked,
             showRelativePath = false,
+            sharedElementKey = if (entry.category == FileCategory.IMAGES) "shared_img_fm_${entry.id}" else null,
+            onThumbClick = if (previewHandler != null) ({ previewHandler(entry) }) else null,
             onClick = { onEntryClick(entry) },
             onLongClick = { onEntryLongClick(entry) },
             onLocateClick = { onLocateDirectory(entry) },
@@ -466,6 +480,7 @@ fun DirectoryTreeTabContent(
   onCreateFolder: () -> Unit,
   onEntryClick: (ManagedFileEntry) -> Unit,
   onEntryLongClick: (ManagedFileEntry) -> Unit,
+  onImagePreviewClick: ((ManagedFileEntry) -> Unit)? = null,
 ) {
   var showSortMenu by remember { mutableStateOf(false) }
   var expandNoiseDirs by remember { mutableStateOf(false) }
@@ -618,11 +633,18 @@ fun DirectoryTreeTabContent(
           }
         }
         items(combinedEntries, key = { it.id }) { entry ->
+          val previewHandler =
+            if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
+              onImagePreviewClick
+            } else {
+              null
+            }
           ManagedFileGridCard(
             entry = entry,
             isSelected = entry.id in selectedIds,
             selectionMode = selectedIds.isNotEmpty(),
-            onClick = { onEntryClick(entry) },
+            sharedElementKey = if (entry.category == FileCategory.IMAGES) "shared_img_fm_${entry.id}" else null,
+            onClick = { if (previewHandler != null) previewHandler(entry) else onEntryClick(entry) },
             onLongClick = { onEntryLongClick(entry) },
           )
         }
@@ -639,12 +661,20 @@ fun DirectoryTreeTabContent(
           }
         }
         items(activeEntries, key = { it.id }) { entry ->
+          val previewHandler =
+            if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
+              onImagePreviewClick
+            } else {
+              null
+            }
           ManagedFileRow(
             entry = entry,
             isSelected = entry.id in selectedIds,
             selectionMode = selectedIds.isNotEmpty(),
             showLocateButton = false,
             showRelativePath = false,
+            sharedElementKey = if (entry.category == FileCategory.IMAGES) "shared_img_fm_${entry.id}" else null,
+            onThumbClick = if (previewHandler != null) ({ previewHandler(entry) }) else null,
             onClick = { onEntryClick(entry) },
             onLongClick = { onEntryLongClick(entry) },
             onLocateClick = {},
@@ -789,11 +819,12 @@ fun SpaceCleanupTabContent(
     if (isScanning) {
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
       ) {
-        LinearProgressIndicator(
-          modifier = Modifier.weight(1f).height(5.dp).clip(themeShape(999.dp)),
+        TactKitBusyStatusBar(
+          message = "正在扫描大文件、重复文件与冗余目录...",
+          modifier = Modifier.weight(1f),
         )
         TextButton(
           onClick = onCancelScan,
@@ -906,6 +937,8 @@ fun ManagedFileRow(
   onClick: () -> Unit,
   onLongClick: () -> Unit,
   onLocateClick: () -> Unit,
+  sharedElementKey: String? = null,
+  onThumbClick: (() -> Unit)? = null,
 ) {
   val isMediaThumb =
     !entry.isDirectory &&
@@ -942,7 +975,12 @@ fun ManagedFileRow(
           modifier = Modifier.size(22.dp),
         )
       }
-      FileEntryThumbnailOrBadge(entry = entry, size = thumbSize)
+      FileEntryThumbnailOrBadge(
+        entry = entry,
+        size = thumbSize,
+        sharedElementKey = sharedElementKey,
+        modifier = if (onThumbClick != null) Modifier.clickable(onClick = onThumbClick) else Modifier,
+      )
       Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.weight(1f),
@@ -1030,6 +1068,7 @@ private fun SquareMediaGridTile(
   entry: ManagedFileEntry,
   isSelected: Boolean,
   selectionMode: Boolean,
+  sharedElementKey: String? = null,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
 ) {
@@ -1049,6 +1088,7 @@ private fun SquareMediaGridTile(
     FileEntryThumbnailOrBadge(
       entry = entry,
       size = androidx.compose.ui.unit.Dp.Unspecified,
+      sharedElementKey = sharedElementKey,
       modifier = Modifier.fillMaxSize(),
     )
     if (selectionMode) {
@@ -1087,6 +1127,7 @@ private fun ManagedFileGridCard(
   entry: ManagedFileEntry,
   isSelected: Boolean,
   selectionMode: Boolean,
+  sharedElementKey: String? = null,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
 ) {
@@ -1097,6 +1138,7 @@ private fun ManagedFileGridCard(
       entry = entry,
       isSelected = isSelected,
       selectionMode = selectionMode,
+      sharedElementKey = sharedElementKey,
       onClick = onClick,
       onLongClick = onLongClick,
     )

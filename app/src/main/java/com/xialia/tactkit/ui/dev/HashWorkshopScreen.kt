@@ -37,7 +37,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -64,8 +63,10 @@ import com.xialia.tactkit.engine.HashAlgorithm
 import com.xialia.tactkit.engine.HashAndCryptoEngine
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.FileInspectionHelper
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -241,7 +242,13 @@ fun HashWorkshopScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("校验和与哈希", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              text = "校验和与哈希",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("hash_workshop"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -260,7 +267,12 @@ fun HashWorkshopScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize().padding(innerPadding),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) {
+          TactKitBusyStatusBar(
+            message = "正在流式计算校验和与指纹...",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+          )
+        }
 
         LazyColumn(
           contentPadding = PaddingValues(16.dp),

@@ -46,7 +46,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
@@ -80,6 +79,8 @@ import com.xialia.tactkit.engine.MediaInfo
 import com.xialia.tactkit.engine.VoiceMemoManager
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.image.ImageToolTab
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -290,6 +291,7 @@ fun MediaWorkshopScreen(
       },
       onNavigateBack = onNavigateBack,
       fabText = "选择视频",
+      heroTargetRoute = "media_workshop",
     )
     return
   }
@@ -305,7 +307,13 @@ fun MediaWorkshopScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("音视频与逐帧扒图", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "音视频与逐帧扒图",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("media_workshop"),
+            )
+          },
           navigationIcon = {
             IconButton(onClick = onNavigateBack) {
               Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
@@ -333,7 +341,7 @@ fun MediaWorkshopScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) TactKitBusyStatusBar(message = "正在解析音视频轨道与渲染帧...")
 
         LazyRow(
           horizontalArrangement = Arrangement.spacedBy(8.dp),

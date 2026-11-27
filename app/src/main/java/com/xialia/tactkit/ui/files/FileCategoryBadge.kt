@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.ManagedFileEntry
+import com.xialia.tactkit.ui.components.TactKitImageThumbCache
+import com.xialia.tactkit.ui.components.tactKitSharedElement
 import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.ui.theme.isMcPixelTheme
@@ -76,6 +78,7 @@ fun FileEntryThumbnailOrBadge(
   entry: ManagedFileEntry,
   modifier: Modifier = Modifier,
   size: Dp = 44.dp,
+  sharedElementKey: String? = null,
 ) {
   val context = LocalContext.current
   val isMc = isMcPixelTheme()
@@ -145,7 +148,16 @@ fun FileEntryThumbnailOrBadge(
 
   val loadedBitmap = thumbnail
   if (loadedBitmap != null) {
-    Box(modifier = sizedModifier) {
+    if (sharedElementKey != null) {
+      TactKitImageThumbCache.put(sharedElementKey, loadedBitmap)
+    }
+    Box(
+      modifier =
+        sizedModifier.then(
+          if (sharedElementKey != null) Modifier.tactKitSharedElement(sharedElementKey)
+          else Modifier
+        )
+    ) {
       Image(
         bitmap = loadedBitmap.asImageBitmap(),
         contentDescription = null,

@@ -59,7 +59,7 @@ import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -384,7 +384,7 @@ private fun QuickLookOverlayScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
           ) {
-            CircularProgressIndicator()
+            TactKitMorphLoadingIndicator(size = 44.dp)
             Text(
               text = "正在流式计算 SHA-256 与读取预览...",
               style = MaterialTheme.typography.bodyMedium,

@@ -46,7 +46,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -88,6 +87,7 @@ import com.xialia.tactkit.engine.PdfPrepareResult
 import com.xialia.tactkit.engine.PdfStroke
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
 import kotlinx.coroutines.launch
@@ -272,7 +272,7 @@ fun PdfAnnotateScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp, vertical = 10.dp),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) TactKitBusyStatusBar(message = "正在渲染与导出 PDF 批注...")
 
         // Interactive PDF Canvas Surface (fills remaining middle space)
         val bmp = pageBitmap

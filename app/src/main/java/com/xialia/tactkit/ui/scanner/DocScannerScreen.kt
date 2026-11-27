@@ -59,7 +59,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -99,7 +98,9 @@ import com.xialia.tactkit.engine.NormalizedQuad
 import com.xialia.tactkit.engine.ScanFilter
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactileActionButton
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.io.File
 import java.util.concurrent.Executors
@@ -268,7 +269,13 @@ fun DocScannerScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("文档扫描仪", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "文档扫描仪",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("doc_scanner"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -313,7 +320,7 @@ fun DocScannerScreen(
             .padding(innerPadding)
             .padding(horizontal = 16.dp, vertical = 10.dp),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) TactKitBusyStatusBar(message = "正在进行文档透视矫正与滤镜增强...")
 
         Row(
           horizontalArrangement = Arrangement.spacedBy(8.dp),

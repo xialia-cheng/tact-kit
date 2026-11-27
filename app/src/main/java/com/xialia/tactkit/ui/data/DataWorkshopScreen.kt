@@ -68,6 +68,7 @@ import com.xialia.tactkit.engine.CsvTableData
 import com.xialia.tactkit.engine.DataFormat
 import com.xialia.tactkit.engine.DataFormatEngine
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.Dispatchers
@@ -225,7 +226,13 @@ fun DataWorkshopScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("结构化数据工坊", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "结构化数据工坊",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("data_workshop"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {

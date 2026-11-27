@@ -44,7 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.xialia.tactkit.ui.components.TactileSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -74,6 +74,7 @@ import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import kotlinx.coroutines.delay
@@ -199,7 +200,13 @@ fun DailyToolsScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("日常高频工具箱", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "日常高频工具箱",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("daily_tools"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -335,7 +342,7 @@ fun DailyToolsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                       )
                     }
-                    Switch(
+                    TactileSwitch(
                       checked = volumeKeyControlEnabled,
                       onCheckedChange = { volumeKeyControlEnabled = it },
                     )

@@ -1,15 +1,25 @@
 package com.xialia.tactkit.ui.components
 
+import android.graphics.Bitmap
 import android.graphics.Matrix as AndroidMatrix
 import android.graphics.Path as AndroidPath
+import android.util.LruCache
 import android.view.SoundEffectConstants
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,20 +44,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -312,8 +332,12 @@ fun TactileModeChip(
   val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
 
   val scale by animateFloatAsState(
-    targetValue = if (isPressed) 0.95f else 1f,
-    animationSpec = TactilePressSpringFloat,
+    targetValue = if (isPressed) 0.94f else if (selected) 1.02f else 1f,
+    animationSpec =
+      spring(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMedium,
+      ),
     label = "chip_scale",
   )
 
@@ -681,4 +705,209 @@ fun SimpleFlowRow(
       }
     }
   }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+
+val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
+
+@Stable
+class TactKitHeroState {
+  var activeToolKey by mutableStateOf<String?>(null)
+  var activeToolTargetRoute by mutableStateOf<String?>(null)
+
+  fun activate(key: String, targetRoute: String) {
+    activeToolKey = key
+    activeToolTargetRoute = targetRoute
+  }
+
+  fun clear() {
+    activeToolKey = null
+    activeToolTargetRoute = null
+  }
+}
+
+val LocalHeroTransitionState = staticCompositionLocalOf<TactKitHeroState?> { null }
+
+object TactKitImageThumbCache {
+  private val cache = LruCache<String, Bitmap>(28)
+
+  fun put(key: String, bitmap: Bitmap) {
+    if (key.isNotBlank() && !bitmap.isRecycled) {
+      cache.put(key, bitmap)
+    }
+  }
+
+  fun get(key: String?): Bitmap? =
+    key?.takeIf { it.isNotBlank() }?.let { cache.get(it) }?.takeIf { !it.isRecycled }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val TactKitSharedBoundsTransform = BoundsTransform { _, _ ->
+  spring(
+    dampingRatio = 0.82f,
+    stiffness = 380f,
+    visibilityThreshold = Rect.VisibilityThreshold,
+  )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+fun Modifier.tactKitSharedElement(
+  key: Any,
+  zIndexInOverlay: Float = 0f,
+): Modifier = composed {
+  val sharedScope = LocalSharedTransitionScope.current
+  val animScope = LocalNavAnimatedVisibilityScope.current
+  if (sharedScope != null && animScope != null) {
+    with(sharedScope) {
+      this@composed.sharedElement(
+        state = rememberSharedContentState(key = key),
+        animatedVisibilityScope = animScope,
+        boundsTransform = TactKitSharedBoundsTransform,
+        zIndexInOverlay = zIndexInOverlay,
+      )
+    }
+  } else {
+    this
+  }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+fun Modifier.tactKitSharedBounds(
+  key: Any,
+  zIndexInOverlay: Float = 0f,
+): Modifier = composed {
+  val sharedScope = LocalSharedTransitionScope.current
+  val animScope = LocalNavAnimatedVisibilityScope.current
+  if (sharedScope != null && animScope != null) {
+    with(sharedScope) {
+      this@composed.sharedBounds(
+        sharedContentState = rememberSharedContentState(key = key),
+        animatedVisibilityScope = animScope,
+        boundsTransform = TactKitSharedBoundsTransform,
+        zIndexInOverlay = zIndexInOverlay,
+      )
+    }
+  } else {
+    this
+  }
+}
+
+fun Modifier.tactKitToolHeroTarget(targetRouteKey: String): Modifier = composed {
+  val heroState = LocalHeroTransitionState.current
+  val activeKey = heroState?.activeToolKey
+  if (activeKey != null && heroState.activeToolTargetRoute == targetRouteKey) {
+    this.tactKitSharedBounds(key = activeKey)
+  } else {
+    this
+  }
+}
+
+@Composable
+fun TactilePinIconButton(
+  pinned: Boolean,
+  onToggle: () -> Unit,
+  contentDescription: String,
+  modifier: Modifier = Modifier,
+  buttonSize: Dp = 40.dp,
+  iconSize: Dp = 18.dp,
+) {
+  val view = LocalView.current
+  val haptics = rememberAppHaptics()
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
+  val pinRotation by
+    animateFloatAsState(
+      targetValue = if (pinned) 0f else 42f,
+      animationSpec =
+        spring(
+          dampingRatio = Spring.DampingRatioMediumBouncy,
+          stiffness = Spring.StiffnessMediumLow,
+        ),
+      label = "pin_rotation",
+    )
+
+  val pinScale by
+    animateFloatAsState(
+      targetValue = if (isPressed) 0.82f else if (pinned) 1.12f else 1f,
+      animationSpec =
+        spring(
+          dampingRatio = Spring.DampingRatioMediumBouncy,
+          stiffness = Spring.StiffnessMedium,
+        ),
+      label = "pin_scale",
+    )
+
+  val pinTint by
+    animateColorAsState(
+      targetValue =
+        if (pinned) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
+      animationSpec = tween(180),
+      label = "pin_tint",
+    )
+
+  IconButton(
+    onClick = {
+      view.playSoundEffect(SoundEffectConstants.CLICK)
+      if (pinned) haptics.tick() else haptics.confirm()
+      onToggle()
+    },
+    interactionSource = interactionSource,
+    modifier = modifier.size(buttonSize),
+  ) {
+    Icon(
+      imageVector = Icons.Rounded.PushPin,
+      contentDescription = contentDescription,
+      tint = pinTint,
+      modifier =
+        Modifier.size(iconSize).graphicsLayer {
+          rotationZ = pinRotation
+          scaleX = pinScale
+          scaleY = pinScale
+        },
+    )
+  }
+}
+
+@Composable
+fun TactileSwitch(
+  checked: Boolean,
+  onCheckedChange: (Boolean) -> Unit,
+  modifier: Modifier = Modifier,
+  enabled: Boolean = true,
+) {
+  val view = LocalView.current
+  val haptics = rememberAppHaptics()
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
+  val bounceScale by
+    animateFloatAsState(
+      targetValue = if (isPressed) 0.90f else if (checked) 1.04f else 1f,
+      animationSpec =
+        spring(
+          dampingRatio = Spring.DampingRatioMediumBouncy,
+          stiffness = Spring.StiffnessMedium,
+        ),
+      label = "switch_bounce_scale",
+    )
+
+  Switch(
+    checked = checked,
+    onCheckedChange = { next ->
+      view.playSoundEffect(SoundEffectConstants.CLICK)
+      if (next) haptics.confirm() else haptics.tick()
+      onCheckedChange(next)
+    },
+    enabled = enabled,
+    interactionSource = interactionSource,
+    modifier =
+      modifier.graphicsLayer {
+        scaleX = bounceScale
+        scaleY = bounceScale
+      },
+  )
 }

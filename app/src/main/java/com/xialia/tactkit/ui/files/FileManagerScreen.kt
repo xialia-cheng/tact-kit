@@ -83,6 +83,7 @@ import com.xialia.tactkit.engine.ManagedFileEntry
 import com.xialia.tactkit.engine.SpaceScanResult
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.ui.theme.OreUiSegmentedTabRow
 import com.xialia.tactkit.ui.theme.isMcPixelTheme
@@ -116,6 +117,7 @@ fun FileManagerScreen(
   onTogglePinnedDir: (String) -> Unit,
   onAddLinkedSafTreeUri: (String) -> Unit,
   onLaunchTool: (uriString: String, launch: TactKitToolLaunch) -> Unit,
+  onPreviewImage: ((uriString: String, title: String, sharedKey: String) -> Unit)? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -142,6 +144,7 @@ fun FileManagerScreen(
           onLaunchTool(uri.toString(), launch)
         }
       },
+      onPreviewImage = onPreviewImage,
       onConfirmPick = {},
       onNavigateBack = onNavigateBack,
     )
@@ -159,6 +162,7 @@ fun FileManagerWorkspace(
   onLaunchTool: (ManagedFileEntry, TactKitToolLaunch) -> Unit,
   onConfirmPick: (List<ManagedFileEntry>) -> Unit,
   onNavigateBack: () -> Unit,
+  onPreviewImage: ((uriString: String, title: String, sharedKey: String) -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val haptics = rememberAppHaptics()
@@ -403,6 +407,20 @@ fun FileManagerWorkspace(
     }
   }
 
+  fun previewImageEntry(entry: ManagedFileEntry) {
+    if (selectedIds.isNotEmpty() || isPickerMode) {
+      handleEntryClick(entry)
+      return
+    }
+    val uri = FileManagerEngine.toShareableUri(context, entry)
+    if (uri != null && onPreviewImage != null) {
+      haptics.tick()
+      onPreviewImage(uri.toString(), entry.name, "shared_img_fm_${entry.id}")
+    } else {
+      handleEntryClick(entry)
+    }
+  }
+
   fun handleEntryLongClick(entry: ManagedFileEntry) {
     if (entry.isSafBacked) {
       inspectedEntry = entry
@@ -451,6 +469,9 @@ fun FileManagerWorkspace(
               else if (isPickerMode) "选择文件 · 简工坊"
               else "文件管理",
             fontWeight = FontWeight.Bold,
+            modifier =
+              if (selectedIds.isEmpty() && !isPickerMode) Modifier.tactKitToolHeroTarget("file_manager")
+              else Modifier,
           )
         },
         actions = {
@@ -614,12 +635,15 @@ fun FileManagerWorkspace(
           modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
           items(searchResults, key = { "search_${it.id}" }) { entry ->
+            val canPreview = !isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES && onPreviewImage != null
             ManagedFileRow(
               entry = entry,
               isSelected = entry.id in selectedIds,
               selectionMode = selectedIds.isNotEmpty(),
               showLocateButton = !isPickerMode && !entry.isSafBacked,
               showRelativePath = true,
+              sharedElementKey = if (entry.category == FileCategory.IMAGES) "shared_img_fm_${entry.id}" else null,
+              onThumbClick = if (canPreview) ({ previewImageEntry(entry) }) else null,
               onClick = { handleEntryClick(entry) },
               onLongClick = { handleEntryLongClick(entry) },
               onLocateClick = { locateEntryDirectory(entry) },
@@ -684,6 +708,7 @@ fun FileManagerWorkspace(
               onEntryClick = ::handleEntryClick,
               onEntryLongClick = ::handleEntryLongClick,
               onLocateDirectory = ::locateEntryDirectory,
+              onImagePreviewClick = if (onPreviewImage != null) ::previewImageEntry else null,
             )
           }
 
@@ -711,6 +736,7 @@ fun FileManagerWorkspace(
               onCreateFolder = { showNewFolderDialog = true },
               onEntryClick = ::handleEntryClick,
               onEntryLongClick = ::handleEntryLongClick,
+              onImagePreviewClick = if (onPreviewImage != null) ::previewImageEntry else null,
             )
           }
 

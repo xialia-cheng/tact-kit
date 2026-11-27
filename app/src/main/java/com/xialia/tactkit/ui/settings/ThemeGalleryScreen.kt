@@ -39,7 +39,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import com.xialia.tactkit.ui.components.TactileSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,6 +61,7 @@ import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileCard
 import com.xialia.tactkit.ui.components.TactileModeChip
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.isTactKitDarkTheme
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -97,7 +98,13 @@ fun ThemeGalleryScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("主题风格画廊", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "主题风格画廊",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("theme_gallery"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
@@ -175,7 +182,7 @@ fun ThemeGalleryScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                       )
                     }
-                    Switch(
+                    TactileSwitch(
                       checked = preferences.dynamicColor,
                       onCheckedChange = {
                         haptics.tick()

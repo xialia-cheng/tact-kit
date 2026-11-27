@@ -1,6 +1,10 @@
 package com.xialia.tactkit.ui.components
 
+import androidx.activity.BackEventCompat
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,8 +34,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * M3 Expressive dual-layer file-picker waiting screen:
@@ -59,6 +65,7 @@ fun ExpressiveEmptyFileScreen(
   fabText: String = "选择文件",
   secondaryActionText: String? = null,
   onSecondaryAction: (() -> Unit)? = null,
+  heroTargetRoute: String? = null,
 ) {
   PredictiveBackContainer(onBack = onNavigateBack) {
     Scaffold(
@@ -75,6 +82,9 @@ fun ExpressiveEmptyFileScreen(
             Text(
               text = title,
               fontWeight = FontWeight.Bold,
+              modifier =
+                if (heroTargetRoute != null) Modifier.tactKitToolHeroTarget(heroTargetRoute)
+                else Modifier,
             )
           },
           navigationIcon = {
@@ -175,38 +185,52 @@ fun ExpressiveEmptyFileScreen(
 
 /**
  * Predictive Back depth wrapper: smoothly scales, rounds corners (28.dp), and shifts foreground
- * during active system back swipe gestures.
+ * during active system back swipe gestures, with spring rebound on cancellation.
  */
 @Composable
 fun PredictiveBackContainer(
   onBack: () -> Unit,
   content: @Composable () -> Unit,
 ) {
-  var backProgress by remember { mutableFloatStateOf(0f) }
+  val backProgress = remember { Animatable(0f) }
+  var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
+  val scope = rememberCoroutineScope()
 
   PredictiveBackHandler { progressFlow ->
     try {
       progressFlow.collect { event ->
-        backProgress = event.progress.coerceIn(0f, 1f)
+        swipeEdge = event.swipeEdge
+        backProgress.snapTo(event.progress.coerceIn(0f, 1f))
       }
-      backProgress = 0f
+      backProgress.snapTo(0f)
       onBack()
     } catch (_: CancellationException) {
-      backProgress = 0f
+      scope.launch {
+        backProgress.animateTo(
+          targetValue = 0f,
+          animationSpec =
+            spring(
+              dampingRatio = Spring.DampingRatioMediumBouncy,
+              stiffness = Spring.StiffnessMediumLow,
+            ),
+        )
+      }
     }
   }
 
   Box(
     modifier =
       Modifier.fillMaxSize()
-        .background(Color.Black.copy(alpha = (0.18f * (1f - backProgress)).coerceAtLeast(0f)))
+        .background(Color.Black.copy(alpha = (0.18f * (1f - backProgress.value)).coerceAtLeast(0f)))
         .graphicsLayer {
-          val scale = 1f - 0.08f * backProgress
+          val p = backProgress.value
+          val scale = 1f - 0.10f * p
+          val dir = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
           scaleX = scale
           scaleY = scale
-          translationX = size.width * 0.12f * backProgress
-          shape = RoundedCornerShape((28f * backProgress).dp)
-          clip = backProgress > 0.01f
+          translationX = size.width * 0.12f * p * dir
+          shape = RoundedCornerShape((28f * p).dp)
+          clip = p > 0.01f
         },
   ) {
     content()

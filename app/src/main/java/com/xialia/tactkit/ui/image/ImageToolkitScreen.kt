@@ -59,7 +59,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -105,6 +104,10 @@ import com.xialia.tactkit.engine.PdfEngine
 import com.xialia.tactkit.engine.SampledPixelColor
 import com.xialia.tactkit.ui.components.ExpressiveEmptyFileScreen
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
+import com.xialia.tactkit.ui.components.TactKitImageThumbCache
+import com.xialia.tactkit.ui.components.tactKitSharedElement
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.components.tactileClickable
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
@@ -147,6 +150,7 @@ private enum class CropHandle {
 fun ImageToolkitScreen(
   initialUriString: String?,
   initialTabName: String? = null,
+  sharedKey: String? = null,
   onNavigateBack: () -> Unit,
 ) {
   val context = LocalContext.current
@@ -156,7 +160,10 @@ fun ImageToolkitScreen(
   var currentUri by remember(initialUriString) {
     mutableStateOf(initialUriString?.let { Uri.parse(it) })
   }
-  var workingBitmap by remember { mutableStateOf<Bitmap?>(null) }
+  var workingBitmap by
+    remember(initialUriString, sharedKey) {
+      mutableStateOf<Bitmap?>(TactKitImageThumbCache.get(sharedKey ?: initialUriString))
+    }
   val undoStack = remember { mutableStateListOf<Bitmap>() }
   var exifSummary by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
   var activeTab by remember(initialTabName) {
@@ -310,6 +317,7 @@ fun ImageToolkitScreen(
       },
       onNavigateBack = onNavigateBack,
       fabText = "选择图片",
+      heroTargetRoute = "image_toolkit",
     )
     return
   }
@@ -325,7 +333,7 @@ fun ImageToolkitScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("图片隐私与工坊", fontWeight = FontWeight.Bold) },
+          title = { Text("图片隐私与工坊", fontWeight = FontWeight.Bold, modifier = Modifier.tactKitToolHeroTarget("image_toolkit")) },
           navigationIcon = {
             IconButton(onClick = onNavigateBack) {
               Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
@@ -353,7 +361,7 @@ fun ImageToolkitScreen(
             .padding(innerPadding)
             .padding(horizontal = 16.dp, vertical = 10.dp),
       ) {
-        if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (isBusy) TactKitBusyStatusBar(message = "正在处理图片像素与无损导出...")
 
         // Clean full-label tab strip
         Row(
@@ -389,6 +397,7 @@ fun ImageToolkitScreen(
             Box(
               modifier =
                 Modifier.aspectRatio(ratio)
+                  .tactKitSharedElement(sharedKey ?: "shared_img_${currentUri}")
                   .pointerInput(activeTab, bmp, mosaicBlockSize, cropAspect) {
                     var lastTapTime = 0L
                     var lastTapPos = Offset.Zero

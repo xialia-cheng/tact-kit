@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.xialia.tactkit.engine.SystemHardwareEngine
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
+import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.util.rememberAppHaptics
 import java.util.Locale
@@ -80,7 +81,13 @@ fun BatteryHardwareScreen(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
               scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          title = { Text("电池功率与硬件信息", fontWeight = FontWeight.Bold) },
+          title = {
+            Text(
+              "电池功率与硬件信息",
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.tactKitToolHeroTarget("battery_hardware"),
+            )
+          },
           navigationIcon = {
             IconButton(
               onClick = {
