@@ -1,6 +1,7 @@
 package com.xialia.tactkit.data.datastore
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -34,6 +35,7 @@ enum class AppThemeStyle(val label: String, val tagline: String) {
   MINECRAFT_PIXEL("MC 像素工坊", "石板黑曜 · 零圆角 3D 像素凹凸框"),
 }
 
+@Immutable
 data class UserPreferences(
   val themeMode: ThemeMode = ThemeMode.SYSTEM,
   val appThemeStyle: AppThemeStyle = AppThemeStyle.CLASSIC_DEFAULT,

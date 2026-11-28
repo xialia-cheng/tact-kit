@@ -351,19 +351,21 @@ fun PdfAnnotateScreen(
                 modifier = Modifier.fillMaxSize(),
               )
 
+              val strokePath = remember { Path() }
               Canvas(modifier = Modifier.fillMaxSize().testTag("pdf_annotate_canvas")) {
                 fun drawStroke(stroke: PdfStroke) {
                   if (stroke.normalizedPoints.size < 2) return
-                  val path = Path()
-                  val first = stroke.normalizedPoints.first()
-                  path.moveTo(first.first * size.width, first.second * size.height)
-                  stroke.normalizedPoints.drop(1).forEach { pt ->
-                    path.lineTo(pt.first * size.width, pt.second * size.height)
+                  strokePath.rewind()
+                  val first = stroke.normalizedPoints[0]
+                  strokePath.moveTo(first.first * size.width, first.second * size.height)
+                  for (i in 1 until stroke.normalizedPoints.size) {
+                    val pt = stroke.normalizedPoints[i]
+                    strokePath.lineTo(pt.first * size.width, pt.second * size.height)
                   }
                   val baseColor = Color(stroke.colorArgb)
                   val alpha = if (stroke.tool == AnnotationTool.HIGHLIGHTER) 0.36f else 1f
                   drawPath(
-                    path = path,
+                    path = strokePath,
                     color = baseColor.copy(alpha = alpha),
                     style =
                       Stroke(

@@ -223,20 +223,32 @@ fun PhysicalRulerScreen(
               }
 
               // Draggable measurement cursors
-              listOf(cursorAY, cursorBY).forEach { cy ->
-                drawLine(
-                  color = cursorColor,
-                  start = Offset(0f, cy),
-                  end = Offset(size.width, cy),
-                  strokeWidth = 2.5.dp.toPx(),
-                  cap = StrokeCap.Round,
-                )
-                drawCircle(
-                  color = cursorColor,
-                  radius = 10.dp.toPx(),
-                  center = Offset(size.width * 0.5f, cy),
-                )
-              }
+              val cursorStroke = 2.5.dp.toPx()
+              val cursorR = 10.dp.toPx()
+              drawLine(
+                color = cursorColor,
+                start = Offset(0f, cursorAY),
+                end = Offset(size.width, cursorAY),
+                strokeWidth = cursorStroke,
+                cap = StrokeCap.Round,
+              )
+              drawCircle(
+                color = cursorColor,
+                radius = cursorR,
+                center = Offset(size.width * 0.5f, cursorAY),
+              )
+              drawLine(
+                color = cursorColor,
+                start = Offset(0f, cursorBY),
+                end = Offset(size.width, cursorBY),
+                strokeWidth = cursorStroke,
+                cap = StrokeCap.Round,
+              )
+              drawCircle(
+                color = cursorColor,
+                radius = cursorR,
+                center = Offset(size.width * 0.5f, cursorBY),
+              )
             }
           }
 

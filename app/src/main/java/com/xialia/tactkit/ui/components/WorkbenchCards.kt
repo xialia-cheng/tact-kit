@@ -464,12 +464,24 @@ private fun RecentFileCardBody(
   val isMc = isMcPixelTheme()
   val sharedKey = "shared_img_home_${card.id}"
   val isImageFile = card.mimeType.startsWith("image/") && card.fileUri != null
+  val cacheKey = remember(sharedKey, card.fileUri) { "home_thumb_${card.id}_${card.fileUri.orEmpty()}" }
   val previewBitmap by
-    produceState<Bitmap?>(initialValue = TactKitImageThumbCache.get(sharedKey), key1 = card.fileUri) {
-      if (!isImageFile) return@produceState
+    produceState<Bitmap?>(
+      initialValue = ThumbnailCache.getCached(cacheKey) ?: TactKitImageThumbCache.get(sharedKey),
+      key1 = card.fileUri,
+    ) {
+      if (!isImageFile || value != null) return@produceState
       val parsedUri = runCatching { Uri.parse(card.fileUri) }.getOrNull() ?: return@produceState
-      val loaded = runCatching { ImageEngine.loadOrientedBitmap(context, parsedUri, maxDimension = 720) }.getOrNull()
+      val loaded =
+        ThumbnailCache.getOrLoadImageThumbnail(
+          context = context,
+          cacheKey = cacheKey,
+          absolutePath = null,
+          safUriString = parsedUri.toString(),
+          targetPx = 360,
+        ) ?: runCatching { ImageEngine.loadOrientedBitmap(context, parsedUri, maxDimension = 480) }.getOrNull()
       if (loaded != null) {
+        ThumbnailCache.putCached(cacheKey, loaded)
         TactKitImageThumbCache.put(sharedKey, loaded)
         value = loaded
       }
@@ -484,8 +496,9 @@ private fun RecentFileCardBody(
 
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     val thumb = previewBitmap
+    val thumbImageBitmap = remember(thumb) { thumb?.asImageBitmap() }
     val rawUri = card.fileUri
-    if (thumb != null && rawUri != null && card.mimeType.startsWith("image/")) {
+    if (thumb != null && thumbImageBitmap != null && rawUri != null && card.mimeType.startsWith("image/")) {
       val shape = themeShape(14.dp)
       Box(
         modifier =
@@ -501,7 +514,7 @@ private fun RecentFileCardBody(
             .testTag("recent_image_thumb_${card.id}"),
       ) {
         Image(
-          bitmap = thumb.asImageBitmap(),
+          bitmap = thumbImageBitmap,
           contentDescription = card.title,
           contentScale = ContentScale.Crop,
           modifier = Modifier.fillMaxWidth().height(156.dp),

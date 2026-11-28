@@ -99,6 +99,8 @@ import com.xialia.tactkit.util.rememberAppHaptics
 
 /**
  * Compact 56.dp rounded-square (16.dp) Liquid Glass Tool Ball & Container-Transformed 28.dp Drawer.
+ * Real-time refraction shader runs strictly on the compact 56.dp ball when collapsed & not in power-save mode;
+ * the expanded drawer uses lightweight frosted translucent surface to avoid full-screen shader overdraw.
  */
 @Composable
 fun LiquidGlassToolBallOverlay(
@@ -109,11 +111,16 @@ fun LiquidGlassToolBallOverlay(
   onTogglePinTool: (String) -> Unit,
   modifier: Modifier = Modifier,
   ballModifier: Modifier = Modifier,
+  onExpandedChange: (Boolean) -> Unit = {},
 ) {
   val haptics = rememberAppHaptics()
   val view = LocalView.current
   var isExpanded by remember { mutableStateOf(false) }
   var searchQuery by remember { mutableStateOf("") }
+
+  androidx.compose.runtime.LaunchedEffect(isExpanded) {
+    onExpandedChange(isExpanded)
+  }
 
   val useLiquidShader = !isPowerSaveMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
@@ -218,8 +225,8 @@ fun LiquidGlassToolBallOverlay(
         else ->
           MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
       }
-    val sheetGlassTint =
-      MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = if (isDark) 0.84f else 0.82f)
+    val sheetFrostedTint =
+      MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = if (isDark) 0.93f else 0.95f)
     val fallbackBallTint = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f)
     val fallbackSheetTint = MaterialTheme.colorScheme.surfaceContainerLowest
 
@@ -227,7 +234,7 @@ fun LiquidGlassToolBallOverlay(
       transformTransition.animateColor(
         transitionSpec = { tween(220) },
         label = "container_glass_tint",
-      ) { expanded -> if (expanded) sheetGlassTint else ballTint }
+      ) { expanded -> if (expanded) sheetFrostedTint else ballTint }
 
     val animatedFallbackTint by
       transformTransition.animateColor(
@@ -251,11 +258,13 @@ fun LiquidGlassToolBallOverlay(
       ) { expanded -> if (expanded) sheetBorder else ballBorder }
 
     val orbInteraction = remember { MutableInteractionSource() }
-    val orbPressed by orbInteraction.collectIsPressedAsState()
+    val orbPressedState = orbInteraction.collectIsPressedAsState()
 
     val containerShape: Shape =
       if (isMinecraft) {
         RectangleShape
+      } else if (!isExpanded && !transformTransition.isRunning) {
+        remember { RoundedCornerShape(16.dp) }
       } else {
         RoundedCornerShape(
           topStart = topCorner.coerceAtLeast(1.dp),
@@ -264,6 +273,10 @@ fun LiquidGlassToolBallOverlay(
           bottomEnd = bottomCorner.coerceAtLeast(1.dp),
         )
       }
+
+    // Apply real-time refraction shader strictly on the small collapsed 56.dp floating orb
+    val enableLocalOrbShader =
+      useLiquidShader && !isExpanded && !transformTransition.targetState && !transformTransition.isRunning
 
     val containerSurfaceModifier =
       Modifier.align(Alignment.BottomEnd)
@@ -291,15 +304,15 @@ fun LiquidGlassToolBallOverlay(
             } else {
               base
                 .background(Color(0xFF3C8527), RectangleShape)
-                .mcGrassButtonBox(pressed = orbPressed)
+                .mcGrassButtonBox(isPressed = { orbPressedState.value })
             }
           } else {
             base.glassSurfaceModifier(
-              useLiquidShader = useLiquidShader,
+              useLiquidShader = enableLocalOrbShader,
               backdrop = backdrop,
               shape = containerShape,
               glassTint = animatedGlassTint,
-              fallbackTint = animatedFallbackTint,
+              fallbackTint = if (isExpanded) sheetFrostedTint else animatedFallbackTint,
               borderColor = animatedBorderColor,
             )
           }
@@ -457,6 +470,7 @@ fun LiquidGlassToolBallOverlay(
 
             val pinnedTools =
               remember(pinnedToolIds) { pinnedToolIds.mapNotNull { ToolCatalog.findById(it) } }
+            val pinnedIdSet = remember(pinnedToolIds) { pinnedToolIds.toSet() }
 
             if (pinnedTools.isNotEmpty()) {
               Spacer(modifier = Modifier.height(10.dp))
@@ -465,7 +479,11 @@ fun LiquidGlassToolBallOverlay(
                 contentPadding = PaddingValues(end = 4.dp),
                 modifier = Modifier.fillMaxWidth().testTag("pinned_tools_row"),
               ) {
-                items(pinnedTools, key = { "pinned_${it.id}" }) { tool ->
+                items(
+                  items = pinnedTools,
+                  key = { "pinned_${it.id}" },
+                  contentType = { "pinned_tool_chip" },
+                ) { tool ->
                   PinnedToolSlotChip(
                     tool = tool,
                     onClick = {
@@ -481,44 +499,48 @@ fun LiquidGlassToolBallOverlay(
             Spacer(modifier = Modifier.height(12.dp))
 
             val normalizedQuery = searchQuery.trim().lowercase()
+            val categorizedTools =
+              remember(normalizedQuery) {
+                ToolCategory.entries.mapNotNull { category ->
+                  val toolsInCategory =
+                    ToolCatalog.allTools.filter { tool ->
+                      tool.category == category &&
+                        (normalizedQuery.isEmpty() ||
+                          tool.name.lowercase().contains(normalizedQuery) ||
+                          tool.subtitle.lowercase().contains(normalizedQuery) ||
+                          category.title.lowercase().contains(normalizedQuery))
+                    }
+                  if (toolsInCategory.isNotEmpty()) category to toolsInCategory else null
+                }
+              }
             LazyColumn(
               verticalArrangement = Arrangement.spacedBy(10.dp),
               modifier = Modifier.weight(1f, fill = false),
             ) {
-              ToolCategory.entries.forEach { category ->
-                val toolsInCategory =
-                  ToolCatalog.allTools.filter { tool ->
-                    tool.category == category &&
-                      (normalizedQuery.isEmpty() ||
-                        tool.name.lowercase().contains(normalizedQuery) ||
-                        tool.subtitle.lowercase().contains(normalizedQuery) ||
-                        category.title.lowercase().contains(normalizedQuery))
-                  }
-                if (toolsInCategory.isNotEmpty()) {
-                  item(key = category.name) {
-                    val isCatExpanded =
-                      if (normalizedQuery.isNotEmpty()) true
-                      else (expandedCategories[category] ?: true)
-                    CategoryToolCard(
-                      category = category,
-                      tools = toolsInCategory,
-                      expanded = isCatExpanded,
-                      pinnedIds = pinnedToolIds,
-                      onToggleExpand = {
-                        haptics.tick()
-                        expandedCategories[category] = !isCatExpanded
-                      },
-                      onToolClick = { tool ->
-                        haptics.tick()
-                        isExpanded = false
-                        onLaunchTool(tool)
-                      },
-                      onTogglePin = { toolId ->
-                        onTogglePinTool(toolId)
-                      },
-                    )
-                  }
-                }
+              items(
+                items = categorizedTools,
+                key = { (category, _) -> category.name },
+                contentType = { "tool_category_card" },
+              ) { (category, toolsInCategory) ->
+                val isCatExpanded =
+                  if (normalizedQuery.isNotEmpty()) true
+                  else (expandedCategories[category] ?: true)
+                CategoryToolCard(
+                  category = category,
+                  tools = toolsInCategory,
+                  expanded = isCatExpanded,
+                  pinnedIdSet = pinnedIdSet,
+                  onToggleExpand = {
+                    haptics.tick()
+                    expandedCategories[category] = !isCatExpanded
+                  },
+                  onToolClick = { tool ->
+                    haptics.tick()
+                    isExpanded = false
+                    onLaunchTool(tool)
+                  },
+                  onTogglePin = onTogglePinTool,
+                )
               }
             }
           }
@@ -576,7 +598,7 @@ private fun CategoryToolCard(
   category: ToolCategory,
   tools: List<ToolItem>,
   expanded: Boolean,
-  pinnedIds: List<String>,
+  pinnedIdSet: Set<String>,
   onToggleExpand: () -> Unit,
   onToolClick: (ToolItem) -> Unit,
   onTogglePin: (String) -> Unit,
@@ -638,7 +660,7 @@ private fun CategoryToolCard(
           modifier = Modifier.padding(top = 8.dp),
         ) {
           tools.forEach { tool ->
-            val isPinned = tool.id in pinnedIds
+            val isPinned = tool.id in pinnedIdSet
             TactileCard(
               onClick = { onToolClick(tool) },
               containerColor = MaterialTheme.colorScheme.surfaceContainerLow,

@@ -274,26 +274,27 @@ private fun LiveRecordingWaveform(
   val peakBarColor = MaterialTheme.colorScheme.error
   val idleBarColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
   val bgColor = MaterialTheme.colorScheme.surfaceContainer
+  val count = VoiceMemoManager.MAX_WAVE_BARS
+  val idleBars =
+    remember(count) {
+      List(count) { idx ->
+        if (idx % 4 == 0) 0.16f else if (idx % 2 == 0) 0.11f else 0.08f
+      }
+    }
+  val waveShape = remember { RoundedCornerShape(12.dp) }
 
   Canvas(
-    modifier = modifier.clip(RoundedCornerShape(12.dp)).background(bgColor).padding(horizontal = 8.dp),
+    modifier = modifier.clip(waveShape).background(bgColor).padding(horizontal = 8.dp),
   ) {
-    val count = VoiceMemoManager.MAX_WAVE_BARS
-    val bars =
-      if (isRecording && amplitudes.isNotEmpty()) {
-        amplitudes
-      } else {
-        List(count) { idx ->
-          if (idx % 4 == 0) 0.16f else if (idx % 2 == 0) 0.11f else 0.08f
-        }
-      }
-
+    val bars = if (isRecording && amplitudes.isNotEmpty()) amplitudes else idleBars
     val slotWidth = size.width / count
     val barWidth = (slotWidth * 0.56f).coerceAtLeast(3f)
     val maxBarHeight = size.height * 0.82f
     val centerY = size.height / 2f
+    val cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
 
-    bars.forEachIndexed { idx, amp ->
+    for (idx in bars.indices) {
+      val amp = bars[idx]
       val barH = (amp * maxBarHeight).coerceAtLeast(4f)
       val left = idx * slotWidth + (slotWidth - barWidth) / 2f
       val top = centerY - barH / 2f
@@ -307,7 +308,7 @@ private fun LiveRecordingWaveform(
         color = color,
         topLeft = Offset(left, top),
         size = Size(barWidth, barH),
-        cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+        cornerRadius = cornerRadius,
       )
     }
   }

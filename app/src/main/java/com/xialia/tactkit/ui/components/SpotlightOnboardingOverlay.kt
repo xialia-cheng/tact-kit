@@ -181,7 +181,7 @@ fun SpotlightOnboardingOverlay(
         bottom = (rawTarget.bottom + padPx).coerceAtMost(rootHeightPx),
       )
 
-    val animatedTarget by
+    val animatedTargetState =
       animateRectAsState(
         targetValue = paddedTarget,
         animationSpec = spring(dampingRatio = 0.78f, stiffness = 420f),
@@ -205,6 +205,7 @@ fun SpotlightOnboardingOverlay(
             }
           },
     ) {
+      val animatedTarget = animatedTargetState.value
       drawRect(color = Color.Black.copy(alpha = 0.72f))
       drawRoundRect(
         color = Color.Transparent,
@@ -223,15 +224,15 @@ fun SpotlightOnboardingOverlay(
     }
 
     // Bubble card placed above or below the highlighted region
-    val placeAbove = animatedTarget.center.y > rootHeightPx * 0.55f
+    val placeAbove = paddedTarget.center.y > rootHeightPx * 0.55f
     val bubbleMarginPx = with(density) { 14.dp.toPx() }
 
     val bubbleYOffsetPx =
       if (placeAbove) {
-        (animatedTarget.top - with(density) { 235.dp.toPx() } - bubbleMarginPx)
+        (paddedTarget.top - with(density) { 235.dp.toPx() } - bubbleMarginPx)
           .coerceAtLeast(with(density) { 72.dp.toPx() })
       } else {
-        (animatedTarget.bottom + bubbleMarginPx)
+        (paddedTarget.bottom + bubbleMarginPx)
           .coerceAtMost(rootHeightPx - with(density) { 255.dp.toPx() })
       }
 

@@ -371,7 +371,10 @@ fun DocxEditorScreen(
               }
             }
           } else {
-            itemsIndexed(editableParagraphs) { index, text ->
+            itemsIndexed(
+              items = editableParagraphs,
+              contentType = { _, _ -> "docx_paragraph" },
+            ) { index, text ->
               Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,

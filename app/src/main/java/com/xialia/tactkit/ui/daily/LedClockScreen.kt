@@ -293,7 +293,11 @@ fun LedClockScreen(
                     modifier = Modifier.fillMaxWidth().testTag("led_text_input"),
                   )
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf("加油！", "我在出站口", "请勿打扰 · 专注中", "简工坊 TactKit")) { preset ->
+                    items(
+                      items = listOf("加油！", "我在出站口", "请勿打扰 · 专注中", "简工坊 TactKit"),
+                      key = { it },
+                      contentType = { "led_preset_chip" },
+                    ) { preset ->
                       FilterChip(
                         selected = bannerText == preset,
                         onClick = { bannerText = preset },

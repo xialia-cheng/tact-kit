@@ -231,37 +231,58 @@ fun NetDiagnosticsScreen(
                 val waveColor = MaterialTheme.colorScheme.primary
                 val errColor = MaterialTheme.colorScheme.error
                 val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val pingPath = remember { Path() }
+                val pingStroke =
+                  remember(density) {
+                    Stroke(width = with(density) { 2.5.dp.toPx() }, cap = StrokeCap.Round)
+                  }
                 Canvas(modifier = Modifier.fillMaxWidth().height(92.dp)) {
                   drawLine(gridColor, Offset(0f, size.height * 0.5f), Offset(size.width, size.height * 0.5f))
                   if (pingHistory.isNotEmpty()) {
-                    val maxLat = (pingHistory.filterNotNull().maxOrNull() ?: 100L).coerceAtLeast(60L).toFloat()
+                    var maxVal = 60L
+                    for (v in pingHistory) {
+                      if (v != null && v > maxVal) maxVal = v
+                    }
+                    val maxLat = maxVal.toFloat()
                     val stepX = size.width / (pingHistory.size - 1).coerceAtLeast(1)
-                    val path = Path()
+                    val padY = 8.dp.toPx()
+                    val availH = size.height - 16.dp.toPx()
+                    val okR = 3.dp.toPx()
+                    val errR = 3.5.dp.toPx()
+                    pingPath.rewind()
                     var started = false
-                    pingHistory.forEachIndexed { idx, ms ->
+                    for (idx in pingHistory.indices) {
+                      val ms = pingHistory[idx]
                       val x = idx * stepX
                       if (ms != null) {
                         val norm = (ms / maxLat).coerceIn(0f, 1f)
-                        val y = size.height - norm * (size.height - 16.dp.toPx()) - 8.dp.toPx()
+                        val y = size.height - norm * availH - padY
                         if (!started) {
-                          path.moveTo(x, y)
+                          pingPath.moveTo(x, y)
                           started = true
                         } else {
-                          path.lineTo(x, y)
+                          pingPath.lineTo(x, y)
                         }
-                        drawCircle(waveColor, radius = 3.dp.toPx(), center = Offset(x, y))
+                        drawCircle(waveColor, radius = okR, center = Offset(x, y))
                       } else {
                         started = false
-                        drawCircle(errColor, radius = 3.5.dp.toPx(), center = Offset(x, size.height - 8.dp.toPx()))
+                        drawCircle(errColor, radius = errR, center = Offset(x, size.height - padY))
                       }
                     }
-                    drawPath(path, waveColor, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
+                    drawPath(pingPath, waveColor, style = pingStroke)
                   }
                 }
 
                 if (pingHistory.isNotEmpty()) {
+                  val recentReversed = remember(pingHistory) { pingHistory.takeLast(8).reversed() }
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(pingHistory.takeLast(8).reversed()) { ms ->
+                    items(
+                      count = recentReversed.size,
+                      key = { idx -> "ping_${pingHistory.size - idx}_${recentReversed[idx]}" },
+                      contentType = { "ping_pill" },
+                    ) { idx ->
+                      val ms = recentReversed[idx]
                       Surface(
                         shape = RoundedCornerShape(10.dp),
                         color =

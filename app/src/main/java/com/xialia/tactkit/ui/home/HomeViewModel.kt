@@ -2,6 +2,7 @@ package com.xialia.tactkit.ui.home
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xialia.tactkit.BuildConfig
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@Immutable
 data class OnboardingUiState(
   val showWelcomeDialog: Boolean = false,
   val activeStep: OnboardingStep? = null,
@@ -39,6 +41,7 @@ enum class CardFilter(val label: String) {
   RECENT_FILE("文件"),
 }
 
+@Immutable
 data class DocumentDashboardStats(
   val totalItemsCount: Int = 0,
   val thisWeekAddedCount: Int = 0,
@@ -49,6 +52,7 @@ data class DocumentDashboardStats(
   val recentFiles: List<WorkbenchCard.RecentFile> = emptyList(),
 )
 
+@Immutable
 data class HomeUiState(
   val cards: List<WorkbenchCard> = emptyList(),
   val totalChecklists: Int = 0,

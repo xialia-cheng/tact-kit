@@ -149,8 +149,8 @@ fun RollingNumberText(
 
 /**
  * Pure Compose zero-bloat M3 Expressive "Q-bounce" tactile press modifier:
- * observes MutableInteractionSource.collectIsPressedAsState(), drives spring(0.7f, 420f) scaling (1f -> 0.95f),
- * dynamic corner radius morphing, and CLOCK_TICK micro-haptics.
+ * observes MutableInteractionSource.collectIsPressedAsState(), drives spring(0.7f, 420f) scaling (1f -> 0.95f)
+ * purely inside graphicsLayer (skipping composition & measure/layout), and plays CLOCK_TICK micro-haptics.
  */
 fun Modifier.tactilePress(
   interactionSource: MutableInteractionSource,
@@ -159,7 +159,8 @@ fun Modifier.tactilePress(
   pressedCorner: Dp = 26.dp,
   enableHapticOnPress: Boolean = true,
 ): Modifier = composed {
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val isPressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = isPressedState.value
   val view = LocalView.current
 
   LaunchedEffect(isPressed) {
@@ -168,26 +169,17 @@ fun Modifier.tactilePress(
     }
   }
 
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed) pressedScale else 1f,
-    animationSpec = TactilePressSpringFloat,
-    label = "tactile_scale",
-  )
-
-  val cornerRadius by animateDpAsState(
-    targetValue = if (isPressed) pressedCorner else baseCorner,
-    animationSpec = TactilePressSpringDp,
-    label = "tactile_corner",
-  )
-
-  val themeStyle = LocalAppThemeStyle.current
-  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+  val scaleState =
+    animateFloatAsState(
+      targetValue = if (isPressed) pressedScale else 1f,
+      animationSpec = TactilePressSpringFloat,
+      label = "tactile_scale",
+    )
 
   this.graphicsLayer {
-    scaleX = scale
-    scaleY = scale
-    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(cornerRadius.coerceAtLeast(0.dp))
-    clip = true
+    val s = scaleState.value
+    scaleX = s
+    scaleY = s
   }
 }
 
@@ -226,7 +218,7 @@ fun Modifier.tactileClickable(
 }
 
 /**
- * M3 Expressive bouncy card container with spring(0.7f, 420f) scale + corner morphing + ripple + sound + haptics.
+ * M3 Expressive bouncy card container with GPU graphicsLayer scale (0 relayout) + ripple + sound + haptics.
  */
 @Composable
 fun TactileCard(
@@ -242,41 +234,35 @@ fun TactileCard(
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = pressedState.value
   val view = LocalView.current
   val themeStyle = LocalAppThemeStyle.current
   val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
-
   val resolvedBaseCorner =
     when (themeStyle) {
       AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
       AppThemeStyle.PRECISION_LAB -> minOf(baseCorner, 16.dp)
       else -> baseCorner
     }
-  val resolvedPressedCorner =
-    when (themeStyle) {
-      AppThemeStyle.MINECRAFT_PIXEL -> 0.dp
-      AppThemeStyle.PRECISION_LAB -> minOf(pressedCorner, 20.dp)
-      else -> pressedCorner
-    }
   val resolvedBorder =
     border ?: themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant)
+  val cardShape =
+    remember(isMinecraft, resolvedBaseCorner) {
+      if (isMinecraft) androidx.compose.ui.graphics.RectangleShape
+      else RoundedCornerShape(resolvedBaseCorner.coerceAtLeast(0.dp))
+    }
 
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed && enabled) pressedScale else 1f,
-    animationSpec = TactilePressSpringFloat,
-    label = "tactile_card_scale",
-  )
-
-  val corner by animateDpAsState(
-    targetValue = if (isPressed && enabled) resolvedPressedCorner else resolvedBaseCorner,
-    animationSpec = TactilePressSpringDp,
-    label = "tactile_card_corner",
-  )
+  val scaleState =
+    animateFloatAsState(
+      targetValue = if (isPressed && enabled) pressedScale else 1f,
+      animationSpec = TactilePressSpringFloat,
+      label = "tactile_card_scale",
+    )
 
   Surface(
-    shape = if (isMinecraft) androidx.compose.ui.graphics.RectangleShape else RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+    shape = cardShape,
     color = containerColor,
     contentColor = contentColor,
     border = resolvedBorder,
@@ -285,14 +271,16 @@ fun TactileCard(
     modifier =
       modifier
         .graphicsLayer {
-          scaleX = scale
-          scaleY = scale
+          val s = scaleState.value
+          scaleX = s
+          scaleY = s
         }
         .let {
           if (isMinecraft) {
-            it.mcPixelBox(pressed = isPressed && enabled,
-                isDark = isDark,
-              )
+            it.mcPixelBox(
+              isDark = isDark,
+              isPressed = { pressedState.value && enabled },
+            )
           } else {
             it
           }
@@ -314,7 +302,7 @@ fun TactileCard(
 }
 
 /**
- * M3 Expressive single-line tactile mode chip (1f -> 0.94f spring bounce).
+ * M3 Expressive single-line tactile mode chip (1f -> 0.94f GPU-accelerated spring bounce).
  */
 @Composable
 fun TactileModeChip(
@@ -325,31 +313,26 @@ fun TactileModeChip(
   icon: ImageVector? = null,
 ) {
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = pressedState.value
   val view = LocalView.current
   val themeStyle = LocalAppThemeStyle.current
   val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
 
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed) 0.94f else if (selected) 1.02f else 1f,
-    animationSpec =
-      spring(
-        dampingRatio = Spring.DampingRatioMediumBouncy,
-        stiffness = Spring.StiffnessMedium,
-      ),
-    label = "chip_scale",
-  )
+  val scaleState =
+    animateFloatAsState(
+      targetValue = if (isPressed) 0.94f else if (selected) 1.02f else 1f,
+      animationSpec =
+        spring(
+          dampingRatio = Spring.DampingRatioMediumBouncy,
+          stiffness = Spring.StiffnessMedium,
+        ),
+      label = "chip_scale",
+    )
 
-  val corner by animateDpAsState(
-    targetValue =
-      if (isMinecraft) 0.dp
-      else if (isPressed) 22.dp
-      else if (selected) 16.dp
-      else 14.dp,
-    animationSpec = TactilePressSpringDp,
-    label = "chip_corner",
-  )
+  val chipCorner = if (isMinecraft) 0.dp else if (selected) 16.dp else 14.dp
+  val chipShape = remember(chipCorner) { RoundedCornerShape(chipCorner) }
 
   val chipBgColor =
     when {
@@ -365,19 +348,20 @@ fun TactileModeChip(
     }
 
   if (isMinecraft) {
-    androidx.compose.foundation.layout.Box(
+    Box(
       contentAlignment = Alignment.Center,
       modifier =
         modifier
           .heightIn(min = 34.dp)
           .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            val s = scaleState.value
+            scaleX = s
+            scaleY = s
           }
           .background(chipBgColor, androidx.compose.ui.graphics.RectangleShape)
           .let { m ->
-            if (selected) m.mcGrassButtonBox(pressed = isPressed)
-            else m.mcPixelBox(pressed = isPressed, isDark = isDark)
+            if (selected) m.mcGrassButtonBox(isPressed = { pressedState.value })
+            else m.mcPixelBox(isDark = isDark, isPressed = { pressedState.value })
           }
           .clickable(
             interactionSource = interactionSource,
@@ -417,15 +401,16 @@ fun TactileModeChip(
     }
   } else {
     Surface(
-      shape = RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+      shape = chipShape,
       color = chipBgColor,
       contentColor = chipFgColor,
       border = themeCardBorder(themeStyle, isDark, MaterialTheme.colorScheme.outlineVariant),
       modifier =
         modifier
           .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            val s = scaleState.value
+            scaleX = s
+            scaleY = s
           }
           .clickable(
             interactionSource = interactionSource,
@@ -463,7 +448,7 @@ fun TactileModeChip(
 }
 
 /**
- * M3 Expressive bouncy primary action button (scale 1f -> 0.95f, dynamic corner morph, sound + haptics).
+ * M3 Expressive bouncy primary action button (GPU graphicsLayer scale 1f -> 0.95f, zero relayout, sound + haptics).
  */
 @Composable
 fun TactileActionButton(
@@ -476,26 +461,20 @@ fun TactileActionButton(
   content: @Composable RowScope.() -> Unit,
 ) {
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = pressedState.value
   val view = LocalView.current
   val themeStyle = LocalAppThemeStyle.current
-  val isDark = MaterialTheme.colorScheme.background.red < 0.2f
   val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
 
-  val scale by animateFloatAsState(
-    targetValue = if (isPressed && enabled) 0.95f else 1f,
-    animationSpec = TactilePressSpringFloat,
-    label = "btn_scale",
-  )
+  val scaleState =
+    animateFloatAsState(
+      targetValue = if (isPressed && enabled) 0.95f else 1f,
+      animationSpec = TactilePressSpringFloat,
+      label = "btn_scale",
+    )
 
-  val corner by animateDpAsState(
-    targetValue =
-      if (isMinecraft) 0.dp
-      else if (isPressed && enabled) 26.dp
-      else 16.dp,
-    animationSpec = TactilePressSpringDp,
-    label = "btn_corner",
-  )
+  val btnShape = remember { RoundedCornerShape(16.dp) }
 
   val btnBgColor =
     when {
@@ -520,11 +499,12 @@ fun TactileActionButton(
           modifier
             .heightIn(min = 36.dp)
             .graphicsLayer {
-              scaleX = scale
-              scaleY = scale
+              val s = scaleState.value
+              scaleX = s
+              scaleY = s
             }
             .background(btnBgColor, androidx.compose.ui.graphics.RectangleShape)
-            .mcGrassButtonBox(pressed = isPressed && enabled)
+            .mcGrassButtonBox(isPressed = { pressedState.value && enabled })
             .clickable(
               interactionSource = interactionSource,
               indication = null,
@@ -542,14 +522,15 @@ fun TactileActionButton(
     }
   } else {
     Surface(
-      shape = RoundedCornerShape(corner.coerceAtLeast(0.dp)),
+      shape = btnShape,
       color = btnBgColor,
       contentColor = btnFgColor,
       modifier =
         modifier
           .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            val s = scaleState.value
+            scaleX = s
+            scaleY = s
           }
           .clickable(
             interactionSource = interactionSource,
@@ -574,7 +555,7 @@ fun TactileActionButton(
 }
 
 /**
- * RoundedPolygon-backed scalloped petal badge (4 or 8 petals) using androidx.graphics:graphics-shapes.
+ * RoundedPolygon-backed scalloped petal badge (4 or 8 petals) using pre-allocated Path/Matrix/bounds.
  */
 class PetalPolygonShape(
   private val petals: Int = 8,
@@ -588,23 +569,25 @@ class PetalPolygonShape(
       rounding = CornerRounding(radius = 0.28f),
       innerRounding = CornerRounding(radius = 0.22f),
     )
+  private val androidPath = AndroidPath()
+  private val matrix = AndroidMatrix()
+  private val bounds = FloatArray(4).also { polygon.calculateBounds(it) }
+  private val composePath = androidPath.asComposePath()
 
   override fun createOutline(
     size: Size,
     layoutDirection: LayoutDirection,
     density: androidx.compose.ui.unit.Density,
   ): Outline {
-    val androidPath = AndroidPath()
+    androidPath.rewind()
     polygon.toPath(androidPath)
-    val matrix = AndroidMatrix()
-    val bounds = FloatArray(4)
-    polygon.calculateBounds(bounds)
     val bw = (bounds[2] - bounds[0]).coerceAtLeast(0.001f)
     val bh = (bounds[3] - bounds[1]).coerceAtLeast(0.001f)
+    matrix.reset()
     matrix.setTranslate(-bounds[0], -bounds[1])
     matrix.postScale(size.width / bw, size.height / bh)
     androidPath.transform(matrix)
-    return Outline.Generic(androidPath.asComposePath())
+    return Outline.Generic(composePath)
   }
 }
 
@@ -816,9 +799,10 @@ fun TactilePinIconButton(
   val view = LocalView.current
   val haptics = rememberAppHaptics()
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = pressedState.value
 
-  val pinRotation by
+  val pinRotationState =
     animateFloatAsState(
       targetValue = if (pinned) 0f else 42f,
       animationSpec =
@@ -829,7 +813,7 @@ fun TactilePinIconButton(
       label = "pin_rotation",
     )
 
-  val pinScale by
+  val pinScaleState =
     animateFloatAsState(
       targetValue = if (isPressed) 0.82f else if (pinned) 1.12f else 1f,
       animationSpec =
@@ -864,9 +848,10 @@ fun TactilePinIconButton(
       tint = pinTint,
       modifier =
         Modifier.size(iconSize).graphicsLayer {
-          rotationZ = pinRotation
-          scaleX = pinScale
-          scaleY = pinScale
+          rotationZ = pinRotationState.value
+          val s = pinScaleState.value
+          scaleX = s
+          scaleY = s
         },
     )
   }
@@ -882,9 +867,10 @@ fun TactileSwitch(
   val view = LocalView.current
   val haptics = rememberAppHaptics()
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
+  val isPressed = pressedState.value
 
-  val bounceScale by
+  val bounceScaleState =
     animateFloatAsState(
       targetValue = if (isPressed) 0.90f else if (checked) 1.04f else 1f,
       animationSpec =
@@ -906,8 +892,9 @@ fun TactileSwitch(
     interactionSource = interactionSource,
     modifier =
       modifier.graphicsLayer {
-        scaleX = bounceScale
-        scaleY = bounceScale
+        val s = bounceScaleState.value
+        scaleX = s
+        scaleY = s
       },
   )
 }

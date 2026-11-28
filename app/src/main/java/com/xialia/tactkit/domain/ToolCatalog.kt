@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Straighten
 import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material.icons.rounded.WifiFind
 import androidx.compose.material.icons.rounded.WifiTethering
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class ToolCategory(val title: String, val icon: ImageVector) {
@@ -46,6 +47,7 @@ enum class ToolCategory(val title: String, val icon: ImageVector) {
   MEASURE_DAILY("测量与日常", Icons.Rounded.Straighten),
 }
 
+@Immutable
 data class ToolItem(
   val id: String,
   val name: String,

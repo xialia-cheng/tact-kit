@@ -97,11 +97,11 @@ fun ImagePreviewScreen(
     isLoading = false
   }
 
-  var zoomScale by remember { mutableFloatStateOf(1f) }
-  var zoomOffset by remember { mutableStateOf(Offset.Zero) }
-  val animatedZoom by
+  val zoomScaleState = remember { mutableFloatStateOf(1f) }
+  val zoomOffsetState = remember { mutableStateOf(Offset.Zero) }
+  val animatedZoomState =
     animateFloatAsState(
-      targetValue = zoomScale,
+      targetValue = zoomScaleState.floatValue,
       animationSpec = spring(dampingRatio = 0.85f, stiffness = 420f),
       label = "preview_zoom_scale",
     )
@@ -190,26 +190,28 @@ fun ImagePreviewScreen(
               detectTapGestures(
                 onDoubleTap = {
                   haptics.tick()
-                  if (zoomScale > 1.05f) {
-                    zoomScale = 1f
-                    zoomOffset = Offset.Zero
+                  if (zoomScaleState.floatValue > 1.05f) {
+                    zoomScaleState.floatValue = 1f
+                    zoomOffsetState.value = Offset.Zero
                   } else {
-                    zoomScale = 2.2f
+                    zoomScaleState.floatValue = 2.2f
                   }
                 },
               )
             }
             .pointerInput(Unit) {
               detectTransformGestures { _, pan, zoom, _ ->
-                val next = (zoomScale * zoom).coerceIn(1f, 5f)
-                zoomScale = next
-                zoomOffset = if (next > 1.03f) zoomOffset + pan else Offset.Zero
+                val next = (zoomScaleState.floatValue * zoom).coerceIn(1f, 5f)
+                zoomScaleState.floatValue = next
+                zoomOffsetState.value = if (next > 1.03f) zoomOffsetState.value + pan else Offset.Zero
               }
             },
       ) {
         val bmp = fullBitmap
-        if (bmp != null) {
+        val imageBmp = remember(bmp) { bmp?.asImageBitmap() }
+        if (bmp != null && imageBmp != null) {
           val ratio = (bmp.width.toFloat() / bmp.height.coerceAtLeast(1).toFloat()).coerceIn(0.25f, 4f)
+          val previewShape = themeShape(16.dp)
           Box(
             contentAlignment = Alignment.Center,
             modifier =
@@ -217,16 +219,18 @@ fun ImagePreviewScreen(
                 .fillMaxWidth()
                 .aspectRatio(ratio, matchHeightConstraintsFirst = false)
                 .graphicsLayer {
-                  scaleX = animatedZoom
-                  scaleY = animatedZoom
-                  translationX = zoomOffset.x
-                  translationY = zoomOffset.y
+                  val z = animatedZoomState.value
+                  val off = zoomOffsetState.value
+                  scaleX = z
+                  scaleY = z
+                  translationX = off.x
+                  translationY = off.y
                 }
                 .tactKitSharedElement(key = sharedKey)
-                .clip(themeShape(16.dp)),
+                .clip(previewShape),
           ) {
             Image(
-              bitmap = bmp.asImageBitmap(),
+              bitmap = imageBmp,
               contentDescription = title,
               contentScale = ContentScale.Crop,
               modifier = Modifier.fillMaxSize(),

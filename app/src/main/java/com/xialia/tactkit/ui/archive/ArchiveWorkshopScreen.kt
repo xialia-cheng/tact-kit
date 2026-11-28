@@ -585,7 +585,11 @@ fun ArchiveWorkshopScreen(
               }
             }
 
-            itemsIndexed(packItems) { idx, item ->
+            itemsIndexed(
+              items = packItems,
+              key = { idx, item -> "pack_${idx}_${item.uri}" },
+              contentType = { _, _ -> "staged_pack_item" },
+            ) { idx, item ->
               Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,

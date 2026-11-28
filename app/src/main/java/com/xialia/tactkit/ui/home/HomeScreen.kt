@@ -2,6 +2,7 @@ package com.xialia.tactkit.ui.home
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -79,6 +80,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -139,6 +141,7 @@ import com.xialia.tactkit.ui.theme.themeShape
 import com.xialia.tactkit.util.AppHaptics
 import com.xialia.tactkit.util.rememberAppHaptics
 
+@Immutable
 private data class QuickStripEntry(
   val id: String,
   val label: String,
@@ -219,6 +222,7 @@ fun HomeScreen(
   var editingNote by remember { mutableStateOf<WorkbenchCard.Note?>(null) }
   var showCreateNoteDialog by remember { mutableStateOf(false) }
   var showVoiceMemoDialog by remember { mutableStateOf(false) }
+  var isToolDrawerExpanded by remember { mutableStateOf(false) }
 
   val targetBoundsMap = remember { mutableStateMapOf<OnboardingStep, Rect>() }
 
@@ -276,12 +280,18 @@ fun HomeScreen(
     if (isMinecraft) (if (isDark) Color(0xFF1C1D20) else Color(0xFFE6E8EB))
     else MaterialTheme.colorScheme.surfaceContainer
   val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
+  val shouldRecordBackdrop =
+    !isMinecraft &&
+      !uiState.preferences.liquidGlassPowerSave &&
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+      !isToolDrawerExpanded &&
+      onboardingState.activeStep == null
 
   Box(modifier = Modifier.fillMaxSize()) {
     Box(
       modifier =
         Modifier.fillMaxSize()
-          .let { if (isMinecraft) it else it.layerBackdrop(backdrop) }
+          .let { if (shouldRecordBackdrop) it.layerBackdrop(backdrop) else it }
           .background(bodySurfaceBg),
     ) {
       Scaffold(
@@ -544,6 +554,8 @@ fun HomeScreen(
               )
             }
 
+          val idleAudioPlayback = remember { AudioPlaybackState() }
+
           BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val isWide = maxWidth >= 640.dp
 
@@ -556,7 +568,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
               ) {
-                item(span = { GridItemSpan(2) }, key = "quick_strip") {
+                item(span = { GridItemSpan(2) }, key = "quick_strip", contentType = "quick_strip") {
                   QuickActionStrip(
                     entries = quickStripEntries,
                     modifier =
@@ -565,7 +577,7 @@ fun HomeScreen(
                       },
                   )
                 }
-                item(span = { GridItemSpan(2) }, key = "overview_header") {
+                item(span = { GridItemSpan(2) }, key = "overview_header", contentType = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
                     onFilterChange = {
@@ -591,7 +603,7 @@ fun HomeScreen(
                 }
 
                 if (uiState.cards.isEmpty()) {
-                  item(span = { GridItemSpan(2) }, key = "empty_actions") {
+                  item(span = { GridItemSpan(2) }, key = "empty_actions", contentType = "empty_actions") {
                     EmptyQuickActionsSection(
                       hasSearchOrFilter =
                         uiState.searchQuery.isNotBlank() || uiState.activeFilter != CardFilter.ALL,
@@ -607,10 +619,20 @@ fun HomeScreen(
                     )
                   }
                 } else {
-                  items(uiState.cards, key = { it.id }) { card ->
+                  items(
+                    items = uiState.cards,
+                    key = { it.id },
+                    contentType = { it::class.simpleName },
+                  ) { card ->
+                    val cardAudioState =
+                      if (card is WorkbenchCard.VoiceMemo && audioPlaybackState.playingCardId == card.id) {
+                        audioPlaybackState
+                      } else {
+                        idleAudioPlayback
+                      }
                     WorkbenchCardView(
                       card = card,
-                      audioPlaybackState = audioPlaybackState,
+                      audioPlaybackState = cardAudioState,
                       onToggleChecklistItem = onToggleChecklistItem,
                       onAddChecklistItem = onAddChecklistItem,
                       onDeleteChecklistItem = onDeleteChecklistItem,
@@ -623,7 +645,7 @@ fun HomeScreen(
                       onDeleteCard = onDeleteCard,
                     )
                   }
-                  item(span = { GridItemSpan(2) }, key = "footer_quick_actions") {
+                  item(span = { GridItemSpan(2) }, key = "footer_quick_actions", contentType = "footer_quick_actions") {
                     QuickCreateListSection(
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
@@ -640,7 +662,7 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize(),
               ) {
-                item(key = "quick_strip") {
+                item(key = "quick_strip", contentType = "quick_strip") {
                   QuickActionStrip(
                     entries = quickStripEntries,
                     modifier =
@@ -649,7 +671,7 @@ fun HomeScreen(
                       },
                   )
                 }
-                item(key = "overview_header") {
+                item(key = "overview_header", contentType = "overview_header") {
                   WorkbenchOverviewSection(
                     uiState = uiState,
                     onFilterChange = {
@@ -675,7 +697,7 @@ fun HomeScreen(
                 }
 
                 if (uiState.cards.isEmpty()) {
-                  item(key = "empty_actions") {
+                  item(key = "empty_actions", contentType = "empty_actions") {
                     EmptyQuickActionsSection(
                       hasSearchOrFilter =
                         uiState.searchQuery.isNotBlank() || uiState.activeFilter != CardFilter.ALL,
@@ -691,10 +713,20 @@ fun HomeScreen(
                     )
                   }
                 } else {
-                  items(uiState.cards, key = { it.id }) { card ->
+                  items(
+                    items = uiState.cards,
+                    key = { it.id },
+                    contentType = { it::class.simpleName },
+                  ) { card ->
+                    val cardAudioState =
+                      if (card is WorkbenchCard.VoiceMemo && audioPlaybackState.playingCardId == card.id) {
+                        audioPlaybackState
+                      } else {
+                        idleAudioPlayback
+                      }
                     WorkbenchCardView(
                       card = card,
-                      audioPlaybackState = audioPlaybackState,
+                      audioPlaybackState = cardAudioState,
                       onToggleChecklistItem = onToggleChecklistItem,
                       onAddChecklistItem = onAddChecklistItem,
                       onDeleteChecklistItem = onDeleteChecklistItem,
@@ -707,7 +739,7 @@ fun HomeScreen(
                       onDeleteCard = onDeleteCard,
                     )
                   }
-                  item(key = "footer_quick_actions") {
+                  item(key = "footer_quick_actions", contentType = "footer_quick_actions") {
                     QuickCreateListSection(
                       onCreateChecklist = openChecklistCreator,
                       onCreateNote = openNoteCreator,
@@ -728,6 +760,7 @@ fun HomeScreen(
       backdrop = backdrop,
       isPowerSaveMode = uiState.preferences.liquidGlassPowerSave,
       pinnedToolIds = uiState.preferences.pinnedToolIds,
+      onExpandedChange = { isToolDrawerExpanded = it },
       ballModifier =
         Modifier.onGloballyPositioned { coords ->
           targetBoundsMap[OnboardingStep.TOOL_BALL] = coords.boundsInRoot()
@@ -856,7 +889,11 @@ private fun QuickActionStrip(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     modifier = modifier.fillMaxWidth().testTag("quick_action_strip"),
   ) {
-    items(entries, key = { it.id }) { entry ->
+    items(
+      items = entries,
+      key = { it.id },
+      contentType = { "quick_strip_entry" },
+    ) { entry ->
       val interaction = remember { MutableInteractionSource() }
       val isMc = com.xialia.tactkit.ui.theme.isMcPixelTheme()
       val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
@@ -1246,6 +1283,7 @@ private fun WorkbenchOverviewSection(
         onSelect = { idx -> onFilterChange(CardFilter.entries[idx]) },
       )
     } else {
+      val tabShape = remember { RoundedCornerShape(14.dp) }
       Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
@@ -1253,9 +1291,10 @@ private fun WorkbenchOverviewSection(
         CardFilter.entries.forEach { filter ->
           val selected = uiState.activeFilter == filter
           val filterInteraction = remember { MutableInteractionSource() }
-          val tabScale by
+          val pressedState = filterInteraction.collectIsPressedAsState()
+          val tabScaleState =
             animateFloatAsState(
-              targetValue = if (selected) 1.03f else 1f,
+              targetValue = if (pressedState.value) 0.94f else if (selected) 1.03f else 1f,
               animationSpec =
                 spring(
                   dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -1274,20 +1313,15 @@ private fun WorkbenchOverviewSection(
           Surface(
             onClick = { onFilterChange(filter) },
             interactionSource = filterInteraction,
-            shape = RoundedCornerShape(14.dp),
+            shape = tabShape,
             color = containerBg,
             modifier =
               Modifier.weight(1f)
                 .graphicsLayer {
-                  scaleX = tabScale
-                  scaleY = tabScale
+                  val s = tabScaleState.value
+                  scaleX = s
+                  scaleY = s
                 }
-                .tactilePress(
-                  interactionSource = filterInteraction,
-                  baseCorner = 14.dp,
-                  pressedCorner = 22.dp,
-                  enableHapticOnPress = false,
-                )
                 .testTag("filter_chip_${filter.name}"),
           ) {
             Text(

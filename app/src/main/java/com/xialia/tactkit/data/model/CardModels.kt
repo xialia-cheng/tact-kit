@@ -1,9 +1,11 @@
 package com.xialia.tactkit.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class ChecklistItem(
   val id: String,
@@ -18,6 +20,7 @@ enum class WorkbenchCardType {
   VOICE_MEMO,
 }
 
+@Immutable
 @Entity(tableName = "workbench_cards")
 data class WorkbenchCardEntity(
   @PrimaryKey(autoGenerate = true) val id: Long = 0L,
@@ -36,6 +39,7 @@ data class WorkbenchCardEntity(
   val audioFilePath: String? = null,
 )
 
+@Immutable
 sealed interface WorkbenchCard {
   val id: Long
   val title: String
@@ -43,6 +47,7 @@ sealed interface WorkbenchCard {
   val createdAt: Long
   val updatedAt: Long
 
+  @Immutable
   data class Checklist(
     override val id: Long,
     override val title: String,
@@ -52,6 +57,7 @@ sealed interface WorkbenchCard {
     override val updatedAt: Long,
   ) : WorkbenchCard
 
+  @Immutable
   data class Note(
     override val id: Long,
     override val title: String,
@@ -61,6 +67,7 @@ sealed interface WorkbenchCard {
     override val updatedAt: Long,
   ) : WorkbenchCard
 
+  @Immutable
   data class RecentFile(
     override val id: Long,
     override val title: String,
@@ -75,6 +82,7 @@ sealed interface WorkbenchCard {
     override val updatedAt: Long,
   ) : WorkbenchCard
 
+  @Immutable
   data class VoiceMemo(
     override val id: Long,
     override val title: String,

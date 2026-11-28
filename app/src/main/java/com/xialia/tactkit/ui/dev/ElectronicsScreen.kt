@@ -174,6 +174,14 @@ fun ElectronicsScreen(
                   )
                 }
 
+                val bandColors = remember(slots) { slots.map { Color(it.second.argb) } }
+                val bandPositions =
+                  remember(isFiveBand) {
+                    if (isFiveBand) floatArrayOf(0.14f, 0.28f, 0.42f, 0.58f, 0.80f)
+                    else floatArrayOf(0.16f, 0.34f, 0.52f, 0.78f)
+                  }
+                val bodyCornerRadius = remember { CornerRadius(24f, 24f) }
+
                 // Live resistor preview Canvas
                 Canvas(modifier = Modifier.fillMaxWidth().height(92.dp)) {
                   val leadY = size.height / 2f
@@ -191,19 +199,16 @@ fun ElectronicsScreen(
                     color = if (isFiveBand) Color(0xFF4FC3F7) else Color(0xFFE7CFA6),
                     topLeft = Offset(bodyLeft, bodyTop),
                     size = Size(bodyW, bodyH),
-                    cornerRadius = CornerRadius(24f, 24f),
+                    cornerRadius = bodyCornerRadius,
                   )
-                  val bandColors = slots.map { Color(it.second.argb) }
                   val bandW = bodyW * 0.08f
-                  val positions =
-                    if (isFiveBand) listOf(0.14f, 0.28f, 0.42f, 0.58f, 0.80f)
-                    else listOf(0.16f, 0.34f, 0.52f, 0.78f)
-                  bandColors.forEachIndexed { idx, col ->
-                    val bx = bodyLeft + bodyW * positions[idx]
+                  val bandSize = Size(bandW, bodyH)
+                  for (idx in bandColors.indices) {
+                    val bx = bodyLeft + bodyW * bandPositions[idx]
                     drawRect(
-                      color = col,
+                      color = bandColors[idx],
                       topLeft = Offset(bx, bodyTop),
-                      size = Size(bandW, bodyH),
+                      size = bandSize,
                     )
                   }
                 }
@@ -229,7 +234,11 @@ fun ElectronicsScreen(
                 }
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  items(slots.size) { idx ->
+                  items(
+                    count = slots.size,
+                    key = { idx -> "slot_${slots[idx].first}" },
+                    contentType = { "resistor_slot" },
+                  ) { idx ->
                     val (title, col) = slots[idx]
                     FilterChip(
                       selected = activeSlot == idx,
@@ -253,7 +262,7 @@ fun ElectronicsScreen(
                   }
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  items(palette, key = { it.name }) { bandCol ->
+                  items(palette, key = { it.name }, contentType = { "band_color" }) { bandCol ->
                     Box(
                       contentAlignment = Alignment.Center,
                       modifier =

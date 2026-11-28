@@ -594,7 +594,11 @@ fun SettingsScreen(
               horizontalArrangement = Arrangement.spacedBy(8.dp),
               modifier = Modifier.fillMaxWidth(),
             ) {
-              items(ThemeMode.entries, key = { it.name }) { mode ->
+              items(
+                items = ThemeMode.entries,
+                key = { it.name },
+                contentType = { "theme_mode_chip" },
+              ) { mode ->
                 FilterChip(
                   selected = preferences.themeMode == mode,
                   onClick = {
@@ -711,7 +715,11 @@ fun SettingsScreen(
               horizontalArrangement = Arrangement.spacedBy(8.dp),
               modifier = Modifier.fillMaxWidth(),
             ) {
-              items(AI_PROVIDER_PRESETS, key = { it.id }) { preset ->
+              items(
+                items = AI_PROVIDER_PRESETS,
+                key = { it.id },
+                contentType = { "ai_preset_chip" },
+              ) { preset ->
                 val selected =
                   baseUrl.trim().trimEnd('/').equals(preset.baseUrl.trimEnd('/'), ignoreCase = true) &&
                     modelName.trim() == preset.model
@@ -1146,7 +1154,7 @@ fun SettingsScreen(
                         modifier = Modifier.size(16.dp),
                       )
                       Spacer(modifier = Modifier.width(6.dp))
-                      Text("选择下载线路 (官方 / 镜像)")
+                      Text("应用内下载与安装更新")
                     }
                   }
                 }

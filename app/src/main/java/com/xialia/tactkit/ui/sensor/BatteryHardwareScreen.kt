@@ -24,7 +24,6 @@ import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -121,7 +120,7 @@ fun BatteryHardwareScreen(
           verticalArrangement = Arrangement.spacedBy(12.dp),
           modifier = Modifier.widthIn(max = 600.dp).fillMaxSize(),
         ) {
-          item(key = "battery_power_card") {
+          item(key = "battery_power_card", contentType = "battery_power_card") {
             Surface(
               shape = RoundedCornerShape(22.dp),
               color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -157,8 +156,8 @@ fun BatteryHardwareScreen(
                   )
                 }
 
-                LinearProgressIndicator(
-                  progress = { (snapshot.batteryLevelPct / 100f).coerceIn(0f, 1f) },
+                com.xialia.tactkit.ui.components.TactKitThemedProgressBar(
+                  progress = (snapshot.batteryLevelPct / 100f).coerceIn(0f, 1f),
                   modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -187,7 +186,7 @@ fun BatteryHardwareScreen(
             }
           }
 
-          item(key = "screen_specs_card") {
+          item(key = "screen_specs_card", contentType = "screen_specs_card") {
             Surface(
               shape = RoundedCornerShape(22.dp),
               color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -209,7 +208,7 @@ fun BatteryHardwareScreen(
             }
           }
 
-          item(key = "soc_ram_card") {
+          item(key = "soc_ram_card", contentType = "soc_ram_card") {
             Surface(
               shape = RoundedCornerShape(22.dp),
               color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -228,7 +227,10 @@ fun BatteryHardwareScreen(
                 val ramProgress =
                   if (snapshot.totalRamMb > 0L) (usedRam.toFloat() / snapshot.totalRamMb).coerceIn(0f, 1f)
                   else 0f
-                LinearProgressIndicator(progress = { ramProgress }, modifier = Modifier.fillMaxWidth())
+                com.xialia.tactkit.ui.components.TactKitThemedProgressBar(
+                  progress = ramProgress,
+                  modifier = Modifier.fillMaxWidth(),
+                )
                 HardwareInfoRow("运行内存 (可用/总计)", "${snapshot.availRamMb} MB / ${snapshot.totalRamMb} MB")
                 HardwareInfoRow("CPU 核心数", "${snapshot.cpuCores} 核")
                 HardwareInfoRow("指令集架构", snapshot.abiLabel)

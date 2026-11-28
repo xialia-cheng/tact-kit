@@ -58,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,7 @@ import com.xialia.tactkit.ui.components.tactileShrinkVertically
 import com.xialia.tactkit.ui.quicklook.QuickLookActivity
 import com.xialia.tactkit.util.AppHaptics
 
+@Immutable
 private data class HelpTipItem(
   val title: String,
   val steps: String,
@@ -89,6 +91,7 @@ private data class HelpTipItem(
   val targetToolId: String? = null,
 )
 
+@Immutable
 private data class HelpCategory(
   val id: String,
   val title: String,
@@ -563,7 +566,11 @@ fun HelpTipsScreen(
           verticalArrangement = Arrangement.spacedBy(12.dp),
           modifier = Modifier.widthIn(max = 600.dp).fillMaxSize(),
         ) {
-          items(filteredCategories, key = { it.id }) { category ->
+          items(
+            items = filteredCategories,
+            key = { it.id },
+            contentType = { "help_category" },
+          ) { category ->
             val expanded =
               if (normalizedQuery.isNotEmpty()) true
               else (expandedCategories[category.id] ?: false)

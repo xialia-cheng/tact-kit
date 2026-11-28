@@ -2,25 +2,27 @@ package com.xialia.tactkit.ui.theme
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,22 +33,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xialia.tactkit.data.datastore.AppThemeStyle
-
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
+import com.xialia.tactkit.ui.components.TactKitThemedProgressBar
 
 enum class OreUiTone {
   SLATE_LIGHT,
@@ -56,7 +50,7 @@ enum class OreUiTone {
 }
 
 /**
- * Standard Minecraft Bedrock OreUI 3D bevel:
+ * Standard Minecraft Bedrock OreUI 3D bevel (draw-phase only lambda support to avoid recomposition):
  * - Outer 1.dp thin outline (#1E1E1F or #141518 in dark mode)
  * - Inner top 1.5.dp highlight
  * - Inner bottom 3.dp thick bevel (narrows to 1.dp when pressed; no thick side shadows)
@@ -65,9 +59,10 @@ fun Modifier.oreUiBevel(
   outerColor: Color = Color(0xFF1E1E1F),
   topHighlight: Color = Color.White,
   bottomShadow: Color = Color(0xFF8E9095),
-  pressed: Boolean = false,
+  isPressed: () -> Boolean,
 ): Modifier =
   this.drawBehind {
+    val pressed = isPressed()
     val outerPx = 1.dp.toPx()
     val topPx = 1.5.dp.toPx()
     val bottomPx = (if (pressed) 1.dp else 3.dp).toPx()
@@ -78,7 +73,6 @@ fun Modifier.oreUiBevel(
     val inset = if (outerColor.alpha > 0f) outerPx else 0f
     val innerW = (w - inset * 2f).coerceAtLeast(0f)
 
-    // Top inner highlight (1.5.dp)
     if (topHighlight.alpha > 0f) {
       drawRect(
         color = topHighlight,
@@ -87,7 +81,6 @@ fun Modifier.oreUiBevel(
       )
     }
 
-    // Bottom inner thick bevel (3.dp -> 1.dp when pressed)
     if (bottomShadow.alpha > 0f) {
       drawRect(
         color = bottomShadow,
@@ -96,7 +89,6 @@ fun Modifier.oreUiBevel(
       )
     }
 
-    // Outer 1.dp thin outline
     if (outerColor.alpha > 0f) {
       drawRect(outerColor, Offset(0f, 0f), Size(w, outerPx))
       drawRect(outerColor, Offset(0f, h - outerPx), Size(w, outerPx))
@@ -105,35 +97,51 @@ fun Modifier.oreUiBevel(
     }
   }
 
+fun Modifier.oreUiBevel(
+  outerColor: Color = Color(0xFF1E1E1F),
+  topHighlight: Color = Color.White,
+  bottomShadow: Color = Color(0xFF8E9095),
+  pressed: Boolean = false,
+): Modifier =
+  oreUiBevel(
+    outerColor = outerColor,
+    topHighlight = topHighlight,
+    bottomShadow = bottomShadow,
+    isPressed = { pressed },
+  )
+
 fun Modifier.mcPixelBox(
   pressed: Boolean = false,
   isDark: Boolean = false,
+  isPressed: (() -> Boolean)? = null,
 ): Modifier =
   oreUiBevel(
     outerColor = if (isDark) Color(0xFF141518) else Color(0xFF1E1E1F),
     topHighlight = if (isDark) Color(0xFF3E4148) else Color.White,
     bottomShadow = if (isDark) Color(0xFF141518) else Color(0xFF8E9095),
-    pressed = pressed,
+    isPressed = isPressed ?: { pressed },
   )
 
 fun Modifier.mcGrassButtonBox(
   pressed: Boolean = false,
+  isPressed: (() -> Boolean)? = null,
 ): Modifier =
   oreUiBevel(
     outerColor = Color(0xFF1E1E1F),
     topHighlight = Color(0xFF63C548),
     bottomShadow = Color(0xFF255917),
-    pressed = pressed,
+    isPressed = isPressed ?: { pressed },
   )
 
 fun Modifier.mcPurpleButtonBox(
   pressed: Boolean = false,
+  isPressed: (() -> Boolean)? = null,
 ): Modifier =
   oreUiBevel(
     outerColor = Color(0xFF1E1E1F),
     topHighlight = Color(0xFF9F6BF5),
     bottomShadow = Color(0xFF4D279B),
-    pressed = pressed,
+    isPressed = isPressed ?: { pressed },
   )
 
 fun Modifier.mcInventorySlotBox(
@@ -158,7 +166,7 @@ fun OreUiSurface(
   interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
   content: @Composable BoxScope.() -> Unit,
 ) {
-  val pressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
   val (bg, fg, outer, hi, lo) = oreUiPalette(tone)
   val clickMod =
     if (onClick != null) {
@@ -175,16 +183,14 @@ fun OreUiSurface(
       modifier =
         modifier
           .graphicsLayer {
-            if (onClick != null && pressed) {
-              translationY = 2.dp.toPx()
-            }
+            translationY = if (onClick != null && pressedState.value) 2.dp.toPx() else 0f
           }
           .background(bg, RectangleShape)
           .oreUiBevel(
             outerColor = outer,
             topHighlight = hi,
             bottomShadow = lo,
-            pressed = onClick != null && pressed,
+            isPressed = { onClick != null && pressedState.value },
           )
           .then(clickMod),
       content = content,
@@ -201,7 +207,7 @@ fun OreUiButton(
   interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
   content: @Composable BoxScope.() -> Unit,
 ) {
-  val pressed by interactionSource.collectIsPressedAsState()
+  val pressedState = interactionSource.collectIsPressedAsState()
   val (baseBg, baseFg, outer, hi, lo) = oreUiPalette(tone)
   val bg = if (enabled) baseBg else Color(0xFF8E9095)
   val fg = if (enabled) baseFg else Color(0xFFE6E8EB)
@@ -211,16 +217,14 @@ fun OreUiButton(
       modifier =
         modifier
           .graphicsLayer {
-            if (enabled && pressed) {
-              translationY = 2.dp.toPx()
-            }
+            translationY = if (enabled && pressedState.value) 2.dp.toPx() else 0f
           }
           .background(bg, RectangleShape)
           .oreUiBevel(
             outerColor = outer,
             topHighlight = if (enabled) hi else Color(0xFFB0B2B7),
             bottomShadow = if (enabled) lo else Color(0xFF6A6C70),
-            pressed = enabled && pressed,
+            isPressed = { enabled && pressedState.value },
           )
           .clickable(
             interactionSource = interactionSource,
@@ -279,7 +283,7 @@ private fun oreUiPalette(tone: OreUiTone): OreUiPalette =
 
 /**
  * 7050.jpg style connected dark slate tab bar (#313236 / #48494E with 1.dp #1E1E1F dividers
- * and smooth spring-sliding centered 2.dp pure white bottom indicator bar).
+ * and smooth GPU graphicsLayer-translated 2.dp pure white bottom indicator bar).
  */
 @Composable
 fun OreUiSegmentedTabRow(
@@ -287,9 +291,10 @@ fun OreUiSegmentedTabRow(
   onSelect: (Int) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val density = LocalDensity.current
   val selectedIndex = items.indexOfFirst { it.second }.coerceAtLeast(0)
   val itemCount = items.size.coerceAtLeast(1)
-  androidx.compose.foundation.layout.BoxWithConstraints(
+  BoxWithConstraints(
     modifier =
       modifier
         .fillMaxWidth()
@@ -300,15 +305,16 @@ fun OreUiSegmentedTabRow(
     val tabWidth = maxWidth / itemCount
     val indicatorWidth = tabWidth * 0.56f
     val targetIndicatorX = tabWidth * selectedIndex + (tabWidth - indicatorWidth) / 2f
-    val animatedIndicatorX by
-      androidx.compose.animation.core.animateDpAsState(
-        targetValue = targetIndicatorX,
+    val targetIndicatorXPx = with(density) { targetIndicatorX.coerceAtLeast(0.dp).toPx() }
+    val animatedIndicatorXPxState =
+      androidx.compose.animation.core.animateFloatAsState(
+        targetValue = targetIndicatorXPx,
         animationSpec =
           androidx.compose.animation.core.spring(
             dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
             stiffness = androidx.compose.animation.core.Spring.StiffnessMedium,
           ),
-        label = "oreui_tab_indicator_x",
+        label = "oreui_tab_indicator_x_px",
       )
 
     Row(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
@@ -321,13 +327,13 @@ fun OreUiSegmentedTabRow(
                 .background(Color(0xFF1E1E1F), RectangleShape),
           )
         }
-        val bgColor by
+        val bgColorState =
           androidx.compose.animation.animateColorAsState(
             targetValue = if (selected) Color(0xFF48494E) else Color(0xFF313236),
             animationSpec = androidx.compose.animation.core.tween(180),
             label = "oreui_tab_bg",
           )
-        val textScale by
+        val textScaleState =
           androidx.compose.animation.core.animateFloatAsState(
             targetValue = if (selected) 1.04f else 1f,
             animationSpec =
@@ -342,7 +348,7 @@ fun OreUiSegmentedTabRow(
           modifier =
             Modifier.weight(1f)
               .fillMaxHeight()
-              .background(bgColor, RectangleShape)
+              .drawBehind { drawRect(bgColorState.value) }
               .clickable { onSelect(index) },
         ) {
           Text(
@@ -353,7 +359,12 @@ fun OreUiSegmentedTabRow(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.graphicsLayer { scaleX = textScale; scaleY = textScale },
+            modifier =
+              Modifier.graphicsLayer {
+                val s = textScaleState.value
+                scaleX = s
+                scaleY = s
+              },
           )
         }
       }
@@ -362,7 +373,7 @@ fun OreUiSegmentedTabRow(
     Box(
       modifier =
         Modifier.align(Alignment.BottomStart)
-          .padding(start = animatedIndicatorX.coerceAtLeast(0.dp))
+          .graphicsLayer { translationX = animatedIndicatorXPxState.value }
           .width(indicatorWidth)
           .height(2.dp)
           .background(Color.White, RectangleShape),
@@ -374,32 +385,9 @@ fun OreUiSegmentedTabRow(
 fun McXpBar(
   progress: Float,
   modifier: Modifier = Modifier,
-  segments: Int = 12,
+  @Suppress("UNUSED_PARAMETER") segments: Int = 10,
 ) {
-  val clamped = progress.coerceIn(0f, 1f)
-  val filledSegments = (clamped * segments).toInt().coerceIn(0, segments)
-  Row(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .height(9.dp)
-        .background(Color(0xFF1E1E1F), RectangleShape)
-        .padding(1.dp),
-  ) {
-    for (i in 0 until segments) {
-      val filled = i < filledSegments || (clamped > 0f && i == 0 && filledSegments == 0)
-      Box(
-        modifier =
-          Modifier.weight(1f)
-            .height(7.dp)
-            .padding(horizontal = 0.5.dp)
-            .background(
-              if (filled) Color(0xFF63C548) else Color(0xFF253022),
-              RectangleShape,
-            ),
-      )
-    }
-  }
+  TactKitThemedProgressBar(progress = progress, modifier = modifier)
 }
 
 @Composable
@@ -436,7 +424,7 @@ fun TactKitCard(
   val isMc = style == AppThemeStyle.MINECRAFT_PIXEL
   val isDark = isSystemInDarkTheme()
   if (isMc) {
-    val pressed by interactionSource.collectIsPressedAsState()
+    val pressedState = interactionSource.collectIsPressedAsState()
     val clickModifier =
       if (onClick != null) {
         Modifier.clickable(
@@ -453,18 +441,19 @@ fun TactKitCard(
           modifier
             .clip(RectangleShape)
             .background(containerColor, RectangleShape)
-            .mcPixelBox(pressed = pressed && onClick != null, isDark = isDark)
+            .mcPixelBox(isDark = isDark, isPressed = { pressedState.value && onClick != null })
             .then(clickModifier),
         content = content,
       )
     }
   } else {
     val resolvedBorder = border ?: themeCardBorder(style, isDark, MaterialTheme.colorScheme.outlineVariant)
+    val cardShape = remember(corner) { RoundedCornerShape(corner) }
     if (onClick != null) {
       Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(corner),
+        shape = cardShape,
         color = containerColor,
         contentColor = contentColor,
         border = resolvedBorder,
@@ -476,7 +465,7 @@ fun TactKitCard(
       }
     } else {
       Surface(
-        shape = RoundedCornerShape(corner),
+        shape = cardShape,
         color = containerColor,
         contentColor = contentColor,
         border = resolvedBorder,
@@ -504,7 +493,7 @@ fun TactKitChip(
   val isMc = isMcPixelTheme()
   val isDark = isSystemInDarkTheme()
   if (isMc) {
-    val pressed by interactionSource.collectIsPressedAsState()
+    val pressedState = interactionSource.collectIsPressedAsState()
     val clickModifier =
       if (onClick != null) {
         Modifier.clickable(
@@ -521,18 +510,19 @@ fun TactKitChip(
           modifier
             .clip(RectangleShape)
             .background(containerColor, RectangleShape)
-            .mcPixelBox(pressed = pressed && onClick != null, isDark = isDark)
+            .mcPixelBox(isDark = isDark, isPressed = { pressedState.value && onClick != null })
             .then(clickModifier),
         contentAlignment = Alignment.Center,
         content = content,
       )
     }
   } else {
+    val chipShape = remember(corner) { RoundedCornerShape(corner) }
     if (onClick != null) {
       Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(corner),
+        shape = chipShape,
         color = containerColor,
         contentColor = contentColor,
         border = border,
@@ -544,7 +534,7 @@ fun TactKitChip(
       }
     } else {
       Surface(
-        shape = RoundedCornerShape(corner),
+        shape = chipShape,
         color = containerColor,
         contentColor = contentColor,
         border = border,
@@ -577,14 +567,14 @@ fun TactKitThumbnailBox(
       content = content,
     )
   } else {
+    val boxShape = remember(corner) { RoundedCornerShape(corner) }
     Box(
       modifier =
         modifier
-          .clip(RoundedCornerShape(corner))
-          .background(containerColor, RoundedCornerShape(corner)),
+          .clip(boxShape)
+          .background(containerColor, boxShape),
       contentAlignment = Alignment.Center,
       content = content,
     )
   }
 }
-

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import android.provider.DocumentsContract
+import androidx.compose.runtime.Immutable
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
@@ -27,6 +28,7 @@ enum class SizeFilterMode(val label: String, val minBytes: Long) {
   OVER_50_MB(">50 MB", 50L * 1024L * 1024L),
 }
 
+@Immutable
 data class ManagedFileEntry(
   val id: String,
   val name: String,
@@ -46,12 +48,14 @@ data class ManagedFileEntry(
   val isSafBacked: Boolean get() = safUriString != null && absolutePath == null
 }
 
+@Immutable
 data class StorageOverview(
   val totalBytes: Long,
   val usedBytes: Long,
   val availableBytes: Long,
 )
 
+@Immutable
 data class MessengerDirHint(
   val label: String,
   val relativePath: String,
@@ -59,6 +63,7 @@ data class MessengerDirHint(
   val fileCountEstimate: Int,
 )
 
+@Immutable
 data class DirectoryListing(
   val currentDir: File,
   val currentRelativePath: String,
@@ -66,12 +71,14 @@ data class DirectoryListing(
   val collapsedNoiseDirs: List<ManagedFileEntry>,
 )
 
+@Immutable
 data class SpaceScanResult(
   val largeFilesOver50Mb: List<ManagedFileEntry>,
   val emptyDirectories: List<ManagedFileEntry>,
   val scannedFileCount: Int,
 )
 
+@Immutable
 data class BatchRenameRule(
   val singleNewName: String? = null,
   val prefix: String = "",

@@ -14,6 +14,13 @@ class TactKitApplication : Application() {
     PDFBoxResourceLoader.init(applicationContext)
   }
 
+  override fun onTrimMemory(level: Int) {
+    super.onTrimMemory(level)
+    if (level >= TRIM_MEMORY_BACKGROUND) {
+      com.xialia.tactkit.ui.components.ThumbnailCache.clear()
+    }
+  }
+
   companion object {
     private const val CRASH_FILE_NAME = "last_crash.txt"
 

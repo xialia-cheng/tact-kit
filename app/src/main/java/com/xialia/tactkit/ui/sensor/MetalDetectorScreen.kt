@@ -223,6 +223,7 @@ fun MetalDetectorScreen(
               val primaryColor = MaterialTheme.colorScheme.primary
               val secondaryColor = MaterialTheme.colorScheme.secondary
               val gridColor = MaterialTheme.colorScheme.outlineVariant
+              val waveStroke = remember { Stroke(width = 6f, cap = StrokeCap.Round) }
               Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
                 drawLine(
                   color = gridColor.copy(alpha = 0.5f),
@@ -233,7 +234,7 @@ fun MetalDetectorScreen(
                 val count = ringCountState.intValue
                 val head = ringHeadState.intValue
                 if (count >= 2) {
-                  wavePath.reset()
+                  wavePath.rewind()
                   val minV = (baselineUt - 60f).coerceAtLeast(0f)
                   val maxV = (baselineUt + 120f).coerceAtLeast(minV + 60f)
                   val stepX = size.width / (count - 1).coerceAtLeast(1)
@@ -249,7 +250,7 @@ fun MetalDetectorScreen(
                   drawPath(
                     path = wavePath,
                     color = if (triggered) primaryColor else secondaryColor,
-                    style = Stroke(width = 6f, cap = StrokeCap.Round),
+                    style = waveStroke,
                   )
                 }
               }

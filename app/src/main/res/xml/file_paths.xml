@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <cache-path name="updates" path="updates/" />
     <cache-path name="lan_uploads" path="lan_share_uploads/" />
     <cache-path name="shared_cache" path="." />
     <files-path name="internal_files" path="." />

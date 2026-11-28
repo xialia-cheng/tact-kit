@@ -534,32 +534,32 @@ fun FileManagerWorkspace(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth().testTag("batch_action_bar"),
           ) {
-            item {
+            item(key = "batch_copy", contentType = "batch_action") {
               BatchBarAction("复制", Icons.Rounded.ContentCopy) {
                 transferTargets = false to selectedEntries
               }
             }
-            item {
+            item(key = "batch_move", contentType = "batch_action") {
               BatchBarAction("移动", Icons.AutoMirrored.Rounded.DriveFileMove) {
                 transferTargets = true to selectedEntries
               }
             }
-            item {
+            item(key = "batch_rename", contentType = "batch_action") {
               BatchBarAction("重命名", Icons.Rounded.DriveFileRenameOutline) {
                 renameTargets = selectedEntries
               }
             }
-            item {
+            item(key = "batch_zip", contentType = "batch_action") {
               BatchBarAction("打包 ZIP", Icons.Rounded.FolderZip) {
                 packZipTargets = selectedEntries
               }
             }
-            item {
+            item(key = "batch_share", contentType = "batch_action") {
               BatchBarAction("分享", Icons.Rounded.Share) {
                 shareEntriesSystem(selectedEntries.filter { !it.isDirectory })
               }
             }
-            item {
+            item(key = "batch_delete", contentType = "batch_action") {
               BatchBarAction("删除", Icons.Rounded.DeleteOutline) {
                 deleteTargets = selectedEntries
               }
@@ -634,7 +634,11 @@ fun FileManagerWorkspace(
           verticalArrangement = Arrangement.spacedBy(8.dp),
           modifier = Modifier.weight(1f).fillMaxWidth(),
         ) {
-          items(searchResults, key = { "search_${it.id}" }) { entry ->
+          items(
+            items = searchResults,
+            key = { "search_${it.id}" },
+            contentType = { if (it.isDirectory) "dir" else "file" },
+          ) { entry ->
             val canPreview = !isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES && onPreviewImage != null
             ManagedFileRow(
               entry = entry,
@@ -670,7 +674,11 @@ fun FileManagerWorkspace(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
           ) {
-            items(visibleModes, key = { it.name }) { m ->
+            items(
+              items = visibleModes,
+              key = { it.name },
+              contentType = { "mode_chip" },
+            ) { m ->
               val icon =
                 when (m) {
                   FileManagerMode.RECENT -> Icons.Rounded.History

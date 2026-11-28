@@ -39,11 +39,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import com.xialia.tactkit.ui.components.TactKitThemedProgressBar
 import com.xialia.tactkit.ui.components.TactileSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -317,7 +317,7 @@ fun DailyToolsScreen(
                   }
 
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf(1, 2, 5, 10, 50)) { step ->
+                    items(listOf(1, 2, 5, 10, 50), key = { "step_$it" }, contentType = { "step_chip" }) { step ->
                       FilterChip(
                         selected = preferences.counterStep == step,
                         onClick = {
@@ -353,7 +353,7 @@ fun DailyToolsScreen(
           }
 
           DailyToolTab.UNIT_AA -> {
-            item(key = "unit_converter_card") {
+            item(key = "unit_converter_card", contentType = "unit_converter") {
               val units = remember(unitCat) { DailyUtilityEngine.unitsFor(unitCat) }
               val inputVal = unitValueText.toDoubleOrNull()
               val converted =
@@ -380,7 +380,7 @@ fun DailyToolsScreen(
                   }
 
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(UnitCategory.entries, key = { it.name }) { cat ->
+                    items(UnitCategory.entries, key = { it.name }, contentType = { "unit_cat" }) { cat ->
                       FilterChip(
                         selected = unitCat == cat,
                         onClick = { unitCat = cat },
@@ -401,7 +401,7 @@ fun DailyToolsScreen(
 
                   Text("从：", style = MaterialTheme.typography.labelMedium)
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(units, key = { "from_${it.id}" }) { u ->
+                    items(units, key = { "from_${it.id}" }, contentType = { "from_unit" }) { u ->
                       FilterChip(
                         selected = fromUnitId == u.id,
                         onClick = { fromUnitId = u.id },
@@ -427,7 +427,7 @@ fun DailyToolsScreen(
                     }
                   }
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(units, key = { "to_${it.id}" }) { u ->
+                    items(units, key = { "to_${it.id}" }, contentType = { "to_unit" }) { u ->
                       FilterChip(
                         selected = toUnitId == u.id,
                         onClick = { toUnitId = u.id },
@@ -535,7 +535,7 @@ fun DailyToolsScreen(
           }
 
           DailyToolTab.POMODORO -> {
-            item(key = "pomodoro_card") {
+            item(key = "pomodoro_card", contentType = "pomodoro_card") {
               val mm = remainingSeconds / 60
               val ss = remainingSeconds % 60
               val progress =
@@ -582,9 +582,9 @@ fun DailyToolsScreen(
                     modifier = Modifier.testTag("pomodoro_clock_text"),
                   )
 
-                  LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
+                  TactKitThemedProgressBar(
+                    progress = progress.coerceIn(0f, 1f),
+                    modifier = Modifier.fillMaxWidth(),
                   )
 
                   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -636,7 +636,7 @@ fun DailyToolsScreen(
                   HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf(15, 25, 45, 60)) { min ->
+                    items(listOf(15, 25, 45, 60), key = { "focus_$it" }, contentType = { "focus_chip" }) { min ->
                       FilterChip(
                         selected = isFocusPhase && focusMinutes == min,
                         onClick = {
@@ -649,7 +649,7 @@ fun DailyToolsScreen(
                         label = { Text("专注 ${min}m", maxLines = 1, softWrap = false) },
                       )
                     }
-                    items(listOf(5, 10)) { brk ->
+                    items(listOf(5, 10), key = { "brk_$it" }, contentType = { "break_chip" }) { brk ->
                       FilterChip(
                         selected = !isFocusPhase && breakMinutes == brk,
                         onClick = {

@@ -150,7 +150,11 @@ fun DnsSslScreen(
                 }
 
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                  items(listOf("github.com", "google.com", "deepseek.com", "cloudflare.com")) { preset ->
+                  items(
+                    items = listOf("github.com", "google.com", "deepseek.com", "cloudflare.com"),
+                    key = { it },
+                    contentType = { "dns_preset_chip" },
+                  ) { preset ->
                     FilterChip(
                       selected = domainInput.equals(preset, ignoreCase = true),
                       onClick = {

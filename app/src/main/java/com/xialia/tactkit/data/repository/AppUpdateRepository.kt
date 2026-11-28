@@ -1,21 +1,30 @@
 package com.xialia.tactkit.data.repository
 
+import android.content.Context
+import android.os.SystemClock
+import androidx.compose.runtime.Immutable
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+@Immutable
 data class ReleaseInfo(
   val tagName: String,
   val title: String,
@@ -34,6 +43,34 @@ data class ReleaseInfo(
     get() = "https://gh-proxy.com/$officialDownloadUrl"
 }
 
+@Immutable
+sealed interface ApkDownloadState {
+  data object Idle : ApkDownloadState
+
+  @Immutable
+  data class Downloading(
+    val sourceLabel: String,
+    val url: String,
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val progress: Float,
+    val speedBytesPerSec: Long,
+  ) : ApkDownloadState
+
+  @Immutable
+  data class Completed(
+    val apkFile: File,
+    val totalBytes: Long,
+  ) : ApkDownloadState
+
+  @Immutable
+  data class Failed(
+    val sourceLabel: String,
+    val url: String,
+    val message: String,
+  ) : ApkDownloadState
+}
+
 class AppUpdateRepository(
   private val client: OkHttpClient =
     OkHttpClient.Builder()
@@ -44,6 +81,16 @@ class AppUpdateRepository(
 ) {
 
   private val json = Json { ignoreUnknownKeys = true }
+
+  private val downloadClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+      .connectTimeout(15, TimeUnit.SECONDS)
+      .readTimeout(30, TimeUnit.SECONDS)
+      .writeTimeout(15, TimeUnit.SECONDS)
+      .followRedirects(true)
+      .followSslRedirects(true)
+      .build()
+  }
 
   /**
    * Dual-path concurrent racing: requests GitHub official API and gh-proxy.com mirror simultaneously.
@@ -81,6 +128,155 @@ class AppUpdateRepository(
         } finally {
           channel.close()
         }
+      }
+    }
+
+  /**
+   * Streams APK update directly into `cacheDir/updates/TactKit-update.apk` using OkHttp on Dispatchers.IO.
+   * Throttles UI progress updates to ~100ms intervals and removes partial files on cancel or error.
+   */
+  suspend fun downloadApk(
+    context: Context,
+    url: String,
+    sourceLabel: String,
+    onProgress: (ApkDownloadState.Downloading) -> Unit,
+  ): Result<File> =
+    withContext(Dispatchers.IO) {
+      val updatesDir = File(context.cacheDir, UPDATES_DIR_NAME).apply { mkdirs() }
+      val tempFile = File(updatesDir, UPDATE_APK_PART_NAME)
+      val finalFile = File(updatesDir, UPDATE_APK_NAME)
+      runCatching { tempFile.delete() }
+
+      val request =
+        Request.Builder()
+          .url(url)
+          .header("User-Agent", "TactKit-Android")
+          .get()
+          .build()
+
+      val call = downloadClient.newCall(request)
+      try {
+        val file =
+          suspendCancellableCoroutine<File> { cont ->
+            cont.invokeOnCancellation {
+              runCatching { call.cancel() }
+              runCatching { tempFile.delete() }
+            }
+
+            try {
+              call.execute().use { response ->
+                if (!response.isSuccessful) {
+                  error("下载失败 (HTTP ${response.code})")
+                }
+                val body = response.body ?: error("响应体为空")
+                val mediaType = body.contentType()
+                if (mediaType != null &&
+                  mediaType.type.equals("text", ignoreCase = true) &&
+                  mediaType.subtype.equals("html", ignoreCase = true)
+                ) {
+                  error("当前线路返回网页而非 APK 安装包，请切换其他线路重试")
+                }
+
+                val totalBytes = body.contentLength()
+                val buffer = ByteArray(16 * 1024)
+                var downloadedBytes = 0L
+                val startTimeMs = SystemClock.elapsedRealtime()
+                var lastEmitTimeMs = startTimeMs - PROGRESS_EMIT_INTERVAL_MS
+                var lastSpeedCalcTimeMs = startTimeMs
+                var lastSpeedBytes = 0L
+                var currentSpeed = 0L
+
+                FileOutputStream(tempFile).use { out ->
+                  body.byteStream().use { input ->
+                    while (true) {
+                      cont.context.ensureActive()
+                      val read = input.read(buffer)
+                      if (read == -1) break
+                      out.write(buffer, 0, read)
+                      downloadedBytes += read
+
+                      val now = SystemClock.elapsedRealtime()
+                      if (now - lastEmitTimeMs >= PROGRESS_EMIT_INTERVAL_MS) {
+                        val dtMs = (now - lastSpeedCalcTimeMs).coerceAtLeast(1L)
+                        val deltaBytes = (downloadedBytes - lastSpeedBytes).coerceAtLeast(0L)
+                        val instantSpeed = (deltaBytes * 1000L) / dtMs
+                        currentSpeed =
+                          if (currentSpeed == 0L) instantSpeed
+                          else (currentSpeed * 3L + instantSpeed * 7L) / 10L
+                        lastSpeedCalcTimeMs = now
+                        lastSpeedBytes = downloadedBytes
+                        lastEmitTimeMs = now
+
+                        val pct =
+                          if (totalBytes > 0L) {
+                            (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                          } else {
+                            0f
+                          }
+                        onProgress(
+                          ApkDownloadState.Downloading(
+                            sourceLabel = sourceLabel,
+                            url = url,
+                            downloadedBytes = downloadedBytes,
+                            totalBytes = totalBytes,
+                            progress = pct,
+                            speedBytesPerSec = currentSpeed,
+                          )
+                        )
+                      }
+                    }
+                    out.flush()
+                  }
+                }
+
+                if (downloadedBytes <= 0L) {
+                  error("下载内容为空")
+                }
+                if (totalBytes > 0L && downloadedBytes < totalBytes) {
+                  error("文件下载不完整 ($downloadedBytes / $totalBytes)")
+                }
+
+                onProgress(
+                  ApkDownloadState.Downloading(
+                    sourceLabel = sourceLabel,
+                    url = url,
+                    downloadedBytes = downloadedBytes,
+                    totalBytes = if (totalBytes > 0L) totalBytes else downloadedBytes,
+                    progress = 1f,
+                    speedBytesPerSec = currentSpeed,
+                  )
+                )
+
+                if (finalFile.exists()) {
+                  finalFile.delete()
+                }
+                if (!tempFile.renameTo(finalFile)) {
+                  tempFile.copyTo(finalFile, overwrite = true)
+                  tempFile.delete()
+                }
+
+                if (cont.isActive) {
+                  cont.resume(finalFile)
+                }
+              }
+            } catch (t: Throwable) {
+              runCatching { tempFile.delete() }
+              if (cont.isActive) {
+                if (t is CancellationException) {
+                  cont.cancel(t)
+                } else {
+                  cont.resumeWithException(t)
+                }
+              }
+            }
+          }
+        Result.success(file)
+      } catch (e: CancellationException) {
+        runCatching { tempFile.delete() }
+        throw e
+      } catch (e: Throwable) {
+        runCatching { tempFile.delete() }
+        Result.failure(e)
       }
     }
 
@@ -146,6 +342,17 @@ class AppUpdateRepository(
       "https://api.github.com/repos/xialia-cheng/tact-kit/releases/latest"
     const val MIRROR_LATEST_RELEASE_URL =
       "https://gh-proxy.com/https://api.github.com/repos/xialia-cheng/tact-kit/releases/latest"
+
+    const val UPDATES_DIR_NAME = "updates"
+    const val UPDATE_APK_NAME = "TactKit-update.apk"
+    const val UPDATE_APK_PART_NAME = "TactKit-update.apk.part"
+    private const val PROGRESS_EMIT_INTERVAL_MS = 100L
+
+    fun cleanupPartialDownloads(context: Context) {
+      val updatesDir = File(context.cacheDir, UPDATES_DIR_NAME)
+      if (!updatesDir.exists()) return
+      runCatching { File(updatesDir, UPDATE_APK_PART_NAME).delete() }
+    }
 
     fun isNewerVersion(currentVersion: String, latestTag: String): Boolean {
       val currentParts = parseNumericParts(currentVersion)

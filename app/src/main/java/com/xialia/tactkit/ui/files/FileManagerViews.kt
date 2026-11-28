@@ -51,7 +51,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -80,6 +79,7 @@ import com.xialia.tactkit.engine.StorageOverview
 import com.xialia.tactkit.ui.components.PetalIconBadge
 import com.xialia.tactkit.ui.components.TactKitBusyStatusBar
 import com.xialia.tactkit.ui.components.TactKitMorphLoadingIndicator
+import com.xialia.tactkit.ui.components.TactKitThemedProgressBar
 import com.xialia.tactkit.ui.components.TactileActionButton
 import com.xialia.tactkit.ui.theme.TactKitCard
 import com.xialia.tactkit.ui.theme.TactKitChip
@@ -151,6 +151,10 @@ fun StorageOverviewAndQuickLinks(
   val isMinecraft =
     com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current ==
       com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
+  val filteredMessengerDirs =
+    remember(messengerDirs, pinnedDirs) {
+      messengerDirs.filter { hint -> pinnedDirs.none { it.equals(hint.relativePath, ignoreCase = true) } }
+    }
   Column(
     verticalArrangement = Arrangement.spacedBy(8.dp),
     modifier = Modifier.fillMaxWidth(),
@@ -185,14 +189,10 @@ fun StorageOverviewAndQuickLinks(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
-          if (isMinecraft) {
-            com.xialia.tactkit.ui.theme.McXpBar(progress = progress)
-          } else {
-            LinearProgressIndicator(
-              progress = { progress },
-              modifier = Modifier.fillMaxWidth().height(6.dp).clip(ContinuousCapsule()),
-            )
-          }
+          TactKitThemedProgressBar(
+            progress = progress,
+            modifier = Modifier.fillMaxWidth(),
+          )
         }
       }
     }
@@ -201,7 +201,7 @@ fun StorageOverviewAndQuickLinks(
       horizontalArrangement = Arrangement.spacedBy(6.dp),
       modifier = Modifier.fillMaxWidth(),
     ) {
-      items(pinnedDirs, key = { "pin_$it" }) { relPath ->
+      items(pinnedDirs, key = { "pin_$it" }, contentType = { "pinned_dir_chip" }) { relPath ->
         val label = relPath.substringAfterLast('/').ifBlank { relPath }
         TactKitChip(
           onClick = { onOpenPinnedPath(relPath) },
@@ -230,8 +230,9 @@ fun StorageOverviewAndQuickLinks(
       }
 
       items(
-        messengerDirs.filter { hint -> pinnedDirs.none { it.equals(hint.relativePath, ignoreCase = true) } },
+        filteredMessengerDirs,
         key = { "msg_${it.relativePath}" },
+        contentType = { "messenger_dir_chip" },
       ) { hint ->
         TactKitChip(
           onClick = { onOpenPinnedPath(hint.relativePath) },
@@ -260,7 +261,7 @@ fun StorageOverviewAndQuickLinks(
         }
       }
 
-      item(key = "link_saf_btn") {
+      item(key = "link_saf_btn", contentType = "link_saf_btn") {
         TactKitChip(
           onClick = onLinkMessengerSaf,
           corner = 999.dp,
@@ -319,6 +320,8 @@ fun RecentFilesTabContent(
       if (selectedCategory == null) allRecentFiles
       else allRecentFiles.filter { it.category == selectedCategory }
     }
+  val filterCategories =
+    remember { FileCategory.entries.filter { it != FileCategory.OTHER } }
 
   Column(modifier = Modifier.fillMaxSize()) {
     LazyRow(
@@ -326,14 +329,14 @@ fun RecentFilesTabContent(
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
     ) {
-      item(key = "cat_all") {
+      item(key = "cat_all", contentType = "cat_chip") {
         FilterChip(
           selected = selectedCategory == null,
           onClick = { onSelectCategory(null) },
           label = { Text("全部 (${allRecentFiles.size})", maxLines = 1, softWrap = false) },
         )
       }
-      items(FileCategory.entries.filter { it != FileCategory.OTHER }, key = { it.name }) { cat ->
+      items(filterCategories, key = { it.name }, contentType = { "cat_chip" }) { cat ->
         val count = countsByCategory[cat] ?: 0
         FilterChip(
           selected = selectedCategory == cat,
@@ -377,9 +380,9 @@ fun RecentFilesTabContent(
         modifier = Modifier.fillMaxSize(),
       ) {
         if (headerContent != null) {
-          item(key = "scrollable_header") { headerContent() }
+          item(key = "scrollable_header", contentType = "header") { headerContent() }
         }
-        item(key = "empty_msg") {
+        item(key = "empty_msg", contentType = "empty_msg") {
           Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
@@ -402,11 +405,11 @@ fun RecentFilesTabContent(
         modifier = Modifier.fillMaxSize().testTag("recent_images_grid"),
       ) {
         if (headerContent != null) {
-          item(span = { GridItemSpan(3) }, key = "scrollable_header") {
+          item(span = { GridItemSpan(3) }, key = "scrollable_header", contentType = "header") {
             Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
           }
         }
-        items(filteredFiles, key = { it.id }) { entry ->
+        items(filteredFiles, key = { it.id }, contentType = { "media_grid_tile" }) { entry ->
           val previewHandler =
             if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
               onImagePreviewClick
@@ -430,11 +433,15 @@ fun RecentFilesTabContent(
         modifier = Modifier.fillMaxSize().testTag("recent_files_list"),
       ) {
         if (headerContent != null) {
-          item(key = "scrollable_header") {
+          item(key = "scrollable_header", contentType = "header") {
             Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
           }
         }
-        items(filteredFiles, key = { it.id }) { entry ->
+        items(
+          items = filteredFiles,
+          key = { it.id },
+          contentType = { if (it.isDirectory) "dir" else "file" },
+        ) { entry ->
           val previewHandler =
             if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
               onImagePreviewClick
@@ -506,7 +513,11 @@ fun DirectoryTreeTabContent(
       horizontalArrangement = Arrangement.spacedBy(2.dp),
       modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
-      items(breadcrumbs.size, key = { idx -> breadcrumbs[idx].second.absolutePath }) { idx ->
+      items(
+        count = breadcrumbs.size,
+        key = { idx -> breadcrumbs[idx].second.absolutePath },
+        contentType = { "breadcrumb" },
+      ) { idx ->
         val (label, target) = breadcrumbs[idx]
         if (idx > 0) {
           Icon(
@@ -607,9 +618,9 @@ fun DirectoryTreeTabContent(
         modifier = Modifier.fillMaxSize(),
       ) {
         if (headerContent != null) {
-          item(key = "scrollable_header") { headerContent() }
+          item(key = "scrollable_header", contentType = "header") { headerContent() }
         }
-        item(key = "empty_dir") {
+        item(key = "empty_dir", contentType = "empty_msg") {
           Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) {
             Text(
               text = "当前目录为空",
@@ -628,11 +639,21 @@ fun DirectoryTreeTabContent(
         modifier = Modifier.fillMaxSize(),
       ) {
         if (headerContent != null) {
-          item(span = { GridItemSpan(3) }, key = "scrollable_header") {
+          item(span = { GridItemSpan(3) }, key = "scrollable_header", contentType = "header") {
             Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
           }
         }
-        items(combinedEntries, key = { it.id }) { entry ->
+        items(
+          items = combinedEntries,
+          key = { it.id },
+          contentType = { entry ->
+            when {
+              entry.isDirectory -> "dir_grid"
+              entry.category == FileCategory.IMAGES || entry.category == FileCategory.AUDIO_VIDEO -> "media_grid"
+              else -> "file_grid"
+            }
+          },
+        ) { entry ->
           val previewHandler =
             if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
               onImagePreviewClick
@@ -656,11 +677,15 @@ fun DirectoryTreeTabContent(
         modifier = Modifier.fillMaxSize().testTag("directory_tree_list"),
       ) {
         if (headerContent != null) {
-          item(key = "scrollable_header") {
+          item(key = "scrollable_header", contentType = "header") {
             Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
           }
         }
-        items(activeEntries, key = { it.id }) { entry ->
+        items(
+          items = activeEntries,
+          key = { it.id },
+          contentType = { if (it.isDirectory) "dir" else "file" },
+        ) { entry ->
           val previewHandler =
             if (!isPickerMode && selectedIds.isEmpty() && entry.category == FileCategory.IMAGES) {
               onImagePreviewClick
@@ -682,7 +707,7 @@ fun DirectoryTreeTabContent(
         }
 
         if (collapsedNoiseDirs.isNotEmpty()) {
-          item(key = "noise_toggle_banner") {
+          item(key = "noise_toggle_banner", contentType = "noise_banner") {
             TactKitCard(
               onClick = { expandNoiseDirs = !expandNoiseDirs },
               corner = 14.dp,
@@ -711,7 +736,11 @@ fun DirectoryTreeTabContent(
             }
           }
           if (expandNoiseDirs) {
-            items(collapsedNoiseDirs, key = { "noise_${it.id}" }) { entry ->
+            items(
+              items = collapsedNoiseDirs,
+              key = { "noise_${it.id}" },
+              contentType = { "noise_dir" },
+            ) { entry ->
               ManagedFileRow(
                 entry = entry,
                 isSelected = entry.id in selectedIds,
@@ -755,8 +784,9 @@ fun SpaceCleanupTabContent(
     remember(filteredLarge, emptyDirs, includeEmptyDirs) {
       if (includeEmptyDirs) filteredLarge + emptyDirs else filteredLarge
     }
-  val checkedEntries = allVisibleEntries.filter { it.id in checkedIds }
-  val reclaimableBytes = checkedEntries.sumOf { it.sizeBytes }
+  val checkedEntries =
+    remember(allVisibleEntries, checkedIds) { allVisibleEntries.filter { it.id in checkedIds } }
+  val reclaimableBytes = remember(checkedEntries) { checkedEntries.sumOf { it.sizeBytes } }
 
   Column(modifier = Modifier.fillMaxSize()) {
     TactKitCard(
@@ -841,11 +871,15 @@ fun SpaceCleanupTabContent(
       modifier = Modifier.weight(1f).fillMaxWidth(),
     ) {
       if (headerContent != null) {
-        item(key = "scrollable_header") {
+        item(key = "scrollable_header", contentType = "header") {
           Box(modifier = Modifier.padding(bottom = 4.dp)) { headerContent() }
         }
       }
-      items(allVisibleEntries, key = { "clean_${it.id}" }) { entry ->
+      items(
+        items = allVisibleEntries,
+        key = { "clean_${it.id}" },
+        contentType = { if (it.isDirectory) "clean_dir" else "clean_file" },
+      ) { entry ->
         TactKitCard(
           onClick = { onToggleChecked(entry) },
           corner = 16.dp,

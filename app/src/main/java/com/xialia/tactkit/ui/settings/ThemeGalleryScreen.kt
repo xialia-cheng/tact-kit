@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +67,7 @@ import com.xialia.tactkit.ui.theme.isTactKitDarkTheme
 import com.xialia.tactkit.ui.theme.minecraftPixelBevel
 import com.xialia.tactkit.util.rememberAppHaptics
 
+@Immutable
 private data class ThemePreviewPalette(
   val bg: Color,
   val card: Color,
@@ -130,7 +132,7 @@ fun ThemeGalleryScreen(
           verticalArrangement = Arrangement.spacedBy(12.dp),
           modifier = Modifier.widthIn(max = 640.dp).fillMaxSize(),
         ) {
-          item(span = { GridItemSpan(2) }, key = "theme_mode_controls") {
+          item(span = { GridItemSpan(2) }, key = "theme_mode_controls", contentType = "theme_mode_controls") {
             Surface(
               shape = MaterialTheme.shapes.large,
               color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -196,7 +198,11 @@ fun ThemeGalleryScreen(
             }
           }
 
-          items(AppThemeStyle.entries, key = { it.name }) { style ->
+          items(
+            items = AppThemeStyle.entries,
+            key = { it.name },
+            contentType = { "theme_style_card" },
+          ) { style ->
             val selected = preferences.appThemeStyle == style
             ThemeStylePreviewCard(
               style = style,
@@ -209,7 +215,7 @@ fun ThemeGalleryScreen(
             )
           }
 
-          item(span = { GridItemSpan(2) }, key = "gallery_footer_spacer") {
+          item(span = { GridItemSpan(2) }, key = "gallery_footer_spacer", contentType = "footer_spacer") {
             Spacer(modifier = Modifier.height(16.dp))
           }
         }

@@ -1279,21 +1279,21 @@ private fun LogSummarySection(summary: LogSummaryInfo) {
         )
       }
       LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
+        item(key = "log_all", contentType = "log_filter_chip") {
           FilterChip(
             selected = levelFilter == "ALL",
             onClick = { levelFilter = "ALL" },
             label = { Text("全部", maxLines = 1, softWrap = false) },
           )
         }
-        item {
+        item(key = "log_error", contentType = "log_filter_chip") {
           FilterChip(
             selected = levelFilter == "ERROR",
             onClick = { levelFilter = "ERROR" },
             label = { Text("ERROR (${summary.errorCount})", maxLines = 1, softWrap = false) },
           )
         }
-        item {
+        item(key = "log_warn", contentType = "log_filter_chip") {
           FilterChip(
             selected = levelFilter == "WARN",
             onClick = { levelFilter = "WARN" },

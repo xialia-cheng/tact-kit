@@ -191,26 +191,33 @@ fun LightLuxScreen(
 
                 val waveColor = MaterialTheme.colorScheme.primary
                 val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val waveStroke =
+                  remember(density) {
+                    Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round)
+                  }
                 Canvas(modifier = Modifier.fillMaxWidth().height(110.dp)) {
                   drawLine(lineColor, Offset(0f, size.height * 0.5f), Offset(size.width, size.height * 0.5f))
                   val count = ringCountState.intValue
                   val head = ringHeadState.intValue
                   if (count >= 2) {
-                    wavePath.reset()
+                    wavePath.rewind()
                     val stepX = size.width / (count - 1).coerceAtLeast(1)
                     val startIdx = if (count == LUX_RING_CAP) head else 0
+                    val padY = 8.dp.toPx()
+                    val availH = size.height - 16.dp.toPx()
                     for (i in 0 until count) {
                       val lux = ringBuffer[(startIdx + i) % LUX_RING_CAP]
                       // Log scale maps 1 lx .. 20000 lx cleanly
                       val norm = (log10(lux + 1f) / 4.3f).coerceIn(0f, 1f)
                       val x = i * stepX
-                      val y = size.height - norm * (size.height - 16.dp.toPx()) - 8.dp.toPx()
+                      val y = size.height - norm * availH - padY
                       if (i == 0) wavePath.moveTo(x, y) else wavePath.lineTo(x, y)
                     }
                     drawPath(
                       path = wavePath,
                       color = waveColor,
-                      style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+                      style = waveStroke,
                     )
                   }
                 }

@@ -1,7 +1,10 @@
 package com.xialia.tactkit.ui.components
 
+import android.graphics.LinearGradient
 import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Paint as FrameworkPaint
 import android.graphics.Path as AndroidPath
+import android.graphics.Shader
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -27,19 +30,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -118,8 +125,8 @@ private val ExpressiveMorphEasing = CubicBezierEasing(0.34f, 1.38f, 0.64f, 1f)
 
 /**
  * Material 3 Expressive Morphing Loading Indicator:
- * Cycles between Rounded Pentagon -> Soft Clover -> Circle -> 8-Point Starburst -> Rounded Square
- * with elastic morphing & silky rotation. Adapts to a crisp pulsing pixel block in MINECRAFT_PIXEL mode.
+ * Reads animated State<Float> exclusively inside Canvas DrawScope (zero per-frame recompositions)
+ * and reuses pre-allocated AndroidPath/AndroidMatrix/Stroke via `rewind()`.
  */
 @Composable
 fun TactKitMorphLoadingIndicator(
@@ -129,9 +136,10 @@ fun TactKitMorphLoadingIndicator(
   containerColor: Color = Color.Transparent,
 ) {
   val isMinecraft = LocalAppThemeStyle.current == AppThemeStyle.MINECRAFT_PIXEL
+  val density = LocalDensity.current
   val transition = rememberInfiniteTransition(label = "tactkit_morph_loader")
 
-  val rawPhase by
+  val rawPhaseState =
     transition.animateFloat(
       initialValue = 0f,
       targetValue = 5f,
@@ -143,7 +151,7 @@ fun TactKitMorphLoadingIndicator(
       label = "morph_phase",
     )
 
-  val spinAngle by
+  val spinAngleState =
     transition.animateFloat(
       initialValue = 0f,
       targetValue = 360f,
@@ -158,10 +166,11 @@ fun TactKitMorphLoadingIndicator(
   val androidPath = remember { AndroidPath() }
   val composePath: Path = remember(androidPath) { androidPath.asComposePath() }
   val matrix = remember { AndroidMatrix() }
-  val sparkleBounds = remember { FloatArray(4) }
+  val mcOutlineColor = Color(0xFF1E1E1F)
+  val mcStroke = remember(density) { Stroke(width = with(density) { 1.dp.toPx() }) }
 
   if (isMinecraft) {
-    val mcPulse by
+    val mcPulseState =
       transition.animateFloat(
         initialValue = 0.80f,
         targetValue = 1.04f,
@@ -178,21 +187,13 @@ fun TactKitMorphLoadingIndicator(
     ) {
       Canvas(modifier = Modifier.size(size)) {
         val blockSize = this.size.minDimension * 0.68f
-        rotate(degrees = spinAngle) {
+        val mcPulse = mcPulseState.value
+        val rectSize = Size(blockSize, blockSize)
+        val topLeft = Offset((this.size.width - blockSize) / 2f, (this.size.height - blockSize) / 2f)
+        rotate(degrees = spinAngleState.value) {
           scale(scaleX = mcPulse, scaleY = mcPulse) {
-            val left = (this.size.width - blockSize) / 2f
-            val top = (this.size.height - blockSize) / 2f
-            drawRect(
-              color = color,
-              topLeft = Offset(left, top),
-              size = androidx.compose.ui.geometry.Size(blockSize, blockSize),
-            )
-            drawRect(
-              color = Color(0xFF1E1E1F),
-              topLeft = Offset(left, top),
-              size = androidx.compose.ui.geometry.Size(blockSize, blockSize),
-              style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
-            )
+            drawRect(color = color, topLeft = topLeft, size = rectSize)
+            drawRect(color = mcOutlineColor, topLeft = topLeft, size = rectSize, style = mcStroke)
           }
         }
       }
@@ -200,6 +201,7 @@ fun TactKitMorphLoadingIndicator(
     return
   }
 
+  val pillShape = remember { RoundedCornerShape(999.dp) }
   Box(
     contentAlignment = Alignment.Center,
     modifier =
@@ -207,13 +209,14 @@ fun TactKitMorphLoadingIndicator(
         .size(size)
         .let { base ->
           if (containerColor.alpha > 0f) {
-            base.clip(RoundedCornerShape(999.dp)).background(containerColor)
+            base.clip(pillShape).background(containerColor)
           } else {
             base
           }
         },
   ) {
     Canvas(modifier = Modifier.size(size * 0.86f)) {
+      val rawPhase = rawPhaseState.value
       val morphIdx = floor(rawPhase).toInt().coerceIn(0, MorphShapeBank.expressiveMorphs.lastIndex)
       val localProgress = (rawPhase - floor(rawPhase)).coerceIn(0f, 1f)
       val activeSpan = (localProgress / 0.78f).coerceIn(0f, 1f)
@@ -231,7 +234,7 @@ fun TactKitMorphLoadingIndicator(
       androidPath.transform(matrix)
 
       val stepRotation = (morphIdx + easedProgress) * 18f
-      rotate(degrees = (spinAngle + stepRotation) % 360f) {
+      rotate(degrees = (spinAngleState.value + stepRotation) % 360f) {
         drawPath(path = composePath, color = color)
       }
     }
@@ -240,7 +243,8 @@ fun TactKitMorphLoadingIndicator(
 
 /**
  * Gemini-inspired AI Sparkle Loader:
- * 4-point curved diamond star with smooth rotation, breathing pulse, and ice-blue/violet sweep shimmer.
+ * 4-point curved diamond star with zero per-frame allocations (pre-allocated LinearGradient, Matrix,
+ * Paint, and AndroidPath) and zero per-frame recompositions.
  */
 @Composable
 fun GeminiSparkleLoader(
@@ -250,7 +254,7 @@ fun GeminiSparkleLoader(
   val isMinecraft = LocalAppThemeStyle.current == AppThemeStyle.MINECRAFT_PIXEL
   val transition = rememberInfiniteTransition(label = "gemini_sparkle_loader")
 
-  val spin by
+  val spinState =
     transition.animateFloat(
       initialValue = 0f,
       targetValue = 360f,
@@ -262,7 +266,7 @@ fun GeminiSparkleLoader(
       label = "gemini_spin",
     )
 
-  val breathe by
+  val breatheState =
     transition.animateFloat(
       initialValue = 0.82f,
       targetValue = 1.08f,
@@ -274,7 +278,7 @@ fun GeminiSparkleLoader(
       label = "gemini_breathe",
     )
 
-  val shimmerShift by
+  val shimmerShiftState =
     transition.animateFloat(
       initialValue = 0f,
       targetValue = 1f,
@@ -287,34 +291,64 @@ fun GeminiSparkleLoader(
     )
 
   val androidPath = remember { AndroidPath() }
-  val composePath: Path = remember(androidPath) { androidPath.asComposePath() }
   val matrix = remember { AndroidMatrix() }
+  val shaderMatrix = remember { AndroidMatrix() }
+  val frameworkPaint =
+    remember {
+      FrameworkPaint(FrameworkPaint.ANTI_ALIAS_FLAG).apply { style = FrameworkPaint.Style.FILL }
+    }
+  val gradientColors =
+    remember(isMinecraft) {
+      if (isMinecraft) {
+        intArrayOf(
+          Color(0xFF7445D6).toArgb(),
+          Color(0xFF38BDF8).toArgb(),
+          Color(0xFF9F6BF5).toArgb(),
+        )
+      } else {
+        intArrayOf(
+          Color(0xFF38BDF8).toArgb(),
+          Color(0xFF60A5FA).toArgb(),
+          Color(0xFF818CF8).toArgb(),
+          Color(0xFFA855F7).toArgb(),
+          Color(0xFF38BDF8).toArgb(),
+        )
+      }
+    }
+  val gradientPositions =
+    remember(gradientColors) {
+      FloatArray(gradientColors.size) { idx ->
+        idx.toFloat() / (gradientColors.size - 1).coerceAtLeast(1)
+      }
+    }
+  val shaderHolder = remember(gradientColors) { arrayOfNulls<LinearGradient>(1) }
 
   Canvas(modifier = modifier.size(size)) {
     val w = this.size.width
     val h = this.size.height
     val minSide = this.size.minDimension
-    val brush =
-      if (isMinecraft) {
-        Brush.linearGradient(
-          colors = listOf(Color(0xFF7445D6), Color(0xFF38BDF8), Color(0xFF9F6BF5)),
-          start = Offset(w * shimmerShift - w * 0.4f, 0f),
-          end = Offset(w * shimmerShift + w * 0.8f, h),
+    if (w <= 0f || h <= 0f) return@Canvas
+
+    var shader = shaderHolder[0]
+    if (shader == null) {
+      shader =
+        LinearGradient(
+          0f,
+          0f,
+          w * 1.2f,
+          h,
+          gradientColors,
+          gradientPositions,
+          Shader.TileMode.CLAMP,
         )
-      } else {
-        Brush.linearGradient(
-          colors =
-            listOf(
-              Color(0xFF38BDF8),
-              Color(0xFF60A5FA),
-              Color(0xFF818CF8),
-              Color(0xFFA855F7),
-              Color(0xFF38BDF8),
-            ),
-          start = Offset(w * (shimmerShift - 0.5f), 0f),
-          end = Offset(w * (shimmerShift + 0.9f), h),
-        )
-      }
+      shaderHolder[0] = shader
+      frameworkPaint.shader = shader
+    }
+
+    val shimmerShift = shimmerShiftState.value
+    shaderMatrix.reset()
+    shaderMatrix.setTranslate(w * (shimmerShift - 0.5f), 0f)
+    shader.setLocalMatrix(shaderMatrix)
 
     androidPath.rewind()
     MorphShapeBank.geminiSparklePolygon.toPath(androidPath)
@@ -324,21 +358,22 @@ fun GeminiSparkleLoader(
     matrix.postTranslate((w - mainExtent) / 2f, (h - mainExtent) / 2f)
     androidPath.transform(matrix)
 
+    val spin = spinState.value
+    val breathe = breatheState.value
+
     rotate(degrees = spin) {
       scale(scaleX = breathe, scaleY = breathe) {
-        drawPath(path = composePath, brush = brush)
+        drawIntoCanvas { canvas ->
+          canvas.nativeCanvas.drawPath(androidPath, frameworkPaint)
+        }
       }
     }
 
-    // Small orbital accent sparkle
-    val accentRadius = minSide * 0.11f
-    val accentPulse = 1.78f - breathe
+    val accentRadius = (minSide * 0.11f * (1.78f - breathe)).coerceAtLeast(1f)
     rotate(degrees = -spin * 0.5f) {
-      drawCircle(
-        brush = brush,
-        radius = (accentRadius * accentPulse).coerceAtLeast(1f),
-        center = Offset(w * 0.82f, h * 0.20f),
-      )
+      drawIntoCanvas { canvas ->
+        canvas.nativeCanvas.drawCircle(w * 0.82f, h * 0.20f, accentRadius, frameworkPaint)
+      }
     }
   }
 }

@@ -440,7 +440,11 @@ fun DevToolsScreen(
                   modifier = Modifier.padding(16.dp),
                 ) {
                   LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(listOf(2 to "二进制", 8 to "八进制", 10 to "十进制", 16 to "十六进制")) { (base, label) ->
+                    items(
+                      items = listOf(2 to "二进制", 8 to "八进制", 10 to "十进制", 16 to "十六进制"),
+                      key = { it.first },
+                      contentType = { "radix_chip" },
+                    ) { (base, label) ->
                       FilterChip(
                         selected = radixBase == base,
                         onClick = { radixBase = base },

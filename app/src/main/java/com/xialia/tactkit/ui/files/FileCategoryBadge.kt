@@ -1,16 +1,12 @@
 package com.xialia.tactkit.ui.files
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOff
@@ -22,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,15 +33,13 @@ import androidx.compose.ui.unit.sp
 import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.ManagedFileEntry
 import com.xialia.tactkit.ui.components.TactKitImageThumbCache
+import com.xialia.tactkit.ui.components.ThumbnailCache
 import com.xialia.tactkit.ui.components.tactKitSharedElement
 import com.xialia.tactkit.ui.theme.TactKitChip
 import com.xialia.tactkit.ui.theme.TactKitMono
 import com.xialia.tactkit.ui.theme.isMcPixelTheme
 import com.xialia.tactkit.ui.theme.mcInventorySlotBox
 import com.xialia.tactkit.ui.theme.themeShape
-import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 fun categoryTonalColors(category: FileCategory): Pair<Color, Color> {
@@ -110,36 +105,52 @@ fun FileEntryThumbnailOrBadge(
     return
   }
 
+  val extLower = remember(entry.extension) { entry.extension.lowercase() }
   val isVideoFile =
     entry.category == FileCategory.AUDIO_VIDEO &&
-      entry.extension.lowercase() in setOf("mp4", "mkv", "mov", "webm", "avi", "3gp", "m4v")
+      extLower in setOf("mp4", "mkv", "mov", "webm", "avi", "3gp", "m4v")
   val shouldLoadThumb =
-    (entry.category == FileCategory.IMAGES && entry.extension.lowercase() !in setOf("svg", "raw", "dng")) ||
+    (entry.category == FileCategory.IMAGES && extLower !in setOf("svg", "raw", "dng")) ||
       isVideoFile
 
+  val cacheKey =
+    remember(entry.id, entry.lastModifiedMs) {
+      ThumbnailCache.buildKey(
+        entryId = entry.id,
+        lastModifiedMs = entry.lastModifiedMs,
+        targetPx = ThumbnailCache.DEFAULT_TARGET_PX,
+      )
+    }
+  val cachedInitial =
+    remember(cacheKey, shouldLoadThumb) {
+      if (shouldLoadThumb) ThumbnailCache.getCached(cacheKey) else null
+    }
+
   val thumbnail by
-    produceState<Bitmap?>(initialValue = null, key1 = entry.id, key2 = entry.lastModifiedMs) {
-      value =
-        if (!shouldLoadThumb) {
-          null
-        } else {
-          withContext(Dispatchers.IO) {
-            if (isVideoFile) {
-              decodeVideoThumbnail(
-                absolutePath = entry.absolutePath,
-                safUriString = entry.safUriString,
-                context = context,
-              )
-            } else {
-              decodeScaledThumbnail(
-                absolutePath = entry.absolutePath,
-                safUriString = entry.safUriString,
-                context = context,
-                targetPx = 240,
-              )
-            }
+    produceState<Bitmap?>(initialValue = cachedInitial, key1 = cacheKey, key2 = shouldLoadThumb) {
+      if (!shouldLoadThumb) {
+        value = null
+      } else if (value == null) {
+        value =
+          if (isVideoFile) {
+            ThumbnailCache.getOrLoadVideoThumbnail(
+              context = context,
+              cacheKey = cacheKey,
+              absolutePath = entry.absolutePath,
+              safUriString = entry.safUriString,
+              targetPx = ThumbnailCache.DEFAULT_TARGET_PX,
+            )
+          } else {
+            ThumbnailCache.getOrLoadImageThumbnail(
+              context = context,
+              cacheKey = cacheKey,
+              absolutePath = entry.absolutePath,
+              safUriString = entry.safUriString,
+              extension = extLower,
+              targetPx = ThumbnailCache.DEFAULT_TARGET_PX,
+            )
           }
-        }
+      }
     }
 
   val sizedModifier =
@@ -147,7 +158,8 @@ fun FileEntryThumbnailOrBadge(
     else modifier.clip(shape)
 
   val loadedBitmap = thumbnail
-  if (loadedBitmap != null) {
+  val imageBitmap = remember(loadedBitmap) { loadedBitmap?.asImageBitmap() }
+  if (loadedBitmap != null && imageBitmap != null) {
     if (sharedElementKey != null) {
       TactKitImageThumbCache.put(sharedElementKey, loadedBitmap)
     }
@@ -159,7 +171,7 @@ fun FileEntryThumbnailOrBadge(
         )
     ) {
       Image(
-        bitmap = loadedBitmap.asImageBitmap(),
+        bitmap = imageBitmap,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier.matchParentSize(),
@@ -171,7 +183,7 @@ fun FileEntryThumbnailOrBadge(
           modifier = Modifier.align(Alignment.Center).size(26.dp),
         ) {
           Icon(
-            imageVector = androidx.compose.material.icons.Icons.Rounded.PlayArrow,
+            imageVector = Icons.Rounded.PlayArrow,
             contentDescription = null,
             tint = Color.White,
             modifier = Modifier.padding(4.dp),
@@ -222,76 +234,4 @@ fun FileExtensionPill(
       modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
     )
   }
-}
-
-private fun decodeScaledThumbnail(
-  absolutePath: String?,
-  safUriString: String?,
-  context: android.content.Context,
-  targetPx: Int,
-): Bitmap? {
-  return runCatching {
-    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    if (absolutePath != null) {
-      val f = File(absolutePath)
-      if (!f.exists() || !f.canRead()) return null
-      BitmapFactory.decodeFile(absolutePath, boundsOpts)
-      if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) return null
-      val decodeOpts =
-        BitmapFactory.Options().apply {
-          inSampleSize = calculateInSampleSize(boundsOpts.outWidth, boundsOpts.outHeight, targetPx)
-          inPreferredConfig = Bitmap.Config.RGB_565
-        }
-      BitmapFactory.decodeFile(absolutePath, decodeOpts)
-    } else if (safUriString != null) {
-      val uri = Uri.parse(safUriString)
-      context.contentResolver.openInputStream(uri)?.use {
-        BitmapFactory.decodeStream(it, null, boundsOpts)
-      }
-      if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) return null
-      val decodeOpts =
-        BitmapFactory.Options().apply {
-          inSampleSize = calculateInSampleSize(boundsOpts.outWidth, boundsOpts.outHeight, targetPx)
-          inPreferredConfig = Bitmap.Config.RGB_565
-        }
-      context.contentResolver.openInputStream(uri)?.use {
-        BitmapFactory.decodeStream(it, null, decodeOpts)
-      }
-    } else {
-      null
-    }
-  }.getOrNull()
-}
-
-private fun decodeVideoThumbnail(
-  absolutePath: String?,
-  safUriString: String?,
-  context: android.content.Context,
-): Bitmap? {
-  val retriever = MediaMetadataRetriever()
-  return runCatching {
-    if (absolutePath != null) {
-      retriever.setDataSource(absolutePath)
-    } else if (safUriString != null) {
-      retriever.setDataSource(context, Uri.parse(safUriString))
-    } else {
-      return null
-    }
-    retriever.getFrameAtTime(500_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-      ?: retriever.frameAtTime
-  }.getOrNull().also {
-    runCatching { retriever.release() }
-  }
-}
-
-private fun calculateInSampleSize(width: Int, height: Int, targetPx: Int): Int {
-  var inSampleSize = 1
-  if (height > targetPx || width > targetPx) {
-    val halfH = height / 2
-    val halfW = width / 2
-    while (halfH / inSampleSize >= targetPx && halfW / inSampleSize >= targetPx) {
-      inSampleSize *= 2
-    }
-  }
-  return inSampleSize.coerceAtLeast(1)
 }

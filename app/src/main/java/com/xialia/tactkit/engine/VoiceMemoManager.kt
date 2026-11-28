@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
+import androidx.compose.runtime.Immutable
 import java.io.File
 import java.util.Locale
 import kotlin.math.sqrt
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+@Immutable
 data class AudioPlaybackState(
   val playingCardId: Long? = null,
   val isPlaying: Boolean = false,

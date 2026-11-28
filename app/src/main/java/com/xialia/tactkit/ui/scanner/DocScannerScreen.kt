@@ -547,24 +547,38 @@ fun DocScannerScreen(
                   contentScale = ContentScale.FillBounds,
                   modifier = Modifier.fillMaxSize(),
                 )
+                val quadPath = remember { Path() }
+                val quadStroke = remember { Stroke(width = 5f) }
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                  val pts =
-                    activePage.quad.corners().map { (cx, cy) ->
-                      Offset(cx * size.width, cy * size.height)
-                    }
-                  val path =
-                    Path().apply {
-                      moveTo(pts[0].x, pts[0].y)
-                      lineTo(pts[1].x, pts[1].y)
-                      lineTo(pts[2].x, pts[2].y)
-                      lineTo(pts[3].x, pts[3].y)
-                      close()
-                    }
-                  drawPath(path = path, color = primaryColor, style = Stroke(width = 5f))
-                  pts.forEach { pt ->
-                    drawCircle(color = Color.White, radius = 16f, center = pt)
-                    drawCircle(color = primaryColor, radius = 11f, center = pt)
-                  }
+                  val quad = activePage.quad
+                  val p0x = quad.topLeft.first * size.width
+                  val p0y = quad.topLeft.second * size.height
+                  val p1x = quad.topRight.first * size.width
+                  val p1y = quad.topRight.second * size.height
+                  val p2x = quad.bottomRight.first * size.width
+                  val p2y = quad.bottomRight.second * size.height
+                  val p3x = quad.bottomLeft.first * size.width
+                  val p3y = quad.bottomLeft.second * size.height
+                  quadPath.rewind()
+                  quadPath.moveTo(p0x, p0y)
+                  quadPath.lineTo(p1x, p1y)
+                  quadPath.lineTo(p2x, p2y)
+                  quadPath.lineTo(p3x, p3y)
+                  quadPath.close()
+                  drawPath(path = quadPath, color = primaryColor, style = quadStroke)
+
+                  val c0 = Offset(p0x, p0y)
+                  val c1 = Offset(p1x, p1y)
+                  val c2 = Offset(p2x, p2y)
+                  val c3 = Offset(p3x, p3y)
+                  drawCircle(color = Color.White, radius = 16f, center = c0)
+                  drawCircle(color = primaryColor, radius = 11f, center = c0)
+                  drawCircle(color = Color.White, radius = 16f, center = c1)
+                  drawCircle(color = primaryColor, radius = 11f, center = c1)
+                  drawCircle(color = Color.White, radius = 16f, center = c2)
+                  drawCircle(color = primaryColor, radius = 11f, center = c2)
+                  drawCircle(color = Color.White, radius = 16f, center = c3)
+                  drawCircle(color = primaryColor, radius = 11f, center = c3)
                 }
               }
             }
@@ -584,7 +598,7 @@ fun DocScannerScreen(
                   horizontalArrangement = Arrangement.spacedBy(8.dp),
                   verticalAlignment = Alignment.CenterVertically,
                 ) {
-                  itemsIndexed(pages, key = { _, p -> p.id }) { idx, page ->
+                  itemsIndexed(pages, key = { _, p -> p.id }, contentType = { _, _ -> "scan_page_thumb" }) { idx, page ->
                     val selected = idx == selectedPageIndex
                     Box(
                       modifier =
