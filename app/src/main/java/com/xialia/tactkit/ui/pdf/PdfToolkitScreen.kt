@@ -191,6 +191,7 @@ fun PdfToolkitScreen(
         }
         isBusy = false
         res.onSuccess {
+          com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
           haptics.confirm()
           Toast.makeText(context, "PDF 处理并保存成功", Toast.LENGTH_SHORT).show()
         }.onFailure { err ->
@@ -207,6 +208,7 @@ fun PdfToolkitScreen(
           isBusy = true
           runCatching { PdfEngine.saveBitmapAsPng(context, bmp, outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已导出当前页为 PNG", Toast.LENGTH_SHORT).show()
             }

@@ -138,6 +138,7 @@ fun CryptoVaultScreen(
             }
           }
         }.onSuccess {
+          com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
           haptics.confirm()
           fileStatusMsg = if (pendingEncrypt) "文件已采用 AES-256-GCM 加密导出" else "文件已成功解密导出"
         }.onFailure { err ->

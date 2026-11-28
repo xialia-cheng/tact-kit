@@ -214,6 +214,7 @@ fun DocScannerScreen(
         scope.launch {
           runCatching { DocScannerEngine.copyFileToSafUri(context, localFile, outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "扫描 PDF 已导出保存", Toast.LENGTH_SHORT).show()
             }

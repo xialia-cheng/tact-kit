@@ -220,6 +220,7 @@ fun ArchiveWorkshopScreen(
               if (packFormat == PackArchiveFormat.ZIP) packPassword.takeIf { it.isNotEmpty() }
               else null,
           ).onSuccess { count ->
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "已打包 $count 个文件为 ${packFormat.label}", Toast.LENGTH_SHORT).show()
           }.onFailure { err ->

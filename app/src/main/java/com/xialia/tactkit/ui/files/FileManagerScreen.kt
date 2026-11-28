@@ -75,12 +75,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.xialia.tactkit.data.datastore.UserPreferences
+import com.xialia.tactkit.data.repository.FileCacheRepository
 import com.xialia.tactkit.engine.DirectoryListing
 import com.xialia.tactkit.engine.DirectorySortBy
 import com.xialia.tactkit.engine.FileCategory
 import com.xialia.tactkit.engine.FileManagerEngine
 import com.xialia.tactkit.engine.ManagedFileEntry
+import com.xialia.tactkit.engine.MessengerDirHint
 import com.xialia.tactkit.engine.SpaceScanResult
+import com.xialia.tactkit.engine.StorageOverview
 import com.xialia.tactkit.ui.components.PredictiveBackContainer
 import com.xialia.tactkit.ui.components.TactileModeChip
 import com.xialia.tactkit.ui.components.tactKitToolHeroTarget
@@ -179,8 +182,21 @@ fun FileManagerWorkspace(
   var searchResults by remember { mutableStateOf<List<ManagedFileEntry>>(emptyList()) }
   var isSearching by remember { mutableStateOf(false) }
 
-  // Recent tab state
-  var recentFiles by remember { mutableStateOf<List<ManagedFileEntry>>(emptyList()) }
+  // Recent tab state (backed by application-scoped FileCacheRepository for 0ms re-entry)
+  var showHidden by remember { mutableStateOf(false) }
+  val initialRecentKey =
+    remember {
+      FileCacheRepository.RecentCacheKey(
+        hasPermission = hasPermission,
+        linkedSafTreeUris = preferences.linkedSafTreeUris,
+        includeHidden = showHidden,
+      )
+    }
+  var recentFiles by remember {
+    mutableStateOf(
+      FileCacheRepository.getRecentIfFresh(initialRecentKey) ?: FileCacheRepository.peekRecent()
+    )
+  }
   var isScanningRecent by remember { mutableStateOf(false) }
   var recentScanJob by remember { mutableStateOf<Job?>(null) }
   var selectedCategory by remember { mutableStateOf<FileCategory?>(null) }
@@ -190,7 +206,6 @@ fun FileManagerWorkspace(
   var directoryListing by remember {
     mutableStateOf(DirectoryListing(rootDir, "", emptyList(), emptyList()))
   }
-  var showHidden by remember { mutableStateOf(false) }
   var smartNoiseReduction by remember { mutableStateOf(true) }
   var isGridMode by remember { mutableStateOf(false) }
   var sortBy by remember { mutableStateOf(DirectorySortBy.NAME) }
@@ -211,12 +226,16 @@ fun FileManagerWorkspace(
   var deleteTargets by remember { mutableStateOf<List<ManagedFileEntry>?>(null) }
   var transferTargets by remember { mutableStateOf<Pair<Boolean, List<ManagedFileEntry>>?>(null) } // isMove to entries
 
-  val storageOverview = remember(refreshTick, hasPermission) { FileManagerEngine.readStorageOverview(rootDir) }
-  val messengerDirs = remember(refreshTick, hasPermission) { FileManagerEngine.detectMessengerDirs(rootDir) }
+  val initialStorageSnapshot = remember { FileCacheRepository.getStorageSnapshot() }
+  var storageOverview by remember {
+    mutableStateOf(initialStorageSnapshot.first ?: StorageOverview(0L, 0L, 0L))
+  }
+  var messengerDirs by remember { mutableStateOf(initialStorageSnapshot.second.orEmpty()) }
 
   val legacyPermLauncher =
     rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
       hasPermission = hasAllFilesAccessPermission(context)
+      FileCacheRepository.markDirty()
       refreshTick++
     }
 
@@ -231,6 +250,7 @@ fun FileManagerWorkspace(
         }
         onAddLinkedSafTreeUri(treeUri.toString())
         haptics.confirm()
+        FileCacheRepository.markDirty()
         refreshTick++
       }
     }
@@ -242,8 +262,8 @@ fun FileManagerWorkspace(
           val nowGranted = hasAllFilesAccessPermission(context)
           if (nowGranted != hasPermission) {
             hasPermission = nowGranted
+            FileCacheRepository.markDirty()
           }
-          refreshTick++
         }
       }
     lifecycleOwner.lifecycle.addObserver(observer)
@@ -251,28 +271,59 @@ fun FileManagerWorkspace(
   }
 
   LaunchedEffect(hasPermission, refreshTick, preferences.linkedSafTreeUris, showHidden) {
+    val currentCacheKey =
+      FileCacheRepository.RecentCacheKey(
+        hasPermission = hasPermission,
+        linkedSafTreeUris = preferences.linkedSafTreeUris,
+        includeHidden = showHidden,
+      )
+    if (hasPermission && (!FileCacheRepository.isStorageSnapshotFresh() || refreshTick > 0)) {
+      val (overview, dirs) =
+        withContext(Dispatchers.IO) {
+          FileManagerEngine.readStorageOverview(rootDir) to FileManagerEngine.detectMessengerDirs(rootDir)
+        }
+      FileCacheRepository.updateStorageSnapshot(overview, dirs)
+      storageOverview = overview
+      messengerDirs = dirs
+    }
     recentScanJob?.cancel()
     if (hasPermission || preferences.linkedSafTreeUris.isNotEmpty()) {
-      val job =
-        scope.launch {
-          isScanningRecent = true
-          try {
-            recentFiles =
-              FileManagerEngine.scanRecentFiles(
-                context = context,
-                rootDir = rootDir,
-                linkedSafTreeUris = preferences.linkedSafTreeUris,
-                limit = 700,
-                includeHidden = showHidden,
-              )
-          } finally {
-            isScanningRecent = false
+      val cachedRecent =
+        if (refreshTick == 0) FileCacheRepository.getRecentIfFresh(currentCacheKey) else null
+      if (cachedRecent != null) {
+        recentFiles = cachedRecent
+        isScanningRecent = false
+      } else {
+        if (recentFiles.isEmpty()) {
+          val stale = FileCacheRepository.peekRecent()
+          if (stale.isNotEmpty()) {
+            recentFiles = stale
           }
         }
-      recentScanJob = job
+        val job =
+          scope.launch {
+            isScanningRecent = true
+            try {
+              val scanned =
+                FileManagerEngine.scanRecentFiles(
+                  context = context,
+                  rootDir = rootDir,
+                  linkedSafTreeUris = preferences.linkedSafTreeUris,
+                  limit = 700,
+                  includeHidden = showHidden,
+                )
+              FileCacheRepository.updateRecent(currentCacheKey, scanned)
+              recentFiles = scanned
+            } finally {
+              isScanningRecent = false
+            }
+          }
+        recentScanJob = job
+      }
     } else {
       recentFiles = emptyList()
       isScanningRecent = false
+      FileCacheRepository.clear()
     }
   }
 
@@ -504,6 +555,7 @@ fun FileManagerWorkspace(
             IconButton(
               onClick = {
                 haptics.tick()
+                FileCacheRepository.markDirty()
                 refreshTick++
               },
             ) {

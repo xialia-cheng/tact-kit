@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -65,17 +66,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -111,6 +116,7 @@ fun LiquidGlassToolBallOverlay(
   onTogglePinTool: (String) -> Unit,
   modifier: Modifier = Modifier,
   ballModifier: Modifier = Modifier,
+  isBackdropReady: Boolean = true,
   onExpandedChange: (Boolean) -> Unit = {},
 ) {
   val haptics = rememberAppHaptics()
@@ -122,7 +128,13 @@ fun LiquidGlassToolBallOverlay(
     onExpandedChange(isExpanded)
   }
 
-  val useLiquidShader = !isPowerSaveMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+  val themeStyle = LocalAppThemeStyle.current
+  val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
+  val useLiquidShader =
+    !isMinecraft &&
+      !isPowerSaveMode &&
+      isBackdropReady &&
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
 
   val expandedCategories = remember {
@@ -146,13 +158,15 @@ fun LiquidGlassToolBallOverlay(
           .align(Alignment.BottomEnd)
           .navigationBarsPadding()
           .padding(end = 16.dp, bottom = 16.dp)
-          .size(56.dp),
+          .size(56.dp)
+          .zIndex(0f),
     )
 
     AnimatedVisibility(
       visible = isExpanded,
       enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
       exit = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+      modifier = Modifier.fillMaxSize().zIndex(1f),
     ) {
       Box(
         modifier =
@@ -168,9 +182,10 @@ fun LiquidGlassToolBallOverlay(
       )
     }
 
-    val themeStyle = LocalAppThemeStyle.current
-    val isMinecraft = themeStyle == AppThemeStyle.MINECRAFT_PIXEL
-    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val layoutDirection = LocalLayoutDirection.current
+    val navInsets = WindowInsets.navigationBars.asPaddingValues()
+    val navBottom = navInsets.calculateBottomPadding()
+    val navEnd = navInsets.calculateEndPadding(layoutDirection)
     val expandedWidth = minOf(maxWidth, 600.dp)
     val expandedHeight = minOf(maxHeight * 0.78f, 640.dp)
     val expandedEndMargin = ((maxWidth - expandedWidth) / 2f).coerceAtLeast(0.dp)
@@ -194,7 +209,7 @@ fun LiquidGlassToolBallOverlay(
       transformTransition.animateDp(
         transitionSpec = { spring(dampingRatio = 0.78f, stiffness = 360f) },
         label = "container_end_margin",
-      ) { expanded -> if (expanded) expandedEndMargin else 16.dp }
+      ) { expanded -> if (expanded) expandedEndMargin else (16.dp + navEnd) }
 
     val bottomMargin by
       transformTransition.animateDp(
@@ -221,7 +236,7 @@ fun LiquidGlassToolBallOverlay(
     val ballTint =
       when (themeStyle) {
         AppThemeStyle.GLACIER_BENTO ->
-          Color(0xFF38BDF8).copy(alpha = if (isDark) 0.28f else 0.26f)
+          Color(0xFF38BDF8).copy(alpha = if (isDark) 0.34f else 0.32f)
         else ->
           MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (isDark) 0.56f else 0.62f)
       }
@@ -245,7 +260,7 @@ fun LiquidGlassToolBallOverlay(
     val ballBorder =
       when (themeStyle) {
         AppThemeStyle.GLACIER_BENTO ->
-          Color(0xFFBAE6FD).copy(alpha = if (isDark) 0.45f else 0.92f)
+          Color(0xFFBAE6FD).copy(alpha = if (isDark) 0.50f else 0.92f)
         else ->
           if (isDark) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.72f)
       }
@@ -259,12 +274,13 @@ fun LiquidGlassToolBallOverlay(
 
     val orbInteraction = remember { MutableInteractionSource() }
     val orbPressedState = orbInteraction.collectIsPressedAsState()
+    val collapsedOrbShape = remember { RoundedCornerShape(16.dp) }
 
     val containerShape: Shape =
       if (isMinecraft) {
         RectangleShape
       } else if (!isExpanded && !transformTransition.isRunning) {
-        remember { RoundedCornerShape(16.dp) }
+        collapsedOrbShape
       } else {
         RoundedCornerShape(
           topStart = topCorner.coerceAtLeast(1.dp),
@@ -280,6 +296,7 @@ fun LiquidGlassToolBallOverlay(
 
     val containerSurfaceModifier =
       Modifier.align(Alignment.BottomEnd)
+        .zIndex(2f)
         .padding(end = endMargin.coerceAtLeast(0.dp), bottom = bottomMargin.coerceAtLeast(0.dp))
         .size(width = containerWidth, height = containerHeight)
         .let { base ->
@@ -314,10 +331,13 @@ fun LiquidGlassToolBallOverlay(
               glassTint = animatedGlassTint,
               fallbackTint = if (isExpanded) sheetFrostedTint else animatedFallbackTint,
               borderColor = animatedBorderColor,
+              shadowElevation = if (isExpanded) 12.dp else 8.dp,
             )
           }
         }
-        .clipToBounds()
+        .let { base ->
+          if (isExpanded || transformTransition.isRunning) base.clipToBounds() else base
+        }
 
     Box(modifier = containerSurfaceModifier) {
       AnimatedContent(
@@ -725,6 +745,7 @@ private fun Modifier.glassSurfaceModifier(
   glassTint: Color,
   fallbackTint: Color,
   borderColor: Color,
+  shadowElevation: Dp = 8.dp,
 ): Modifier {
   val supportsLensSdf = shape is androidx.compose.foundation.shape.CornerBasedShape
   return if (useLiquidShader && supportsLensSdf) {
@@ -742,7 +763,8 @@ private fun Modifier.glassSurfaceModifier(
       )
       .border(width = 1.dp, color = borderColor, shape = shape)
   } else {
-    this.clip(shape)
+    this.shadow(elevation = shadowElevation, shape = shape, clip = false)
+      .clip(shape)
       .background(fallbackTint, shape)
       .border(width = 1.dp, color = borderColor, shape = shape)
   }

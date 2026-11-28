@@ -86,6 +86,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -104,6 +105,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.capsule.ContinuousCapsule
@@ -222,7 +224,6 @@ fun HomeScreen(
   var editingNote by remember { mutableStateOf<WorkbenchCard.Note?>(null) }
   var showCreateNoteDialog by remember { mutableStateOf(false) }
   var showVoiceMemoDialog by remember { mutableStateOf(false) }
-  var isToolDrawerExpanded by remember { mutableStateOf(false) }
 
   val targetBoundsMap = remember { mutableStateMapOf<OnboardingStep, Rect>() }
 
@@ -273,24 +274,24 @@ fun HomeScreen(
   }
 
   val bodySurfaceBg = MaterialTheme.colorScheme.surfaceContainerLowest
+  val latestBodySurfaceBg by rememberUpdatedState(bodySurfaceBg)
   val isDark = isSystemInDarkTheme() || MaterialTheme.colorScheme.background.red < 0.2f
   val themeStyle = com.xialia.tactkit.ui.theme.LocalAppThemeStyle.current
   val isMinecraft = themeStyle == com.xialia.tactkit.data.datastore.AppThemeStyle.MINECRAFT_PIXEL
   val topBarSurfaceBg =
     if (isMinecraft) (if (isDark) Color(0xFF1C1D20) else Color(0xFFE6E8EB))
     else MaterialTheme.colorScheme.surfaceContainer
-  val backdrop = rememberLayerBackdrop { drawRect(bodySurfaceBg) }
+  val backdrop = rememberLayerBackdrop { drawRect(latestBodySurfaceBg) }
   val shouldRecordBackdrop =
     !isMinecraft &&
       !uiState.preferences.liquidGlassPowerSave &&
-      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-      !isToolDrawerExpanded &&
-      onboardingState.activeStep == null
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
   Box(modifier = Modifier.fillMaxSize()) {
     Box(
       modifier =
         Modifier.fillMaxSize()
+          .zIndex(0f)
           .let { if (shouldRecordBackdrop) it.layerBackdrop(backdrop) else it }
           .background(bodySurfaceBg),
     ) {
@@ -760,7 +761,8 @@ fun HomeScreen(
       backdrop = backdrop,
       isPowerSaveMode = uiState.preferences.liquidGlassPowerSave,
       pinnedToolIds = uiState.preferences.pinnedToolIds,
-      onExpandedChange = { isToolDrawerExpanded = it },
+      isBackdropReady = shouldRecordBackdrop,
+      modifier = Modifier.zIndex(10f),
       ballModifier =
         Modifier.onGloballyPositioned { coords ->
           targetBoundsMap[OnboardingStep.TOOL_BALL] = coords.boundsInRoot()
@@ -813,6 +815,7 @@ fun HomeScreen(
         targetBoundsMap = targetBoundsMap,
         onAdvanceStep = onAdvanceOnboarding,
         onSkipTutorial = onSkipOnboarding,
+        modifier = Modifier.zIndex(20f),
       )
     }
   }

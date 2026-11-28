@@ -1,5 +1,6 @@
 package com.xialia.tactkit.engine
 
+import com.xialia.tactkit.data.repository.FileCacheRepository
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -158,6 +159,7 @@ class LanShareServer(
           val contentType = headers["content-type"].orEmpty()
           val saved = handleMultipartUpload(rawInput, contentType, contentLength)
           if (saved != null) {
+            FileCacheRepository.markDirty()
             onFileReceived(saved)
             onLog("收到文件：${saved.fileName} (${saved.byteSize} B)")
             val redirectHtml =

@@ -118,6 +118,7 @@ fun DocxEditorScreen(
               editedParagraphs = editableParagraphs.toList(),
             )
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "已导出 .docx 文档", Toast.LENGTH_SHORT).show()
           }.onFailure { err ->

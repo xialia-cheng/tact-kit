@@ -163,6 +163,7 @@ fun PdfAnnotateScreen(
           isBusy = true
           runCatching { PdfEngine.exportAnnotatedPdf(context, srcUri, strokesByPage.toMap(), outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已导出含批注与签名的新 PDF", Toast.LENGTH_SHORT).show()
             }

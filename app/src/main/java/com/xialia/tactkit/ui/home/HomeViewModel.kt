@@ -13,6 +13,7 @@ import com.xialia.tactkit.data.datastore.ThemeMode
 import com.xialia.tactkit.data.datastore.UserPreferences
 import com.xialia.tactkit.data.model.WorkbenchCard
 import com.xialia.tactkit.data.repository.AppUpdateRepository
+import com.xialia.tactkit.data.repository.FileCacheRepository
 import com.xialia.tactkit.data.repository.ReleaseInfo
 import com.xialia.tactkit.data.repository.WorkbenchRepository
 import com.xialia.tactkit.engine.AudioPlaybackState
@@ -302,6 +303,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
       isImportingFile.value = true
       try {
         workbenchRepository.importLocalFile(uri)
+        FileCacheRepository.markDirty()
         statusMessage.value = "已导入本地文件并生成校验指纹"
       } catch (e: Exception) {
         statusMessage.value = "导入文件失败: ${e.message ?: "未知错误"}"
@@ -318,6 +320,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     excerpt: String = "",
   ) {
     viewModelScope.launch {
+      FileCacheRepository.markDirty()
       workbenchRepository.registerGeneratedFileCard(file, uriString, mimeType, excerpt)
     }
   }

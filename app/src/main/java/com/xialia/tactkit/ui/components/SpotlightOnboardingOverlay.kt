@@ -155,11 +155,12 @@ fun SpotlightOnboardingOverlay(
   targetBoundsMap: Map<OnboardingStep, Rect>,
   onAdvanceStep: () -> Unit,
   onSkipTutorial: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   val view = LocalView.current
   val density = LocalDensity.current
 
-  BoxWithConstraints(modifier = Modifier.fillMaxSize().testTag("spotlight_onboarding_overlay")) {
+  BoxWithConstraints(modifier = modifier.fillMaxSize().testTag("spotlight_onboarding_overlay")) {
     val rootWidthPx = with(density) { maxWidth.toPx() }
     val rootHeightPx = with(density) { maxHeight.toPx() }
     val padPx = with(density) { 6.dp.toPx() }

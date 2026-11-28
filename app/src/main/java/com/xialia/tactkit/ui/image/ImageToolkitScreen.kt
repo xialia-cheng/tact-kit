@@ -261,6 +261,7 @@ fun ImageToolkitScreen(
               targetKb = if (useTargetKb) targetKb.roundToInt() else null,
             )
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "已剥离 EXIF 并保存图片", Toast.LENGTH_SHORT).show()
           }.onFailure {
@@ -279,6 +280,7 @@ fun ImageToolkitScreen(
           isBusy = true
           runCatching { PdfEngine.imagesToPdf(context, targets, outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已将 ${targets.size} 张图片合成为 PDF", Toast.LENGTH_SHORT).show()
             }

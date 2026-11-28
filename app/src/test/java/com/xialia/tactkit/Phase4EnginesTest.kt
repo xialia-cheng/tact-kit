@@ -159,7 +159,7 @@ class Phase4EnginesTest {
 
   @Test
   fun `QrCodeEngine encodes and decodes QR bitmap offline`() {
-    val payload = "https://github.com/xialiacheng/TactKit"
+    val payload = "https://github.com/xialia-cheng/tact-kit"
     val bmp = QrCodeEngine.generateQrBitmap(payload, sizePx = 400)
     assertEquals(400, bmp.width)
     val decoded = QrCodeEngine.decodeBitmap(bmp)

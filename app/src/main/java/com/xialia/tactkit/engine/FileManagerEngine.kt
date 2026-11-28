@@ -7,6 +7,7 @@ import android.os.StatFs
 import android.provider.DocumentsContract
 import androidx.compose.runtime.Immutable
 import androidx.core.content.FileProvider
+import com.xialia.tactkit.data.repository.FileCacheRepository
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -540,6 +541,7 @@ object FileManagerEngine {
         val target = File(parentDir, sanitized)
         require(!target.exists()) { "同名文件或文件夹已存在：$sanitized" }
         check(target.mkdirs()) { "创建文件夹失败，请检查存储权限" }
+        FileCacheRepository.markDirty()
         target
       }
     }
@@ -559,6 +561,7 @@ object FileManagerEngine {
           src.copyRecursively(dst, overwrite = false)
           count++
         }
+        if (count > 0) FileCacheRepository.markDirty()
         count
       }
     }
@@ -582,6 +585,7 @@ object FileManagerEngine {
           }
           count++
         }
+        if (count > 0) FileCacheRepository.markDirty()
         count
       }
     }
@@ -598,6 +602,7 @@ object FileManagerEngine {
           require(!dst.exists() || dst.absolutePath == src.absolutePath) { "目标文件名已存在" }
           if (dst.absolutePath != src.absolutePath) {
             check(src.renameTo(dst)) { "重命名失败" }
+            FileCacheRepository.markDirty()
           }
           return@runCatching 1
         }
@@ -630,6 +635,7 @@ object FileManagerEngine {
             if (src.renameTo(dst)) count++
           }
         }
+        if (count > 0) FileCacheRepository.markDirty()
         count
       }
     }
@@ -650,6 +656,7 @@ object FileManagerEngine {
             }
           }
         }
+        if (count > 0) FileCacheRepository.markDirty()
         count
       }
     }
@@ -689,6 +696,7 @@ object FileManagerEngine {
           format = PackArchiveFormat.ZIP,
           zipPassword = zipPassword?.takeIf { it.isNotEmpty() },
         )
+        FileCacheRepository.markDirty()
         outputZipFile
       }
     }

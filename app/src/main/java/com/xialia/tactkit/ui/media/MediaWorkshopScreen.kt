@@ -149,6 +149,7 @@ fun MediaWorkshopScreen(
           isBusy = true
           runCatching { MediaEngine.extractAudioLossless(context, src, outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已无损提取 .m4a 音轨", Toast.LENGTH_SHORT).show()
             }
@@ -171,6 +172,7 @@ fun MediaWorkshopScreen(
           isBusy = true
           runCatching { MediaEngine.trimVideoLossless(context, src, startMs, endMs, outUri) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已完成关键帧无损裁剪导出", Toast.LENGTH_SHORT).show()
             }
@@ -190,6 +192,7 @@ fun MediaWorkshopScreen(
           isBusy = true
           runCatching { MediaEngine.saveFrameToUri(context, bmp, outUri, asPng = true) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已保存原画质 PNG 帧", Toast.LENGTH_SHORT).show()
             }
@@ -209,6 +212,7 @@ fun MediaWorkshopScreen(
           isBusy = true
           runCatching { MediaEngine.saveFrameToUri(context, bmp, outUri, asPng = false) }
             .onSuccess {
+              com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
               haptics.confirm()
               Toast.makeText(context, "已保存原画质 JPG 帧", Toast.LENGTH_SHORT).show()
             }

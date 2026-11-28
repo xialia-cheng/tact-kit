@@ -201,6 +201,7 @@ fun HashWorkshopScreen(
               }
             }
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "已导出校验报告", Toast.LENGTH_SHORT).show()
           }

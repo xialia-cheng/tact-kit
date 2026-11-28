@@ -206,6 +206,7 @@ fun DataWorkshopScreen(
               } ?: error("无法写入目标文件")
             }
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "导出成功", Toast.LENGTH_SHORT).show()
           }.onFailure { err ->

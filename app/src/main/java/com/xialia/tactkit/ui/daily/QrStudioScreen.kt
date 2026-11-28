@@ -103,7 +103,7 @@ fun QrStudioScreen(
   val scope = rememberCoroutineScope()
 
   var activeTab by remember { mutableStateOf(QrTab.GENERATE) }
-  var qrInput by remember { mutableStateOf("https://github.com/xialiacheng/TactKit") }
+  var qrInput by remember { mutableStateOf("https://github.com/xialia-cheng/tact-kit") }
   var scannedResult by remember { mutableStateOf<String?>(null) }
   var hasCameraPermission by remember {
     mutableStateOf(
@@ -161,6 +161,7 @@ fun QrStudioScreen(
               }
             }
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "二维码图片已保存", Toast.LENGTH_SHORT).show()
           }

@@ -203,6 +203,7 @@ fun LanShareScreen(
               }
             }
           }.onSuccess {
+            com.xialia.tactkit.data.repository.FileCacheRepository.markDirty()
             haptics.confirm()
             Toast.makeText(context, "已导出：${target.fileName}", Toast.LENGTH_SHORT).show()
           }
